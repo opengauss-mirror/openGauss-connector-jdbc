@@ -1,0 +1,28 @@
+{
+  "defaultSigner": {
+    "signerType": "DefaultSignerType"
+  },
+  "serviceSigners": [{
+    "key": "s3",
+    "config": {
+      "signerType": "S3SignerType"
+    }
+  }],
+  "regionSigners": [],
+  "serviceRegionSigners": [{
+    "key": "s3/us-east-1",
+    "config": {
+      "signerType": "S3SignerType"
+    }
+  }, {
+    "key": "s3/us-west-1",
+    "config": {
+      "signerType": "S3SignerType"
+    }
+  }, {
+    "key": "s3/us-west-2",
+    "config": {
+      "signerType": "S3SignerType"
+    }
+  }]
+}
