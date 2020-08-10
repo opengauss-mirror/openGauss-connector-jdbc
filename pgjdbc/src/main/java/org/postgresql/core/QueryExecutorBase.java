@@ -365,9 +365,8 @@ public abstract class QueryExecutorBase implements QueryExecutor {
       return false;
     }
     // "cached plan must not change result type"
-    String routine = pe.getServerErrorMessage().getRoutine();
-    return "RevalidateCachedQuery".equals(routine) // 9.2+
-        || "RevalidateCachedPlan".equals(routine); // <= 9.1
+    String message = pe.getServerErrorMessage().getMessage();
+    return message.contains("cached plan must not change result type");
   }
 
   @Override
