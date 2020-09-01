@@ -186,6 +186,10 @@ public class PgStatement implements Statement, BaseStatement {
     return rsHoldability == ResultSet.HOLD_CURSORS_OVER_COMMIT;
   }
 
+  public ResultWrapper getUpdateResult() {
+    return this.result;
+  }
+
   /**
    * ResultHandler implementations for updates, queries, and either-or.
    */

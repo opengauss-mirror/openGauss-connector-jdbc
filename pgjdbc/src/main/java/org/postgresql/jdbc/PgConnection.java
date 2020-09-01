@@ -335,6 +335,9 @@ public class PgConnection implements BaseConnection {
 	xmlFactoryFactoryClass = PGProperty.XML_FACTORY_FACTORY.get(info);
 	
 	
+    if(replicationConnection) {
+      return;
+    }
     /* Get Database GUC parameters when connection established. */
     Statement stmtGetGuc = null;
     ResultSet rsGetGuc = null;

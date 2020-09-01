@@ -15,6 +15,7 @@ import org.postgresql.util.PSQLState;
 
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.sql.SQLException;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -194,7 +195,9 @@ public class V3PGReplicationStream implements PGReplicationStream {
 
   private byte[] prepareUpdateStatus(LogSequenceNumber received, LogSequenceNumber flushed,
       LogSequenceNumber applied, boolean replyRequired) {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(1 + 8 + 8 + 8 + 8 + 1);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(1 + 8 + 8 + 8 + 8 + 8 + 4 + 4 + 8 + 1 + 7);
+    //mark byte as litter endian
+    byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
     long now = System.currentTimeMillis();
     long systemClock = TimeUnit.MICROSECONDS.convert((now - POSTGRES_EPOCH_2000_01_01),
@@ -206,25 +209,38 @@ public class V3PGReplicationStream implements PGReplicationStream {
     }
 
     byteBuffer.put((byte) 'r');
+    byteBuffer.putLong(Long.MAX_VALUE);
     byteBuffer.putLong(received.asLong());
     byteBuffer.putLong(flushed.asLong());
+    byteBuffer.putLong(Long.MAX_VALUE);
     byteBuffer.putLong(applied.asLong());
+    byteBuffer.putInt(Integer.MAX_VALUE);
+    byteBuffer.putInt(Integer.MAX_VALUE);
     byteBuffer.putLong(systemClock);
     if (replyRequired) {
       byteBuffer.put((byte) 1);
     } else {
       byteBuffer.put(received == LogSequenceNumber.INVALID_LSN ? (byte) 1 : (byte) 0);
     }
+    byteBuffer.putInt(0);
+    byteBuffer.put((byte) 1);
+    byteBuffer.put((byte) 1);
+    byteBuffer.put((byte) 1);
 
     lastStatusUpdate = now;
     return byteBuffer.array();
   }
 
   private boolean processKeepAliveMessage(ByteBuffer buffer) {
+    //to little endian
+    buffer.order(ByteOrder.LITTLE_ENDIAN);
     lastServerLSN = LogSequenceNumber.valueOf(buffer.getLong());
     if (lastServerLSN.asLong() > lastReceiveLSN.asLong()) {
       lastReceiveLSN = lastServerLSN;
     }
+    //ignore useless content from backend
+    int serverMode = buffer.getInt();
+    int dbState = buffer.getInt();
 
     long lastServerClock = buffer.getLong();
 
