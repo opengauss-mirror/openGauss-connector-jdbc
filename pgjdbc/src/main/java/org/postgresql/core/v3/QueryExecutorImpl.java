@@ -2751,7 +2751,11 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       String columnLabel = pgStream.receiveString();
       int tableOid = pgStream.receiveInteger4();
       short positionInTable = (short) pgStream.receiveInteger2();
+    /*if it is CLOB Type, it is still treated as text type.*/
       int typeOid = pgStream.receiveInteger4();
+      if (typeOid == Oid.CLOB) {
+        typeOid = Oid.TEXT;
+      }
       int typeLength = pgStream.receiveInteger2();
       int typeModifier = pgStream.receiveInteger4();
       int formatType = pgStream.receiveInteger2();
