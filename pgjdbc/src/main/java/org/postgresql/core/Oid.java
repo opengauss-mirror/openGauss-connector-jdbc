@@ -84,6 +84,7 @@ public class Oid {
   public static final int REF_CURSOR = 1790;
   public static final int REF_CURSOR_ARRAY = 2201;
   public static final int BLOB = 88;
+  public static final int CLOB = 90;
 
   private static final Map<Integer, String> OID_TO_NAME = new HashMap<Integer, String>(100);
   private static final Map<String, Integer> NAME_TO_OID = new HashMap<String, Integer>(100);
