@@ -49,7 +49,6 @@ public class MultiHostsConnectionTest {
   private static final String secondary1 = getSecondaryServer() + ":" + getSecondaryPort();
   private static final String secondary2 = getSecondaryServer2() + ":" + getSecondaryPort2();
   private static final String fake1 = "127.127.217.217:1";
-
   private String masterIp;
   private String secondaryIP;
   private String secondaryIP2;
@@ -89,48 +88,37 @@ public class MultiHostsConnectionTest {
       return false;
     }
   }
-
   private static Connection openSecondaryDB() throws Exception {
     TestUtil.initDriver();
-
     Properties props = userAndPassword();
-
     return DriverManager.getConnection(TestUtil.getURL(getSecondaryServer(), getSecondaryPort()), props);
   }
-
   private static Properties userAndPassword() {
     Properties props = new Properties();
-
     props.setProperty("user", TestUtil.getUser());
     props.setProperty("password", TestUtil.getPassword());
     return props;
   }
-
   private static String getSecondaryServer() {
     return System.getProperty("secondaryServer", TestUtil.getServer());
   }
-
   private static int getSecondaryPort() {
     return Integer.parseInt(System.getProperty("secondaryPort", String.valueOf(TestUtil.getPort() + 1)));
   }
-
   private static Connection openSecondaryDB2() throws Exception {
     TestUtil.initDriver();
-
     Properties props = userAndPassword();
     return DriverManager.getConnection(TestUtil.getURL(getSecondaryServer2(), getSecondaryPort2()), props);
   }
-
   private static String getSecondaryServer2() {
     return System.getProperty("secondaryServer2", TestUtil.getServer());
   }
-
   private static int getSecondaryPort2() {
     return Integer.parseInt(System.getProperty("secondaryPort2", String.valueOf(TestUtil.getPort() + 2)));
   }
 
   private Connection getConnection(HostRequirement hostType, String... targets)
-      throws SQLException {
+          throws SQLException {
     return getConnection(hostType, true, targets);
   }
 
@@ -140,12 +128,12 @@ public class MultiHostsConnectionTest {
   }
 
   private Connection getConnection(HostRequirement hostType, boolean reset,
-      String... targets) throws SQLException {
+                                   String... targets) throws SQLException {
     return getConnection(hostType, reset, false, targets);
   }
 
   private Connection getConnection(HostRequirement hostType, boolean reset, boolean lb,
-      String... targets) throws SQLException {
+                                   String... targets) throws SQLException {
     TestUtil.closeDB(con);
 
     if (reset) {
@@ -176,14 +164,12 @@ public class MultiHostsConnectionTest {
   private void assertRemote(String expectedHost) throws SQLException {
     assertEquals(expectedHost, getRemoteHostSpec());
   }
-
   private String getRemoteHostSpec() throws SQLException {
     ResultSet rs = con.createStatement()
-        .executeQuery("select inet_server_addr() || ':' || inet_server_port()");
+            .executeQuery("select inet_server_addr() || ':' || inet_server_port()");
     rs.next();
     return rs.getString(1);
   }
-
   public static boolean isMaster(Connection con) throws SQLException {
     ResultSet rs = con.createStatement().executeQuery("show transaction_read_only");
     rs.next();
@@ -293,7 +279,7 @@ public class MultiHostsConnectionTest {
       }
     }
     assertEquals("Never connected to all hosts", new HashSet<String>(asList(masterIp, secondaryIP)),
-        connectedHosts);
+            connectedHosts);
     assertTrue("Never tried to connect to fake node", fake1FoundTried);
   }
 
@@ -310,8 +296,8 @@ public class MultiHostsConnectionTest {
       }
     }
     assertEquals("Never connected to all secondary hosts", new HashSet<String>(asList(secondaryIP, secondaryIP2)),
-        connectedHosts);
-    assertEquals("Never tried to connect to fake node",4, tryConnectedHosts.size());
+            connectedHosts);
+    assertEquals("Never tried to connect to fake node", 4, tryConnectedHosts.size());
 
     getConnection(preferSecondary, false, true, fake1, master1, secondary1);
     assertRemote(secondaryIP);
@@ -324,7 +310,7 @@ public class MultiHostsConnectionTest {
       }
     }
     assertEquals("Never connected to all secondary hosts", new HashSet<String>(asList(secondaryIP, secondaryIP2)),
-        connectedHosts);
+            connectedHosts);
 
     // connect to master when there's no secondary
     getConnection(preferSecondary, true, true, fake1, master1);
@@ -347,7 +333,7 @@ public class MultiHostsConnectionTest {
       }
     }
     assertEquals("Did not attempt to connect to all salve hosts", new HashSet<String>(asList(secondaryIP, secondaryIP2)),
-        connectedHosts);
+            connectedHosts);
     assertEquals("Did not attempt to connect to master and fake node", 4, tryConnectedHosts.size());
 
     getConnection(preferSecondary, false, true, fake1, master1, secondary1);
@@ -361,7 +347,7 @@ public class MultiHostsConnectionTest {
       }
     }
     assertEquals("Did not connect to all secondary hosts", new HashSet<String>(asList(secondaryIP, secondaryIP2)),
-        connectedHosts);
+            connectedHosts);
   }
 
   @Test

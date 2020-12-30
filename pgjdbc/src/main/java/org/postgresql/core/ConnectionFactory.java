@@ -16,8 +16,9 @@ import org.postgresql.util.PSQLState;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
+
 
 /**
  * Handles protocol-specific connection setup.
@@ -25,7 +26,7 @@ import java.util.logging.Logger;
  * @author Oliver Jowett (oliver@opencloud.com)
  */
 public abstract class ConnectionFactory {
-  private static final Logger LOGGER = Logger.getLogger(ConnectionFactory.class.getName());
+  private static Log LOGGER = Logger.getLogger(ConnectionFactory.class.getName());
   /**
    * <p>Establishes and initializes a new connection.</p>
    *
@@ -89,7 +90,7 @@ public abstract class ConnectionFactory {
       try {
         newStream.close();
       } catch (IOException e) {
-          LOGGER.log(Level.FINEST, "Catch IOException on close:", e);
+        LOGGER.trace("Catch IOException on close:", e);
       }
     }
   }

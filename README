@@ -25,7 +25,7 @@ COMPILING
 To compile you will need to have a Java 8 and will need to have
 Maven installed.
 
-Once you have Maven, simply run sh build.sh in the top level directory.
+Once you have Maven, simply run mvn clean install -PexcludeOsgiFiles in the top level directory.
 This will compile the correct driver for your JVM, and build a .jar file (Java ARchive)
 called postgresql.jar.
 
@@ -176,9 +176,7 @@ Typically you can test against an old JDK with:
     export JAVA_HOME=/path/to/jdk_1_5
     export PATH=$JAVA_HOME/bin:$JAVA_HOME/jre/bin:
     mvn clean install -PexcludeOsgiFiles
-Please firstly compile the openGauss-server, and create the user, change the build.properties user, port, etc.
-Just test without compile
-    mvn test -PexcludeOsgiFiles
+
 Ideas
 -----
 

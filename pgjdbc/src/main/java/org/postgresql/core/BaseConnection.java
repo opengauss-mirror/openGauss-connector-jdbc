@@ -4,10 +4,11 @@
  */
 
 package org.postgresql.core;
-import org.postgresql.PGProperty;
+
 import org.postgresql.PGConnection;
 import org.postgresql.jdbc.FieldMetadata;
 import org.postgresql.jdbc.TimestampUtils;
+import org.postgresql.log.Log;
 import org.postgresql.util.LruCache;
 import org.postgresql.xml.PGXmlFactoryFactory;
 
@@ -142,7 +143,7 @@ public interface BaseConnection extends PGConnection, Connection {
   TimestampUtils getTimestampUtils();
 
   // Get the per-connection logger.
-  java.util.logging.Logger getLogger();
+  Log getLogger();
 
   // Get the bind-string-as-varchar config flag
   boolean getStringVarcharFlag();
@@ -203,6 +204,7 @@ public interface BaseConnection extends PGConnection, Connection {
    * @param flushCacheOnDeallocate true if statement cache should be reset when "deallocate/discard" message observed
    */
   void setFlushCacheOnDeallocate(boolean flushCacheOnDeallocate);
+
   /**
    * Retrieve the factory to instantiate XML processing factories.
    *
@@ -210,4 +212,6 @@ public interface BaseConnection extends PGConnection, Connection {
    * @throws SQLException if the class cannot be found or instantiated.
    */
   PGXmlFactoryFactory getXmlFactoryFactory() throws SQLException;
+
+  public String getSocketAddress();
 }

@@ -13,6 +13,8 @@ import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.util.URLCoder;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -24,8 +26,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.naming.NamingException;
 import javax.naming.RefAddr;
 import javax.naming.Reference;
@@ -40,7 +40,7 @@ import javax.sql.CommonDataSource;
  */
 public abstract class BaseDataSource implements CommonDataSource, Referenceable {
 
-  private static final Logger LOGGER = Logger.getLogger(BaseDataSource.class.getName());
+  private static Log LOGGER = Logger.getLogger(BaseDataSource.class.getName());
 
   // Standard properties, defined in the JDBC 2.0 Optional Package spec
   private String serverName = "localhost";
@@ -123,13 +123,12 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
   public Connection getConnection(String user, String password) throws SQLException {
     try {
       Connection con = DriverManager.getConnection(getUrl(), user, password);
-      if (LOGGER.isLoggable(Level.FINE)) {
-        LOGGER.log(Level.FINE, "Created a {0} for {1} at {2}", new Object[]{getDescription(), user, getUrl()});
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Created a " + getDescription() + " for " + user + " at " + getUrl());
       }
       return con;
     } catch (SQLException e) {
-      LOGGER.log(Level.FINE, "Failed to create a {0} for {1} at {2}: {3}",
-          new Object[]{getDescription(), user, getUrl(), e});
+      LOGGER.debug("Failed to create a " + getDescription() + " for " + user + " at " + getUrl() + ": " + e);
       throw e;
     }
   }
@@ -1145,8 +1144,9 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
    * Sets properties from a {@link DriverManager} URL.
    *
    * @param url properties to set
+ * @throws PSQLException 
    */
-  public void setUrl(String url) {
+  public void setUrl(String url) throws PSQLException {
 
     Properties p = org.postgresql.Driver.parseURL(url, null);
 
@@ -1160,8 +1160,9 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
    * Added to follow convention used in other DBMS.
    *
    * @param url properties to set
+ * @throws PSQLException 
    */
-  public void setURL(String url) {
+  public void setURL(String url) throws PSQLException {
     setUrl(url);
   }
 
@@ -1359,18 +1360,21 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
   public void setReWriteBatchedInserts(boolean reWrite) {
     PGProperty.REWRITE_BATCHED_INSERTS.set(properties, reWrite);
   }
-  //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.1"
-  //#endif
+
   public java.util.logging.Logger getParentLogger() {
-    return Logger.getLogger("org.postgresql");
+    if(org.postgresql.log.Logger.isUsingJDKLogger()){
+      return java.util.logging.Logger.getLogger("org.postgresql");
+    }else{
+      return null;
+    }
   }
-  
-    public String getXmlFactoryFactory() {
+  //#endif
+
+  public String getXmlFactoryFactory() {
     return PGProperty.XML_FACTORY_FACTORY.get(properties);
   }
 
   public void setXmlFactoryFactory(String xmlFactoryFactory) {
     PGProperty.XML_FACTORY_FACTORY.set(properties, xmlFactoryFactory);
   }
-  
 }

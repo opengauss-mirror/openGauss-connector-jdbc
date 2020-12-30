@@ -14,12 +14,13 @@ import org.postgresql.core.Query;
 import org.postgresql.core.SqlCommand;
 import org.postgresql.core.Utils;
 import org.postgresql.jdbc.PgResultSet;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.lang.ref.PhantomReference;
 import java.util.BitSet;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 
 /**
  * V3 Query implementation for a single-statement query. This also holds the state of any associated
@@ -29,7 +30,7 @@ import java.util.logging.Logger;
  * @author Oliver Jowett (oliver@opencloud.com)
  */
 class SimpleQuery implements Query {
-  private static final Logger LOGGER = Logger.getLogger(SimpleQuery.class.getName());
+  private static Log LOGGER = Logger.getLogger(SimpleQuery.class.getName());
 
   SimpleQuery(SimpleQuery src) {
     this(src.nativeQuery, src.transferModeRegistry, src.sanitiserDisabled);
@@ -180,14 +181,12 @@ class SimpleQuery implements Query {
           && (paramType != Oid.UNSPECIFIED
           || unspecified == null
           || !unspecified.get(i))) {
-        if (LOGGER.isLoggable(Level.FINER)) {
-          LOGGER.log(Level.FINER,
-              "Statement {0} does not match new parameter types. Will have to un-prepare it and parse once again."
-                  + " To avoid performance issues, use the same data type for the same bind position. Bind index (1-based) is {1},"
-                  + " preparedType was {2} (after describe {3}), current bind type is {4}",
-              new Object[]{statementName, i + 1,
-                  Oid.toString(unspecified != null && unspecified.get(i) ? 0 : preparedType),
-                  Oid.toString(preparedType), Oid.toString(paramType)});
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug(
+              "Statement " + statementName + " does not match new parameter types. Will have to un-prepare it and parse once again."
+                  + " To avoid performance issues, use the same data type for the same bind position. Bind index (1-based) is " + (i + 1) + ","
+                  + " preparedType was " + (Oid.toString(unspecified != null && unspecified.get(i) ? 0 : preparedType)) + " (after describe " + Oid.toString(preparedType) 
+                  + "), current bind type is " + Oid.toString(paramType));
         }
         return false;
       }

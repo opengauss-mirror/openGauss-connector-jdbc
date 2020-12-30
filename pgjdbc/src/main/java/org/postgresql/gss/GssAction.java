@@ -10,6 +10,9 @@ import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.util.ServerErrorMessage;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
+
 
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSCredential;
@@ -20,19 +23,18 @@ import org.ietf.jgss.Oid;
 
 import java.io.IOException;
 import java.security.PrivilegedAction;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 
 class GssAction implements PrivilegedAction<Exception> {
 
-  private static final Logger LOGGER = Logger.getLogger(GssAction.class.getName());
+  private static Log LOGGER = Logger.getLogger(GssAction.class.getName());
   private final PGStream pgStream;
   private final String host;
   private final String user;
   private final String kerberosServerName;
   private final boolean useSpnego;
   private final GSSCredential clientCredentials;
-
+  private final String socketAddress;
 
   GssAction(PGStream pgStream, GSSCredential clientCredentials, String host, String user,
       String kerberosServerName, boolean useSpnego) {
@@ -42,6 +44,7 @@ class GssAction implements PrivilegedAction<Exception> {
     this.user = user;
     this.kerberosServerName = kerberosServerName;
     this.useSpnego = useSpnego;
+    this.socketAddress = pgStream.getConnectInfo();
   }
 
   private static boolean hasSpnegoSupport(GSSManager manager) throws GSSException {
@@ -86,6 +89,7 @@ class GssAction implements PrivilegedAction<Exception> {
           GSSContext.DEFAULT_LIFETIME);
       return secContext;
   }
+
   public Exception run() {
 
     try {
@@ -103,7 +107,7 @@ class GssAction implements PrivilegedAction<Exception> {
 
 
         if (outToken != null) {
-          LOGGER.log(Level.FINEST, " FE=> Password(GSS Authentication Token)");
+          LOGGER.trace(" FE=> Password(GSS Authentication Token)");
 
           pgStream.sendChar('p');
           pgStream.sendInteger4(4 + outToken.length);
@@ -118,13 +122,13 @@ class GssAction implements PrivilegedAction<Exception> {
             case 'E':
               int l_elen = pgStream.receiveInteger4();
               ServerErrorMessage l_errorMsg
-                  = new ServerErrorMessage(pgStream.receiveErrorString(l_elen - 4));
+                  = new ServerErrorMessage(pgStream.receiveErrorString(l_elen - 4), socketAddress);
 
-              LOGGER.log(Level.FINEST, " <=BE ErrorMessage({0})", l_errorMsg);
+              LOGGER.trace(" <=BE ErrorMessage(" + l_errorMsg + ")");
 
               return new PSQLException(l_errorMsg);
             case 'R':
-              LOGGER.log(Level.FINEST, " <=BE AuthenticationGSSContinue");
+              LOGGER.trace(" <=BE AuthenticationGSSContinue");
               int len = pgStream.receiveInteger4();
               int type = pgStream.receiveInteger4();
               // should check type = 8

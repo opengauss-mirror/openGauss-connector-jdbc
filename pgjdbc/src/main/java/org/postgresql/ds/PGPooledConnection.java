@@ -9,6 +9,9 @@ import org.postgresql.PGConnection;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
+
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -26,8 +29,6 @@ import javax.sql.ConnectionEvent;
 import javax.sql.ConnectionEventListener;
 import javax.sql.PooledConnection;
 import javax.sql.StatementEventListener;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * PostgreSQL implementation of the PooledConnection interface. This shouldn't be used directly, as
@@ -43,7 +44,7 @@ public class PGPooledConnection implements PooledConnection {
   private ConnectionHandler last;
   private final boolean autoCommit;
   private final boolean isXA;
-  private static final Logger LOGGER = Logger.getLogger(PGPooledConnection.class.getName());
+  private static Log LOGGER = Logger.getLogger(PGPooledConnection.class.getName());
 
   /**
    * Creates a new PooledConnection representing the specified physical connection.
@@ -91,7 +92,7 @@ public class PGPooledConnection implements PooledConnection {
           try {
             con.rollback();
           } catch (SQLException ignored) {
-              LOGGER.log(Level.FINEST, "Catch SQLException while rollback. ", ignored);
+              LOGGER.trace("Catch SQLException while rollback. ", ignored);
           }
         }
       }
@@ -136,7 +137,7 @@ public class PGPooledConnection implements PooledConnection {
           try {
             con.rollback();
           } catch (SQLException ignored) {
-              LOGGER.log(Level.FINEST, "Catch SQLException while rollback. ", ignored);
+              LOGGER.trace("Catch SQLException while rollback. ", ignored);
           }
         }
         con.clearWarnings();

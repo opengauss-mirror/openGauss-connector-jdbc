@@ -12,6 +12,8 @@ import org.postgresql.replication.ReplicationType;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
@@ -19,12 +21,11 @@ import java.nio.ByteOrder;
 import java.sql.SQLException;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 
 public class V3PGReplicationStream implements PGReplicationStream {
 
-  private static final Logger LOGGER = Logger.getLogger(V3PGReplicationStream.class.getName());
+  private static Log LOGGER = Logger.getLogger(V3PGReplicationStream.class.getName());
   public static final long POSTGRES_EPOCH_2000_01_01 = 946684800000L;
   private final CopyDual copyDual;
   private final long updateInterval;
@@ -203,9 +204,8 @@ public class V3PGReplicationStream implements PGReplicationStream {
     long systemClock = TimeUnit.MICROSECONDS.convert((now - POSTGRES_EPOCH_2000_01_01),
         TimeUnit.MICROSECONDS);
 
-    if (LOGGER.isLoggable(Level.FINEST)) {
-      LOGGER.log(Level.FINEST, " FE=> StandbyStatusUpdate(received: {0}, flushed: {1}, applied: {2}, clock: {3})",
-          new Object[]{received.asString(), flushed.asString(), applied.asString(), new Date(now)});
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace(" FE=> StandbyStatusUpdate(received: " + received.asString() + ", flushed: " + flushed.asString() + ", applied: " + applied.asString() + ", clock: " + new Date(now) +")");
     }
 
     byteBuffer.put((byte) 'r');
@@ -246,12 +246,11 @@ public class V3PGReplicationStream implements PGReplicationStream {
 
     boolean replyRequired = buffer.get() != 0;
 
-    if (LOGGER.isLoggable(Level.FINEST)) {
+    if (LOGGER.isTraceEnabled()) {
       Date clockTime = new Date(
           TimeUnit.MILLISECONDS.convert(lastServerClock, TimeUnit.MICROSECONDS)
           + POSTGRES_EPOCH_2000_01_01);
-      LOGGER.log(Level.FINEST, "  <=BE Keepalive(lastServerWal: {0}, clock: {1} needReply: {2})",
-          new Object[]{lastServerLSN.asString(), clockTime, replyRequired});
+      LOGGER.trace("  <=BE Keepalive(lastServerWal: " + lastServerLSN.asString() + ", clock: " + clockTime + " needReply: " + replyRequired + ")");
     }
 
     return replyRequired;
@@ -272,9 +271,8 @@ public class V3PGReplicationStream implements PGReplicationStream {
         break;
     }
 
-    if (LOGGER.isLoggable(Level.FINEST)) {
-      LOGGER.log(Level.FINEST, "  <=BE XLogData(currWal: {0}, lastServerWal: {1}, clock: {2})",
-          new Object[]{lastReceiveLSN.asString(), lastServerLSN.asString(), systemClock});
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("  <=BE XLogData(currWal: " + lastReceiveLSN.asString() + ", lastServerWal: " + lastServerLSN.asString() + ", clock: " + systemClock + ")");
     }
 
     return buffer.slice();
@@ -292,7 +290,7 @@ public class V3PGReplicationStream implements PGReplicationStream {
       return;
     }
 
-    LOGGER.log(Level.FINEST, " FE=> StopReplication");
+    LOGGER.trace(" FE=> StopReplication");
 
     copyDual.endCopy();
 

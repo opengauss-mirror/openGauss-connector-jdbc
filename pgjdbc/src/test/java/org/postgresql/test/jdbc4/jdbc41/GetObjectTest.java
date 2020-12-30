@@ -40,6 +40,7 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLXML;
 import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -86,6 +87,7 @@ public class GetObjectTest {
             + "lob_column oid,"
             + "array_column text[],"
             + "point_column point,"
+            + "line_column line,"
             + "lseg_column lseg,"
             + "box_column box,"
             + "path_column path,"
@@ -97,6 +99,7 @@ public class GetObjectTest {
             + "inet_column inet,"
             + "cidr_column cidr,"
             + "macaddr_column macaddr"
+            + (TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_3) ? ",xml_column xml" : "")
     );
   }
 
@@ -123,6 +126,43 @@ public class GetObjectTest {
       assertEquals("char_value", rs.getObject(2, String.class));
     } finally {
       rs.close();
+    }
+  }
+
+  /**
+   * Test the behavior getObject for string columns.
+   */
+  @Test
+  public void testGetClob() throws SQLException {
+    Statement stmt = _conn.createStatement();
+    _conn.setAutoCommit(false);
+    try {
+      char[] data = new char[]{'d', 'e', 'a', 'd', 'b', 'e', 'e', 'f'};
+      PreparedStatement insertPS = _conn.prepareStatement(TestUtil.insertSQL("table1", "lob_column", "?"));
+      try {
+        insertPS.setObject(1, new SerialClob(data), Types.CLOB);
+        insertPS.executeUpdate();
+      } finally {
+        insertPS.close();
+      }
+
+      ResultSet rs = stmt.executeQuery(TestUtil.selectSQL("table1", "lob_column"));
+      try {
+        assertTrue(rs.next());
+        Clob blob = rs.getObject("lob_column", Clob.class);
+        assertEquals(data.length, blob.length());
+        assertEquals(new String(data), blob.getSubString(1, data.length));
+        blob.free();
+
+        blob = rs.getObject(1, Clob.class);
+        assertEquals(data.length, blob.length());
+        assertEquals(new String(data), blob.getSubString(1, data.length));
+        blob.free();
+      } finally {
+        rs.close();
+      }
+    } finally {
+      _conn.setAutoCommit(true);
     }
   }
 
@@ -268,6 +308,30 @@ public class GetObjectTest {
       assertEquals(expected, rs.getObject("timestamp_with_time_zone_column", Calendar.class).getTimeInMillis());
       assertEquals(expected, rs.getObject(2, Calendar.class).getTimeInMillis());
       assertNull(rs.getObject(3, Calendar.class));
+    } finally {
+      rs.close();
+    }
+  }
+
+  /**
+   * Test the behavior getObject for date columns.
+   */
+  @Test
+  public void testGetDate() throws SQLException {
+    Statement stmt = _conn.createStatement();
+    stmt.executeUpdate(TestUtil.insertSQL("table1","date_column","DATE '1999-01-08'"));
+
+    ResultSet rs = stmt.executeQuery(TestUtil.selectSQL("table1", "date_column"));
+    try {
+      assertTrue(rs.next());
+      Calendar calendar = GregorianCalendar.getInstance();
+      calendar.clear();
+      calendar.set(Calendar.YEAR, 1999);
+      calendar.set(Calendar.MONTH, Calendar.JANUARY);
+      calendar.set(Calendar.DAY_OF_MONTH, 8);
+      Date expectedNoZone = new Date(calendar.getTimeInMillis());
+      assertEquals(expectedNoZone, rs.getObject("date_column", Date.class));
+      assertEquals(expectedNoZone, rs.getObject(1, Date.class));
     } finally {
       rs.close();
     }
@@ -563,6 +627,43 @@ public class GetObjectTest {
   }
 
   /**
+   * Test the behavior getObject for xml columns.
+   */
+  @Test
+  public void testGetBlob() throws SQLException {
+    Statement stmt = _conn.createStatement();
+    _conn.setAutoCommit(false);
+    try {
+      byte[] data = new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF};
+      PreparedStatement insertPS = _conn.prepareStatement(TestUtil.insertSQL("table1", "lob_column", "?"));
+      try {
+        insertPS.setObject(1, new SerialBlob(data), Types.BLOB);
+        insertPS.executeUpdate();
+      } finally {
+        insertPS.close();
+      }
+
+      ResultSet rs = stmt.executeQuery(TestUtil.selectSQL("table1", "lob_column"));
+      try {
+        assertTrue(rs.next());
+        Blob blob = rs.getObject("lob_column", Blob.class);
+        assertEquals(data.length, blob.length());
+        assertArrayEquals(data, blob.getBytes(1, data.length));
+        blob.free();
+
+        blob = rs.getObject(1, Blob.class);
+        assertEquals(data.length, blob.length());
+        assertArrayEquals(data, blob.getBytes(1, data.length));
+        blob.free();
+      } finally {
+        rs.close();
+      }
+    } finally {
+      _conn.setAutoCommit(true);
+    }
+  }
+
+  /**
    * Test the behavior getObject for array columns.
    */
   @Test
@@ -581,6 +682,34 @@ public class GetObjectTest {
       array = rs.getObject(1, Array.class);
       assertArrayEquals(data, (String[]) array.getArray());
       array.free();
+    } finally {
+      rs.close();
+    }
+  }
+
+  /**
+   * Test the behavior getObject for xml columns.
+   */
+  @Test
+  public void testGetXml() throws SQLException {
+    if (!TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_3)) {
+      // XML column requires PostgreSQL 8.3+
+      return;
+    }
+    Statement stmt = _conn.createStatement();
+    String content = "<book><title>Manual</title></book>";
+    stmt.executeUpdate(TestUtil.insertSQL("table1","xml_column","XMLPARSE (DOCUMENT '<?xml version=\"1.0\"?><book><title>Manual</title></book>')"));
+
+    ResultSet rs = stmt.executeQuery(TestUtil.selectSQL("table1", "xml_column"));
+    try {
+      assertTrue(rs.next());
+      SQLXML sqlXml = rs.getObject("xml_column", SQLXML.class);
+      assertEquals(content, sqlXml.getString());
+      sqlXml.free();
+
+      sqlXml = rs.getObject(1, SQLXML.class);
+      assertEquals(content, sqlXml.getString());
+      sqlXml.free();
     } finally {
       rs.close();
     }
@@ -625,6 +754,30 @@ public class GetObjectTest {
       assertTrue(rs.next());
       assertEquals(expected, rs.getObject("point_column", PGpoint.class));
       assertEquals(expected, rs.getObject(1, PGpoint.class));
+    } finally {
+      rs.close();
+    }
+  }
+
+  /**
+   * Test the behavior getObject for line columns.
+   */
+  @Test
+  public void testGetLine() throws SQLException {
+    if (!((BaseConnection) _conn).haveMinimumServerVersion(ServerVersion.v9_4)) {
+      // only 9.4 and later ship with full line support by default
+      return;
+    }
+
+    Statement stmt = _conn.createStatement();
+    PGline expected = new PGline(1.0d, 2.0d, 3.0d);
+    stmt.executeUpdate(TestUtil.insertSQL("table1","line_column","line '{1, 2, 3}'"));
+
+    ResultSet rs = stmt.executeQuery(TestUtil.selectSQL("table1", "line_column"));
+    try {
+      assertTrue(rs.next());
+      assertEquals(expected, rs.getObject("line_column", PGline.class));
+      assertEquals(expected, rs.getObject(1, PGline.class));
     } finally {
       rs.close();
     }

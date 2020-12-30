@@ -5,7 +5,10 @@
 
 package org.postgresql;
 
+import org.postgresql.hostchooser.MultiHostChooser;
 import org.postgresql.jdbc.PgConnection;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 import org.postgresql.util.DriverInfo;
 import org.postgresql.util.ExpressionProperties;
 import org.postgresql.util.GT;
@@ -15,8 +18,7 @@ import org.postgresql.util.PSQLState;
 import org.postgresql.util.SharedTimer;
 import org.postgresql.util.URLCoder;
 import org.postgresql.util.WriterHandler;
-import java.util.jar.Attributes;
-import java.util.jar.Manifest;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
@@ -28,37 +30,45 @@ import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
-import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
-import java.sql.Statement;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Formatter;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.logging.StreamHandler;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.Map.Entry;
 import javax.net.ssl.SSLContext;
-import javax.xml.bind.DatatypeConverter;
+
+import com.huawei.shade.org.apache.http.Header;
+import com.huawei.shade.org.apache.http.HttpHeaders;
+import com.huawei.shade.org.apache.http.HttpResponse;
+import com.huawei.shade.org.apache.http.client.methods.HttpDelete;
+import com.huawei.shade.org.apache.http.client.methods.HttpGet;
+import com.huawei.shade.org.apache.http.client.methods.HttpHead;
+import com.huawei.shade.org.apache.http.client.methods.HttpPatch;
+import com.huawei.shade.org.apache.http.client.methods.HttpPost;
+import com.huawei.shade.org.apache.http.client.methods.HttpPut;
+import com.huawei.shade.org.apache.http.client.methods.HttpRequestBase;
+import com.huawei.shade.org.apache.http.conn.ssl.AllowAllHostnameVerifier;
+import com.huawei.shade.org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import com.huawei.shade.org.apache.http.conn.ssl.SSLContexts;
+import com.huawei.shade.org.apache.http.conn.ssl.TrustSelfSignedStrategy;
+import com.huawei.shade.org.apache.http.entity.InputStreamEntity;
+import com.huawei.shade.org.apache.http.impl.client.CloseableHttpClient;
+import com.huawei.shade.org.apache.http.impl.client.HttpClients;
+import com.huawei.shade.com.alibaba.fastjson.JSONObject;
+import com.huawei.shade.com.cloud.apigateway.sdk.utils.Request;
+import com.huawei.shade.com.cloud.apigateway.sdk.utils.Client;
+import com.huawei.shade.com.cloud.sdk.http.HttpMethodName;
+
 
 /**
  * <p>The Java SQL framework allows for multiple database drivers. Each driver should supply a class
@@ -80,12 +90,16 @@ import javax.xml.bind.DatatypeConverter;
 public class Driver implements java.sql.Driver {
 
   private static Driver registeredDriver;
-  private static final Logger PARENT_LOGGER = Logger.getLogger("org.postgresql");
-  private static final Logger LOGGER = Logger.getLogger("org.postgresql.Driver");
+  private static final java.util.logging.Logger PARENT_LOGGER = java.util.logging.Logger.getLogger("org.postgresql");
+
+  private static Log LOGGER = Logger.getLogger("org.postgresql.Driver");
   private static SharedTimer sharedTimer = new SharedTimer();
   private static final String DEFAULT_PORT =
       /*$"\""+mvn.project.property.template.default.pg.port+"\";"$*//*-*/"5431";
-  private static final String gsVersion = "openGauss 1.0.0";
+  private static CloseableHttpClient client = null;
+  private static final String gsVersion = "@GSVERSION@";
+  /* generate one log file */
+  public static AtomicBoolean isLogFileCreated;
   static {
     try {
       // moved the registerDriver from the constructor to here
@@ -142,18 +156,18 @@ public class Driver implements java.sql.Driver {
     // neither case can throw SecurityException.
     ClassLoader cl = getClass().getClassLoader();
     if (cl == null) {
-      LOGGER.log(Level.FINE, "Can't find our classloader for the Driver; "
-          + "attempt to use the system class loader");
+      LOGGER.debug("Can't find our classloader for the Driver; "
+      + "attempt to use the system class loader");
       cl = ClassLoader.getSystemClassLoader();
     }
 
     if (cl == null) {
-      LOGGER.log(Level.WARNING, "Can't find a classloader for the Driver; not loading driver "
-          + "configuration from org/postgresql/driverconfig.properties");
+      LOGGER.warn("Can't find a classloader for the Driver; not loading driver "
+      + "configuration from org/postgresql/driverconfig.properties");
       return merged; // Give up on finding defaults.
     }
 
-    LOGGER.log(Level.FINE, "Loading driver configuration via classloader {0}", cl);
+    LOGGER.debug("Loading driver configuration via classloader " + cl);
 
     // When loading the driver config files we don't want settings found
     // in later files in the classpath to override settings specified in
@@ -167,382 +181,16 @@ public class Driver implements java.sql.Driver {
 
     for (int i = urls.size() - 1; i >= 0; i--) {
       URL url = urls.get(i);
-      LOGGER.log(Level.FINE, "Loading driver configuration from: {0}", url);
+      LOGGER.debug("Loading driver configuration from: " + url);
       InputStream is = url.openStream();
       merged.load(is);
       is.close();
     }
 
     return merged;
-  }
-
-    private static RunnableRefreshCNList refreshCNList;
-    private static boolean firstConnect;
-    private static boolean autoBalance;
-    private static String logName;
-    private static Properties propsCNList;
-    private static String secretKey;
-    private static ConcurrentHashMap<String, Long> statisticsForCNConnect = new ConcurrentHashMap<String, Long>();
-    private static int totalConnectNumbers;
-    
-    private static void setStaticFirstConnect(boolean firstConnectValue) {
-        firstConnect = firstConnectValue;
-    }
-    private void setFirstConnect(boolean firstConnectValue) {
-        setStaticFirstConnect(firstConnectValue);
-    }
-    private static void setStaticAutoBalance(boolean autoBalanceValue) {
-        autoBalance = autoBalanceValue;
-    }
-    private void setAutoBalance(boolean autoBalanceValue) {
-        setStaticAutoBalance(autoBalanceValue);
     }
 
-    private static void encryptPropertiy(Properties info) {
-        AESGCMUtil aesgcmUtil = new AESGCMUtil();
-        String encryptedUser = aesgcmUtil.encryptGCM(secretKey, info.getProperty("user"));
-        propsCNList.setProperty("user", encryptedUser);
-        String encryptedPassword = aesgcmUtil.encryptGCM(secretKey, info.getProperty("password"));
-        propsCNList.setProperty("password", encryptedPassword);
-    }
-
-    private static Properties decryptPropertiy() {
-        Properties props = new Properties();
-        props.setProperty("PGPORT", propsCNList.getProperty("PGPORT"));
-        props.setProperty("PGHOST", propsCNList.getProperty("PGHOST"));
-        props.setProperty("PGDBNAME", propsCNList.getProperty("PGDBNAME"));
-        if (propsCNList.getProperty("hostRecheckSeconds") != null) {
-            props.setProperty("hostRecheckSeconds", propsCNList.getProperty("hostRecheckSeconds"));
-        }
-        if (propsCNList.getProperty("loadBalanceHosts") != null) {
-            props.setProperty("loadBalanceHosts", propsCNList.getProperty("loadBalanceHosts"));
-        }
-        if (propsCNList.getProperty("loggerLevel") != null) {
-            props.setProperty("loggerLevel", propsCNList.getProperty("loggerLevel"));
-        }
-
-        AESGCMUtil aesgcmUtil = new AESGCMUtil();
-        String user = aesgcmUtil.decryptGCM(secretKey, propsCNList.getProperty("user"));
-        props.setProperty("user", user);
-        String password = aesgcmUtil.decryptGCM(secretKey, propsCNList.getProperty("password"));
-        props.setProperty("password", password);
-
-        user = "";
-        password = "";
-        return props;
-    }
-
-    static class RunnableRefreshCNList implements Runnable {
-        private Thread thread;
-
-        /* sleep time(ms) */
-        private int refreshCNIpListTime = 10000;
-
-        /* wait for first connection finished.(ms) */
-        private int threadWaitFirstConnect = 50;
-
-        /* query CN list from pgxc_node */
-        private String queryCNSQL = "select node_host, node_port from pgxc_node where node_type='C' and nodeis_active = true;";
-
-        private Connection conn = null;
-        private StringBuilder hosts = new StringBuilder();
-        private StringBuilder ports = new StringBuilder();
-        private PgConnection pgConnection = null;
-        private HostSpec connectHostSpec = null;
-
-        private void closeConnection() {
-            if (conn != null) {
-                try {
-                    if (pgConnection != null) {
-                        pgConnection.close();
-                    }
-                    conn.close();
-                    conn = null;
-                    pgConnection = null;
-                } catch (SQLException e1) {
-                    LOGGER.log(Level.INFO, "SQLException. Close connection failed, thread will try to connect continue.\n");
-                }
-            }
-        }
-
-        /* get CN list from connection */
-        private void setCNList() throws SQLException {
-            Statement st = null;
-            ResultSet rs = null;
-            try {
-                st = conn.createStatement();
-                rs = st.executeQuery(queryCNSQL);
-                while (rs.next()) {
-                    hosts.append(rs.getObject("node_host").toString() + ',');
-                    ports.append(rs.getObject("node_port").toString() + ',');
-                }
-                ports.setLength(ports.length() - 1);
-                hosts.setLength(hosts.length() - 1);
-                propsCNList.setProperty("PGPORT", ports.toString());
-                propsCNList.setProperty("PGHOST", hosts.toString());
-            } catch (SQLException e) {
-                throw e;
-            } finally {
-                if (rs != null) {
-                    rs.close();
-                }
-                if (st != null) {
-                    st.close();
-                }
-            }
-        }
-
-        /* refresh CN list */
-        public void run() {
-            while (true) {
-                try {
-                    /* when object props has been instanced, thread begins to refresh CN List */
-                    if (firstConnect == true) {
-                        /* wait for first connect finished */
-                        Thread.sleep(threadWaitFirstConnect);
-                        continue;
-                    }
-                    /* if first connection has finished, this step begins. This step must behind of the condition: "if (firstConnect == true)" */
-                    if (autoBalance == false) {
-                        break;
-                    }
-                    /* if this property is null, continue. This step must behind of the condition: "if (autoBalance == false)" */
-                    if (propsCNList.getProperty("PGDBNAME") == null) {
-                        Thread.sleep(threadWaitFirstConnect);
-                        continue;
-                    }
-
-                    hosts.setLength(0);
-                    ports.setLength(0);
-                    /* if connection failed, catch SQLException. Break while. */
-                    if (pgConnection == null) {
-                        Properties props = decryptPropertiy();
-                        pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props, getUrlFromProperties(props));
-                        props.setProperty("user", "");
-                        props.setProperty("password", "");
-                    }
-                    connectHostSpec = pgConnection.getQueryExecutor().getHostSpec();
-
-                    conn = pgConnection;
-                    setCNList();
-                    writeCNConnectCount2Log(propsCNList);
-
-                    /* time(ms) * 1000 and longest time is 9999 */
-                    if ((propsCNList.getProperty("refreshCNIpListTime") != null) && (propsCNList.getProperty("refreshCNIpListTime").length() < 5)) {
-                        refreshCNIpListTime = Integer.parseInt(propsCNList.getProperty("refreshCNIpListTime")) * 1000;
-                    }
-                    /* if once finished, thread will sleep queryCycle ms. */
-                    Thread.sleep(refreshCNIpListTime);
-                } catch (InterruptedException e) {
-                    LOGGER.log(Level.INFO, "InterruptedException. This caused by deamon thread: \"Thread.sleep\".");
-                } catch (SQLException e) {
-                    if (connectHostSpec == null) {
-                        LOGGER.log(Level.INFO, "SQLException. This caused by deamon thread: \"connection\".\n" + "Deamon thread will try to connect other host.\n");
-                    } else {
-                        LOGGER.log(Level.INFO, "SQLException. This caused by deamon thread: \"connection\".\n" + "Error host ip: {0}. Deamon thread will try to connect other host.\n", connectHostSpec.getHost());
-                    }
-                    closeConnection();
-                }
-            }
-        }
-
-        /* start thread */
-        public void start() {
-            if (thread == null) {
-                thread = new Thread(this);
-                /* set this thread to daemon thread. If main thread finished, this daemon thread will be killed. */
-                thread.setDaemon(true);
-                thread.start();
-            }
-        }
-    }
-
-    private static String getHostAndPortFromUrl(String url) {
-        String pattern = "://(.+):(\\d+)";
-        Pattern patternCN = Pattern.compile(pattern);
-        Matcher match = patternCN.matcher(url);
-        String hostAndPort = null;
-        if (match.find()) {
-            hostAndPort = match.group();
-            return hostAndPort.split("://")[1];
-        } else {
-            return url;
-        }
-    }
-
-    private static String getUrlFromProperties(Properties props) {
-        String hosts = props.getProperty("PGHOST");
-        String ports = props.getProperty("PGPORT");
-        StringBuilder url = new StringBuilder();
-        url.append("jdbc:postgresql://");
-        for (int i = 0; i < ports.split(",").length; i++) {
-            url.append(hosts.split(",")[i] + ":" + ports.split(",")[i] + ",");
-        }
-        url.setLength(url.length() - 1);
-        url.append("/" + props.getProperty("PGDBNAME"));
-        return url.toString();
-    }
-
-    private static synchronized void writeCNConnectCount2Map(HostSpec thisConnectHostSpec) {
-        String host = thisConnectHostSpec.getHost();
-        if (statisticsForCNConnect.containsKey(host)) {
-            statisticsForCNConnect.put(host, statisticsForCNConnect.get(host) + 1L);
-        } else {
-            statisticsForCNConnect.put(host, 1L);
-        }
-    }
-
-    private static void writeCNConnectCount2Log(Properties props) {
-        String url = getUrlFromProperties(props);
-        String hostsAndPorts = getHostAndPortFromUrl(url);
-        LOGGER.log(Level.INFO, "hosts and port are : {0}", hostsAndPorts);
-
-        Iterator<Entry<String, Long>> iter = statisticsForCNConnect.entrySet().iterator();
-        StringBuilder hostAndConnectCount = new StringBuilder();
-        while (iter.hasNext()) {
-            ConcurrentHashMap.Entry<String, Long> entry = (ConcurrentHashMap.Entry<String, Long>) iter.next();
-            hostAndConnectCount.append(entry.getKey() + " - " + entry.getValue() + "; ");
-        }
-
-        if (hostAndConnectCount.length() > 0) {
-            LOGGER.log(Level.INFO, "hosts and connect times are : {0}\n", hostAndConnectCount.toString());
-        } else {
-            LOGGER.log(Level.INFO, "hosts and connect times are : null\n");
-        }
-    }
-
-    boolean checkInputForSecurity(String logPath) {
-        if (logPath == null) {
-            return false;
-        }
-
-        String[] dangerCharacterList = {
-            "|", ";", "&", "$", "<", ">", "`", "'", "\"", "{", "}", "(", ")", "[", "]", "~", "*", "?", "!", "'", "\n"
-        };
-        char[] logLetter = logPath.toCharArray();
-        for (int i = 0; i < logPath.length(); i++) {
-            if (Arrays.asList(dangerCharacterList).contains(String.valueOf(logLetter[i]))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private Properties adjustCNList(Properties props, int currentConnectNumber) {
-        if (props.getProperty("PGHOST") != null) {
-            String[] hosts = props.getProperty("PGHOST").split(",");
-            String[] ports = props.getProperty("PGPORT").split(",");
-
-            int lengthOfCNList = hosts.length;
-            if (lengthOfCNList <= 1) {
-                return props;
-            }
-            int thisConnectPos = currentConnectNumber % lengthOfCNList;
-            StringBuilder hostsStringBuilder = new StringBuilder();
-            StringBuilder portsStringBuilder = new StringBuilder();
-
-            HostSpec[] hostSpecs = new HostSpec[lengthOfCNList - 1];
-            int numOfHostSpec = 0;
-            for (int i = 0; i < lengthOfCNList; i++) {
-                if (i != thisConnectPos) {
-                    hostSpecs[numOfHostSpec] = new HostSpec(hosts[i], Integer.parseInt(ports[i]));
-                    numOfHostSpec++;
-                }
-            }
-            List<HostSpec> allHosts = Arrays.asList(hostSpecs);
-            allHosts = new ArrayList<HostSpec>(allHosts);
-            Collections.shuffle(allHosts);
-
-            hostsStringBuilder.append(hosts[thisConnectPos] + ',');
-            portsStringBuilder.append(ports[thisConnectPos] + ',');
-            for (int i = 0; i < hostSpecs.length; i++) {
-                hostsStringBuilder.append(allHosts.get(i).getHost() + ',');
-                portsStringBuilder.append(String.valueOf(allHosts.get(i).getPort()) + ',');
-            }
-
-            if (hostsStringBuilder.length() != 0) {
-                hostsStringBuilder.setLength(hostsStringBuilder.length() - 1);
-                portsStringBuilder.setLength(portsStringBuilder.length() - 1);
-                props.setProperty("PGHOST", hostsStringBuilder.toString());
-                props.setProperty("PGPORT", portsStringBuilder.toString());
-            }
-        }
-        return props;
-    }
-
-    private static synchronized int increaseConnectNumber() {
-        totalConnectNumbers++;
-        int currentNumberOfConnct = totalConnectNumbers;
-        return currentNumberOfConnct;
-    }
-
-    private Properties algorithmRR(Properties props) {
-        if (props.getProperty("autoBalance") != null && !props.getProperty("autoBalance").equals("true")) {
-            return props;
-        }
-        if (props.getProperty("loadBalanceHosts") != null) {
-            if (props.getProperty("loadBalanceHosts").equals("true")) {
-                return props;
-            }
-        }
-
-        /* set Max connection number, if larger than this, reset to 0 */
-        final int maxConnectNum = 100000;
-        int currentConnectNumber = 0;
-        if (totalConnectNumbers > maxConnectNum) {
-            totalConnectNumbers = 0;
-        }
-
-        currentConnectNumber = increaseConnectNumber();
-        props = adjustCNList(props, currentConnectNumber);
-        return props;
-    }
-
-    private Properties setAutoBalanceProps(Properties props, Properties info) {
-        if (firstConnect) {
-            setFirstConnect(false);
-            if (props.getProperty("autoBalance") != null && props.getProperty("autoBalance").equals("true")) {
-                setAutoBalance(true);
-                /* set log name */
-                String logPath = props.getProperty("loggerFile");
-                if (logPath != null && !logPath.endsWith("/")) {
-                    logPath = logPath + "/";
-                }
-                if (logPath != null && checkInputForSecurity(logPath) == true) {
-                    logPath = logPath + logName;
-                    props.setProperty("loggerFile", logPath);
-                } else {
-                    props.setProperty("loggerFile", logName);
-                }
-                /* set log level */
-                String logLevel = props.getProperty("loggerLevel");
-                if (logLevel == null) {
-                    props.setProperty("loggerLevel", "INFO");
-                    propsCNList.setProperty("loggerLevel", "INFO");
-                }
-                setupLoggerFromProperties(props);
-
-                /* encrypt user name and password */
-                encryptPropertiy(info);
-                propsCNList.setProperty("PGDBNAME", props.getProperty("PGDBNAME"));
-                /* time to update CN list. It must be Integer */
-                String refreshCNIpListTime = props.getProperty("refreshCNIpListTime");
-                Pattern pattern = Pattern.compile("[0-9]+");
-                if (refreshCNIpListTime != null
-                        && pattern.matcher(refreshCNIpListTime).matches()
-                        && !refreshCNIpListTime.startsWith("0")) {
-                    propsCNList.setProperty("refreshCNIpListTime", refreshCNIpListTime);
-                }
-            }
-        } else {
-            if (autoBalance) {
-                props.setProperty("PGHOST", propsCNList.getProperty("PGHOST"));
-                props.setProperty("PGPORT", propsCNList.getProperty("PGPORT"));
-            }
-        }
-        return props;
-    }
-    private Properties getProps(Properties defaults, Properties info) throws PSQLException {
+    public static Properties GetProps(Properties defaults, Properties info) throws PSQLException {
         Properties newProps;
         newProps = new Properties(defaults);
 
@@ -615,37 +263,43 @@ public class Driver implements java.sql.Driver {
   @Override
   public Connection connect(String url, Properties info) throws SQLException {
     // get defaults
-    Properties defaults;
-    Properties props;
+    Properties defaults, props;
 
-    if (!url.startsWith("jdbc:postgresql:")) {
-      return null;
+    if (!url.startsWith("jdbc:postgresql:") && !url.startsWith("jdbc:dws:iam:")) {
+        return null;
     }
     try {
-      defaults = getDefaultProperties();
+        defaults = getDefaultProperties();
     } catch (IOException ioe) {
-      throw new PSQLException(GT.tr("Error loading default settings from driverconfig.properties"), PSQLState.UNEXPECTED_ERROR, ioe);
+        throw new PSQLException(GT.tr("Error loading default settings from driverconfig.properties"), PSQLState.UNEXPECTED_ERROR, ioe);
     }
 
-    props = getProps(defaults, info);
+    props = GetProps(defaults, info);
+
     // parse URL and add more properties
     if ((props = parseURL(url, props)) == null) {
-      return null;
+        return null;
     }
 
-    /* if jdbc is load balance, set props */
-    if (info != null) {
-        props = setAutoBalanceProps(props, info);
-        props = algorithmRR(props);
+
+
+    Logger.setLoggerName(props.getProperty("logger"));
+
+    if(Logger.isUsingJDKLogger()) {
+        setupLoggerFromProperties(props);
+    } else {
+        LOGGER = Logger.getLogger("org.postgresql.Driver");
+    }
+
+    if (MultiHostChooser.isUsingAutoLoadBalance(props)) {
+      if(!MultiHostChooser.isVaildPriorityLoadBalance(props)){
+        return null;
+      }
+      QueryCNListUtils.refreshProperties(props);
     }
 
     try {
-      // Setup java.util.logging.Logger using connection properties.
-      if (autoBalance == false) {
-          setupLoggerFromProperties(props);
-      }
-
-      LOGGER.log(Level.FINE, "Connecting with URL: {0}", url);
+      LOGGER.debug("Connecting with URL: " + url);
 
       // Enforce login timeout, if specified, by running the connection
       // attempt in a separate thread. If we hit the timeout without the
@@ -665,17 +319,16 @@ public class Driver implements java.sql.Driver {
       Thread thread = new Thread(ct, "PostgreSQL JDBC driver connection thread");
       thread.setDaemon(true); // Don't prevent the VM from shutting down
       thread.start();
-      setFirstConnect(false);
       return ct.getResult(timeout);
     } catch (PSQLException ex1) {
-      LOGGER.log(Level.FINE, "Connection error: ", ex1);
+      LOGGER.debug("Connection error: ",ex1);
       // re-throw the exception, otherwise it will be caught next, and a
       // org.postgresql.unusual error will be returned instead.
       throw ex1;
     } catch (java.security.AccessControlException ace) {
       throw new PSQLException(GT.tr("Your security policy has prevented the connection from being attempted.  You probably need to grant the connect java.net.SocketPermission to the database server host and port that you wish to connect to."), PSQLState.UNEXPECTED_ERROR, ace);
     } catch (Exception ex2) {
-      LOGGER.log(Level.FINE, "Unexpected connection error: ", ex2);
+      LOGGER.debug("Unexpected connection error: ", ex2);
       throw new PSQLException(GT.tr("Something unusual has occured to cause the driver to fail. Please report this exception."), PSQLState.UNEXPECTED_ERROR, ex2);
     }
   }
@@ -690,20 +343,38 @@ public class Driver implements java.sql.Driver {
    *
    * @param props Connection Properties
    */
+  private Boolean initLoggerProperties(String driverLogLevel) {
+      if (driverLogLevel == null) {
+          return false; // Don't mess with Logger if not set
+        }
+        if (!"OFF".equalsIgnoreCase(driverLogLevel) && !isLogFileCreated.compareAndSet(false, true)) {
+            return false;
+        }
+        if ("OFF".equalsIgnoreCase(driverLogLevel)) {
+          PARENT_LOGGER.setLevel(Level.OFF);
+          return false; // Don't mess with Logger if set to OFF
+        } else if ("DEBUG".equalsIgnoreCase(driverLogLevel)) {
+          PARENT_LOGGER.setLevel(Level.FINE);
+        } else if ("TRACE".equalsIgnoreCase(driverLogLevel)) {
+          PARENT_LOGGER.setLevel(Level.FINEST);
+        } else if ("INFO".equalsIgnoreCase(driverLogLevel)) {
+            PARENT_LOGGER.setLevel(Level.INFO);
+        } else {
+          PARENT_LOGGER.setLevel(Level.OFF);
+        }
+        return true;
+  }
+  /**
+   * <p>Setup java.util.logging.Logger using connection properties.</p>
+   *
+   * <p>See {@link PGProperty#LOGGER_FILE} and {@link PGProperty#LOGGER_FILE}</p>
+   *
+   * @param props Connection Properties
+   */
   private void setupLoggerFromProperties(final Properties props) {
     final String driverLogLevel = PGProperty.LOGGER_LEVEL.get(props);
-    if (driverLogLevel == null) {
-      return; // Don't mess with Logger if not set
-    }
-    if ("OFF".equalsIgnoreCase(driverLogLevel)) {
-      PARENT_LOGGER.setLevel(Level.OFF);
-      return; // Don't mess with Logger if set to OFF
-    } else if ("DEBUG".equalsIgnoreCase(driverLogLevel)) {
-      PARENT_LOGGER.setLevel(Level.FINE);
-    } else if ("TRACE".equalsIgnoreCase(driverLogLevel)) {
-      PARENT_LOGGER.setLevel(Level.FINEST);
-    } else {
-      PARENT_LOGGER.setLevel(Level.INFO);
+    if (!initLoggerProperties(driverLogLevel)) {
+        return;
     }
 
     ExpressionProperties exprProps = new ExpressionProperties(props, System.getProperties());
@@ -854,12 +525,6 @@ public class Driver implements java.sql.Driver {
    */
   private static Connection makeConnection(String url, Properties props) throws SQLException {
       PgConnection pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props, url);
-
-      HostSpec currentConnectHostSpec;
-      currentConnectHostSpec = pgConnection.getQueryExecutor().getHostSpec();
-      if (autoBalance == true) {
-          writeCNConnectCount2Map(currentConnectHostSpec);
-      }
       return pgConnection;
   }
 
@@ -889,10 +554,11 @@ public class Driver implements java.sql.Driver {
    * @param info a proposed list of tag/value pairs that will be sent on connect open.
    * @return An array of DriverPropertyInfo objects describing possible properties. This array may
    *         be an empty array if no properties are required
+ * @throws PSQLException 
    * @see java.sql.Driver#getPropertyInfo
    */
   @Override
-  public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) {
+  public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws PSQLException {
     Properties copy = new Properties(info);
     Properties parse = parseURL(url, copy);
     if (parse != null) {
@@ -951,7 +617,7 @@ public class Driver implements java.sql.Driver {
           + "(1\\d{2}|2[0-4]\\d|25[0-5]|[1-9]\\d|\\d)$";
       Pattern pattern = Pattern.compile(regex);
       if (!pattern.matcher(address).matches()) {
-          LOGGER.log(Level.FINE, "JDBC URL invalid ip address: {0}", address);
+          LOGGER.debug("JDBC URL invalid ip address: " + address);
       }
       return address;
   }
@@ -962,10 +628,10 @@ public class Driver implements java.sql.Driver {
    * @param url JDBC URL to parse
    * @param defaults Default properties
    * @return Properties with elements added from the url
+   * @throws PSQLException 
    */
-  public static  Properties parseURL(String url, Properties defaults) {
+  public static  Properties parseURL(String url, Properties defaults) throws PSQLException {
     Properties urlProps = new Properties(defaults);
-
     String l_urlServer = url;
     String l_urlArgs = "";
 
@@ -975,100 +641,321 @@ public class Driver implements java.sql.Driver {
       l_urlArgs = url.substring(l_qPos + 1);
     }
 
-    if (!l_urlServer.startsWith("jdbc:postgresql:")) {
-      LOGGER.log(Level.FINE, "JDBC URL must start with \"jdbc:postgresql:\" but was: {0}", url);
+    if (!l_urlServer.startsWith("jdbc:postgresql:") && !l_urlServer.startsWith("jdbc:dws:iam:")) {
+      LOGGER.debug("JDBC URL must start with \"jdbc:postgresql:\" or \"jdbc:dws:iam:\" but was: " + url);
       return null;
     }
+    if(l_urlServer.startsWith("jdbc:postgresql:")) {
+        l_urlServer = l_urlServer.substring("jdbc:postgresql:".length());
 
-    l_urlServer = l_urlServer.substring("jdbc:postgresql:".length());
-
-    if (l_urlServer.startsWith("//")) {
-      l_urlServer = l_urlServer.substring(2);
-      int slash = l_urlServer.indexOf('/');
-      if (slash == -1) {
-        LOGGER.log(Level.WARNING, "JDBC URL must contain a / at the end of the host or port: {0}", url);
-        return null;
-      }
-      urlProps.setProperty("PGDBNAME", URLCoder.decode(l_urlServer.substring(slash + 1)));
-
-      String[] addresses = l_urlServer.substring(0, slash).split(",");
-      StringBuilder hosts = new StringBuilder();
-      StringBuilder ports = new StringBuilder();
-      for (String address : addresses) {
-        int portIdx = address.lastIndexOf(':');
-        if (portIdx != -1 && address.lastIndexOf(']') < portIdx) {
-          String portStr = address.substring(portIdx + 1);
-          try {
-            int port = Integer.parseInt(portStr);
-            if (port < 1 || port > 65535) {
-              LOGGER.log(Level.WARNING, "JDBC URL port: {0} not valid (1:65535) ", portStr);
-              return null;
+        if (l_urlServer.startsWith("//")) {
+            l_urlServer = l_urlServer.substring(2);
+            int slash = l_urlServer.indexOf('/');
+            if (slash == -1) {
+                LOGGER.warn("JDBC URL must contain a / at the end of the host or port: " + url);
+                return null;
             }
-          } catch (NumberFormatException ignore) {
-            LOGGER.log(Level.WARNING, "JDBC URL invalid port number: {0}", portStr);
-            return null;
-          }
-          ports.append(portStr);
-          hosts.append(parseIPValid((String) address.subSequence(0, portIdx)));
+            urlProps.setProperty("PGDBNAME", URLCoder.decode(l_urlServer.substring(slash + 1)));
+
+            // Save the ip and port configured in the url
+            String[] addresses = l_urlServer.substring(0, slash).split(",");
+            StringBuilder hosts = new StringBuilder();
+            StringBuilder ports = new StringBuilder();
+            for (String address : addresses) {
+                int portIdx = address.lastIndexOf(':');
+                if (portIdx != -1 && address.lastIndexOf(']') < portIdx) {
+                    String portStr = address.substring(portIdx + 1);
+                    try {
+                        int port = Integer.parseInt(portStr);
+                        if (port < 1 || port > 65535) {
+                            LOGGER.warn("JDBC URL port: " + portStr + " not valid (1:65535) ");
+                            return null;
+                        }
+                    } catch (NumberFormatException ignore) {
+                        LOGGER.warn("JDBC URL invalid port number: " + portStr);
+                        return null;
+                    }
+                    ports.append(portStr);
+                    hosts.append(parseIPValid((String) address.subSequence(0, portIdx)));
+                } else {
+                    ports.append(DEFAULT_PORT);
+                    hosts.append(parseIPValid(address));
+                }
+                ports.append(',');
+                hosts.append(',');
+            }
+            ports.setLength(ports.length() - 1);
+            hosts.setLength(hosts.length() - 1);
+
+            urlProps.setProperty("PGHOST", hosts.toString());
+            urlProps.setProperty("PGPORT", ports.toString());
+
+            //The first connection, put the host and port in the url into the props
+            urlProps.setProperty("PGHOSTURL", hosts.toString());
+            urlProps.setProperty("PGPORTURL", ports.toString());
         } else {
-          ports.append(DEFAULT_PORT);
-          hosts.append(parseIPValid(address));
-        }
-        ports.append(',');
-        hosts.append(',');
-      }
-      ports.setLength(ports.length() - 1);
-      hosts.setLength(hosts.length() - 1);
-
-      urlProps.setProperty("PGHOST", hosts.toString());
-      urlProps.setProperty("PGPORT", ports.toString());
-
-      if (firstConnect) {
-          propsCNList.setProperty("PGHOST", hosts.toString());
-          propsCNList.setProperty("PGPORT", ports.toString());
-      }
-    } else {
       /*
        if there are no defaults set or any one of PORT, HOST, DBNAME not set
        then set it to default
       */
-      if (defaults == null || !defaults.containsKey("PGPORT")) {
-        urlProps.setProperty("PGPORT", DEFAULT_PORT);
-      }
-      if (defaults == null || !defaults.containsKey("PGHOST")) {
-        urlProps.setProperty("PGHOST", "localhost");
-      }
-      if (defaults == null || !defaults.containsKey("PGDBNAME")) {
-        urlProps.setProperty("PGDBNAME", URLCoder.decode(l_urlServer));
-      }
+            if (defaults == null || !defaults.containsKey("PGPORT")) {
+                urlProps.setProperty("PGPORT", DEFAULT_PORT);
+            }
+            if (defaults == null || !defaults.containsKey("PGHOST")) {
+                urlProps.setProperty("PGHOST", "localhost");
+            }
+            if (defaults == null || !defaults.containsKey("PGDBNAME")) {
+                urlProps.setProperty("PGDBNAME", URLCoder.decode(l_urlServer));
+            }
+        }
+
+        // parse the args part of the url
+        String[] args = l_urlArgs.split("&");
+        for (String token : args) {
+            if (token.isEmpty()) {
+                continue;
+            }
+            int l_pos = token.indexOf('=');
+            if (l_pos == -1) {
+                urlProps.setProperty(token, "");
+            } else {
+                urlProps.setProperty(token.substring(0, l_pos), URLCoder.decode(token.substring(l_pos + 1)));
+            }
+        }
+
+        return urlProps;
+    }else {
+        StringBuffer tmp = new StringBuffer();
+        l_urlServer = l_urlServer.substring("jdbc:dws:iam:".length());
+        String ClusterIdentifier="", region="", DbUser="", AutoCreate="", AccessKeyID="", SecretAccessKey="";
+        if (l_urlServer.startsWith("//")) {
+            l_urlServer = l_urlServer.substring(2);
+            int slash = l_urlServer.indexOf('/');
+            if (slash == -1) {
+                return null;
+            }
+            urlProps.setProperty("PGDBNAME", l_urlServer.substring(slash + 1));
+            
+            String serverurl = l_urlServer.substring(0, slash);
+            String[] clusterurl = serverurl.split(":");
+            if(clusterurl.length != 2){
+                return null;
+            }
+             ClusterIdentifier = clusterurl[0];
+             region = clusterurl[1];
+
+        }
+	
+	    //parse the args part of the url
+        String[] args = l_urlArgs.split("&");
+        for (int i = 0; i < args.length; ++i)
+        {
+            String token = args[i];
+            if (token.length() ==  0) {
+                continue;
+            }
+            int l_pos = token.indexOf('=');
+            if (l_pos == -1)
+            {
+                urlProps.setProperty(token, "");
+            }
+            else
+            {
+                if(token.substring(0, l_pos).equals("AccessKeyID")){
+                    AccessKeyID = token.substring(l_pos + 1);
+                }else if(token.substring(0, l_pos).equals("SecretAccessKey")){
+                    SecretAccessKey = token.substring(l_pos + 1);
+                }else if(token.substring(0, l_pos).equals("DbUser")){
+                    DbUser = token.substring(l_pos + 1);
+                }else if(token.substring(0, l_pos).equals("AutoCreate")){
+                    AutoCreate = token.substring(l_pos + 1);
+                }else{
+                    tmp.append("&"+token.substring(0, l_pos)+"="+token.substring(l_pos + 1));
+                } 
+            }
+        }
+        StringBuffer jdbcUrl = new StringBuffer();
+        if(region.equals("") || ClusterIdentifier.equals("") || DbUser.equals("") || AccessKeyID.equals("") 
+                || SecretAccessKey.equals("")){
+            throw new PSQLException(GT.tr("Please confirm that all the parameters needed is added to the url."), PSQLState.CONNECTION_REJECTED);
+        }
+        InputStream in = null;
+        Properties props = new Properties();
+        String domainName = "";
+        try {
+            File f = new File(Driver.class.getClassLoader().getResource("").getPath());
+            String filePath = f.getParent() + File.separator + "config" + File.separator + "jdbcconfig.properties";
+            in = new BufferedInputStream(new FileInputStream(filePath));
+            props = new Properties();
+            props.load(in);
+            domainName = props.getProperty(region);
+            in.close();
+         } catch (Exception e) {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ioe) {
+                    LOGGER.warn(ioe.getMessage());
+                }
+            }
+            try {
+                props = new Properties();
+                in = Driver.class.getResourceAsStream("/org/postgresql/jdbcconfig.properties");
+                props.load(in);
+                domainName = props.getProperty(region);
+                in.close();
+            } catch (Exception e1) {
+                if (in != null) {
+                    try {
+                        in.close();
+                    } catch (IOException ioe) {
+                        LOGGER.warn(ioe.getMessage());
+                    }
+                }
+                throw new PSQLException(GT.tr("Parse jdbcconfig.properties failed."),
+                        PSQLState.CONNECTION_UNABLE_TO_CONNECT, e1);
+            }
+        }
+        if(domainName == null || domainName.equals("")) {
+            throw new PSQLException(GT.tr("Unrecognized region name."), PSQLState.CONNECTION_REJECTED);
+        }
+        jdbcUrl.append("https://" + domainName + "/credentials?");
+        jdbcUrl.append("clusterName="+ClusterIdentifier);
+        jdbcUrl.append("&dbUser="+DbUser);
+        if(!AutoCreate.equals("")) {
+            jdbcUrl.append("&autoCreate="+AutoCreate);
+        }
+        jdbcUrl.append(tmp.toString());
+
+        String jsonstr="";
+        jsonstr = getReturn(AccessKeyID, SecretAccessKey, jdbcUrl.toString(), region);
+        try {
+            JSONObject jsonObj = JSONObject.parseObject(jsonstr);
+            if(jsonObj.get("cluster_credentials") != null){
+                jsonstr = jsonObj.get("cluster_credentials").toString();
+                jsonObj = JSONObject.parseObject(jsonstr);
+                if(jsonObj.get("db_user")!=null){
+                    urlProps.setProperty("user", jsonObj.get("db_user").toString());
+                }
+                if(jsonObj.get("db_endpoint")!=null){
+                    urlProps.setProperty("PGHOST", jsonObj.get("db_endpoint").toString());
+                }
+                if(jsonObj.get("db_port")!=null){
+                    urlProps.setProperty("PGPORT", jsonObj.get("db_port").toString());
+                }
+                if(jsonObj.get("db_password")!=null){
+                    urlProps.setProperty("password", jsonObj.get("db_password").toString());
+                }
+
+              //The first connection, put the host and port in the url into the clusters
+                urlProps.setProperty("PGHOSTURL", urlProps.getProperty("PGHOST"));
+                urlProps.setProperty("PGPORTURL", urlProps.getProperty("PGPORT"));
+            } else if(jsonObj.get("externalMessage") != null) {
+                throw new PSQLException (GT.tr(jsonObj.get("externalMessage").toString()), PSQLState.CONNECTION_UNABLE_TO_CONNECT);
+            } else {
+                throw new PSQLException (GT.tr("The format of Token is not as expected."), PSQLState.CONNECTION_UNABLE_TO_CONNECT);
+            }
+        } catch (Exception e) {
+            throw new PSQLException (GT.tr("Parse the token failed."), PSQLState.CONNECTION_UNABLE_TO_CONNECT, e);
+        }
+        if(urlProps.getProperty("ssl") == null && urlProps.getProperty("sslmode") == null) {
+            urlProps.setProperty("sslmode", "require");
+        }
+        return urlProps;
     }
-
-    /* jdbc load balance */
-    urlProps.setProperty("autoBalance", "false");
-
-    // parse the args part of the url
-    String[] args = l_urlArgs.split("&");
-    for (String token : args) {
-      if (token.isEmpty()) {
-        continue;
-      }
-      int l_pos = token.indexOf('=');
-      if (l_pos == -1) {
-        urlProps.setProperty(token, "");
-      } else {
-        urlProps.setProperty(token.substring(0, l_pos), URLCoder.decode(token.substring(l_pos + 1)));
-      }
-    }
-
-    return urlProps;
   }
 
+private static Request getRequest(URL url, String ak, String sk) throws Exception {
+      Request request = new Request();
+      request.setUrl(url.toString());
+      request.setKey(ak);
+      request.setSecret(sk);
+      return request;
+  }
+  private static  String  getReturn(String ak, String sk, String requestUrl,String region) throws PSQLException {
+      try {
+          URL url = new URL(requestUrl);
+          HttpMethodName httpMethod = HttpMethodName.GET;
+          Request request = getRequest(url, ak, sk);
+          request.setMethod(httpMethod.toString());
+          request.addHeader("X-Language", "en-us");
+          request.addHeader("Content-Type", "application/json");
+          request.addHeader("Accept", "application/json");
+
+          HttpRequestBase signedRequest = Client.sign(request);
+          HttpResponse response = null;
+
+          SSLContext sslContext = SSLContexts.custom().loadTrustMaterial(null,
+                  new TrustSelfSignedStrategy()).useTLS().build();
+          SSLConnectionSocketFactory sslSocketFactory = new SSLConnectionSocketFactory(sslContext,
+                  new AllowAllHostnameVerifier());
+
+          client = HttpClients.custom().setSSLSocketFactory(sslSocketFactory).build();
+
+          response = client.execute(signedRequest);
+          return convertStreamToString(response.getEntity().getContent());
+      } catch (Exception e) {
+        throw new PSQLException (GT.tr("Get the token failed."), PSQLState.CONNECTION_UNABLE_TO_CONNECT, e);
+      } finally {
+          try {
+              if (client != null) {
+                  client.close();
+              }
+          }
+          catch (IOException e) {
+              LOGGER.warn("Catch IOException, client close failed.");
+          }
+      }
+  }
+  
+  private static  String convertStreamToString(InputStream is) throws IOException {
+      BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+      StringBuilder sb = new StringBuilder();
+      String line = null;
+      try {
+          while ((line = reader.readLine()) != null) {
+              sb.append(line + "\n");
+          }
+      } catch (IOException ioEX) {
+          throw ioEX ;
+      } finally {
+              is.close();
+      }
+      return sb.toString();
+  }
+
+  /* public method */
+  public static HostSpec[] GetHostSpecs(Properties props) {
+      return hostSpecs(props);
+  }
+  /**
+   * @param props Connection properties
+   * @return the address portion of the orgin URL
+   */
+  public static HostSpec[] getURLHostSpecs(Properties props) {
+    return urlHostSpecs(props);
+  }
+  public static String GetUser(Properties props) {
+      return user(props);
+  }
+  public static String GetDatabase(Properties props) {
+      return database(props);
+  }
+  private static HostSpec[] urlHostSpecs(Properties props) {
+    String[] ports = props.getProperty("PGPORTURL").split(",");
+    String[] hosts = props.getProperty("PGHOSTURL").split(",", ports.length);
+    HostSpec[] hostSpecs = new HostSpec[hosts.length];
+    for (int i = 0; i < hostSpecs.length; ++i) {
+      hostSpecs[i] = new HostSpec(hosts[i], Integer.parseInt(ports[i]));
+    }
+    return hostSpecs;
+  }
   /**
    * @return the address portion of the URL
    */
   private static HostSpec[] hostSpecs(Properties props) {
-    String[] hosts = props.getProperty("PGHOST").split(",");
     String[] ports = props.getProperty("PGPORT").split(",");
+    String[] hosts = props.getProperty("PGHOST").split(",", ports.length);
     HostSpec[] hostSpecs = new HostSpec[hosts.length];
     for (int i = 0; i < hostSpecs.length; ++i) {
       hostSpecs[i] = new HostSpec(hosts[i], Integer.parseInt(ports[i]));
@@ -1099,7 +986,7 @@ public class Driver implements java.sql.Driver {
       try {
         return (long) (Float.parseFloat(timeout) * 1000);
       } catch (NumberFormatException e) {
-        LOGGER.log(Level.WARNING, "Couldn't parse loginTimeout value: {0}", timeout);
+        LOGGER.warn("Couldn't parse loginTimeout value: " + timeout);
       }
     }
     return (long) DriverManager.getLoginTimeout() * 1000;
@@ -1123,17 +1010,15 @@ public class Driver implements java.sql.Driver {
         PSQLState.NOT_IMPLEMENTED.getState());
   }
 
-//  //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.1"
-//  @Override
-//  public java.util.logging.Logger getParentLogger() {
-//  }
-//  //#endif
-
   public java.util.logging.Logger getParentLogger()
   {
+    if(Logger.isUsingJDKLogger()) {
       return PARENT_LOGGER;
+    } else {
+      return null;
+    }
   }
-  
+
   public static SharedTimer getSharedTimer() {
     return sharedTimer;
   }
@@ -1154,24 +1039,8 @@ public class Driver implements java.sql.Driver {
     registeredDriver = new Driver();
     DriverManager.registerDriver(registeredDriver);
     Driver.registeredDriver = registeredDriver;
-    firstConnect = true;
-    autoBalance = false;
-    totalConnectNumbers = 0;
 
-    /* set initial vector length */
-    int GCM_IV_LENGTH = 12;
-    byte[] initVector = new byte[GCM_IV_LENGTH];
-    /* use security random number to generate secret key */
-    new SecureRandom().nextBytes(initVector);
-    secretKey = DatatypeConverter.printBase64Binary(initVector);
-
-    /* deploy log file name and position */
-    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
-    logName = "jdbc_" + df.format(new Date()) + "_" + System.currentTimeMillis() + ".log";
-    propsCNList = new Properties();
-
-    refreshCNList = new RunnableRefreshCNList();
-    refreshCNList.start();
+    isLogFileCreated = new AtomicBoolean(false);
   }
 
   /**

@@ -6,6 +6,8 @@
 package org.postgresql.ssl;
 
 import org.postgresql.util.GT;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
@@ -23,8 +25,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * <p>Provides a SSLSocketFactory that authenticates the remote server against an explicit pre-shared
@@ -86,7 +86,7 @@ public class SingleCertValidatingFactory extends WrappedFactory {
   private static final String CLASSPATH_PREFIX = "classpath:";
   private static final String ENV_PREFIX = "env:";
   private static final String SYS_PROP_PREFIX = "sys:";
-  private static final Logger LOGGER = Logger.getLogger(SingleCertValidatingFactory.class.getName());
+  private static Log LOGGER = Logger.getLogger(SingleCertValidatingFactory.class.getName());
 
   public SingleCertValidatingFactory(String sslFactoryArg) throws GeneralSecurityException {
     if (sslFactoryArg == null || sslFactoryArg.equals("")) {
@@ -135,7 +135,7 @@ public class SingleCertValidatingFactory extends WrappedFactory {
         try {
           in.close();
         } catch (Exception e2) {
-            LOGGER.log(Level.FINEST, "Catch IOException on close:", e2);
+            LOGGER.trace("Catch IOException on close:", e2);
         }
       }
     }

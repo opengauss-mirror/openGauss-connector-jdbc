@@ -379,6 +379,27 @@ public class CursorFetchTest extends BaseTest4 {
     stmt.executeUpdate();
   }
 
+  @Test
+  public void testMultistatement() throws Exception {
+    // Queries with multiple statements should not be transformed.
+
+    createRows(100); // 0 .. 99
+    PreparedStatement stmt = con.prepareStatement(
+        "insert into test_fetch(value) values(100); select * from test_fetch order by value");
+    stmt.setFetchSize(10);
+
+    assertTrue(!stmt.execute()); // INSERT
+    assertTrue(stmt.getMoreResults()); // SELECT
+    ResultSet rs = stmt.getResultSet();
+    int count = 0;
+    while (rs.next()) {
+      assertEquals(count, rs.getInt(1));
+      ++count;
+    }
+
+    assertEquals(101, count);
+  }
+
   // if the driver tries to use a cursor with autocommit on
   // it will fail because the cursor will disappear partway
   // through execution

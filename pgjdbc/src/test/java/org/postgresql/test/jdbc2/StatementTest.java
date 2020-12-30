@@ -590,6 +590,25 @@ public class StatementTest {
     }
   }
 
+  /**
+   * The parser tries to break multiple statements into individual queries as required by the V3
+   * extended query protocol. It can be a little overzealous sometimes and this test ensures we keep
+   * multiple rule actions together in one statement.
+   */
+  @Test
+  public void testParsingSemiColons() throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute(
+        "CREATE RULE r1 AS ON INSERT TO escapetest DO (DELETE FROM test_statement ; INSERT INTO test_statement VALUES (1); INSERT INTO test_statement VALUES (2); );");
+    stmt.executeUpdate("INSERT INTO escapetest(ts) VALUES (NULL)");
+    ResultSet rs = stmt.executeQuery("SELECT i from test_statement ORDER BY i");
+    assertTrue(rs.next());
+    assertEquals(1, rs.getInt(1));
+    assertTrue(rs.next());
+    assertEquals(2, rs.getInt(1));
+    assertTrue(!rs.next());
+  }
+
   @Test
   public void testParsingDollarQuotes() throws SQLException {
     // dollar-quotes are supported in the backend since version 8.0

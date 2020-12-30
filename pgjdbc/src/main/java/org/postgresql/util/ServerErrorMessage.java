@@ -7,16 +7,18 @@
 package org.postgresql.util;
 
 import org.postgresql.core.EncodingPredictor;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+
 
 public class ServerErrorMessage implements Serializable {
 
-  private static final Logger LOGGER = Logger.getLogger(ServerErrorMessage.class.getName());
+  private static Log LOGGER = Logger.getLogger(ServerErrorMessage.class.getName());
 
   private static final Character SEVERITY = 'S';
   private static final Character MESSAGE = 'M';
@@ -31,17 +33,11 @@ public class ServerErrorMessage implements Serializable {
   private static final Character ERRORCODE = Character.valueOf('c');
   private static final Character INTERNAL_POSITION = 'p';
   private static final Character INTERNAL_QUERY = 'q';
-  private static final Character SCHEMA = 's';
-  private static final Character TABLE = 't';
-  private static final Character COLUMN = 'c';
-  private static final Character DATATYPE = 'd';
-  private static final Character CONSTRAINT = 'n';
-
-
+  private static final Character SOCKET_ADDRESS = 'a';
   private final Map<Character, String> m_mesgParts = new HashMap<Character, String>();
 
-  public ServerErrorMessage(EncodingPredictor.DecodeResult serverError) {
-    this(serverError.result);
+  public ServerErrorMessage(EncodingPredictor.DecodeResult serverError, String socketAddress) {
+    this(serverError.result, socketAddress);
     if (serverError.encoding != null) {
       m_mesgParts.put(MESSAGE, m_mesgParts.get(MESSAGE)
           + GT.tr(" (pgjdbc: autodetected server-encoding to be {0}, if the message is not readable, please check database logs and/or host, port, dbname, user, password, pg_hba.conf)",
@@ -69,14 +65,18 @@ public class ServerErrorMessage implements Serializable {
       l_pos++;
     }
   }
+  public ServerErrorMessage(String p_serverError ,String socketAddress) {
+	this(p_serverError);
+    m_mesgParts.put(SOCKET_ADDRESS, socketAddress);
+  }
 
   public String getSQLState() {
     return m_mesgParts.get(SQLSTATE);
   }
-  
+
   public String getERRORCODE()
   {
-  	return (String)m_mesgParts.get(ERRORCODE);
+    return (String)m_mesgParts.get(ERRORCODE);
   }
   public String getMessage() {
     return m_mesgParts.get(MESSAGE);
@@ -101,27 +101,6 @@ public class ServerErrorMessage implements Serializable {
   public String getWhere() {
     return m_mesgParts.get(WHERE);
   }
-
-  public String getSchema() {
-    return m_mesgParts.get(SCHEMA);
-  }
-
-  public String getTable() {
-    return m_mesgParts.get(TABLE);
-  }
-
-  public String getColumn() {
-    return m_mesgParts.get(COLUMN);
-  }
-
-  public String getDatatype() {
-    return m_mesgParts.get(DATATYPE);
-  }
-
-  public String getConstraint() {
-    return m_mesgParts.get(CONSTRAINT);
-  }
-
 
   public String getFile() {
     return m_mesgParts.get(FILE);
@@ -151,6 +130,7 @@ public class ServerErrorMessage implements Serializable {
     return Integer.parseInt(s);
   }
 
+
   public String toString() {
     // Now construct the message from what the server sent
     // The general format is:
@@ -170,7 +150,11 @@ public class ServerErrorMessage implements Serializable {
     // is included.
 
     StringBuilder l_totalMessage = new StringBuilder();
-    String l_message = m_mesgParts.get(SEVERITY);
+    String l_message = m_mesgParts.get(SOCKET_ADDRESS);
+    if (l_message != null) {
+      l_totalMessage.append("[" + l_message + "] ");
+    }
+    l_message = m_mesgParts.get(SEVERITY);
     if (l_message != null) {
       l_totalMessage.append(l_message).append(": ");
     }
@@ -196,7 +180,7 @@ public class ServerErrorMessage implements Serializable {
       l_totalMessage.append("\n  ").append(GT.tr("Where: {0}", l_message));
     }
 
-    if (LOGGER.isLoggable(Level.FINEST)) {
+    if (LOGGER.isTraceEnabled()) {
       String l_internalQuery = m_mesgParts.get(INTERNAL_QUERY);
       if (l_internalQuery != null) {
         l_totalMessage.append("\n  ").append(GT.tr("Internal Query: {0}", l_internalQuery));

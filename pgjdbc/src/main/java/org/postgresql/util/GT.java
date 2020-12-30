@@ -4,13 +4,13 @@
  */
 
 package org.postgresql.util;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * This class provides a wrapper around a gettext message catalog that can provide a localized
@@ -22,7 +22,7 @@ public class GT {
 
   private static final GT _gt = new GT();
   private static final Object[] noargs = new Object[0];
-  private static final Logger LOGGER = Logger.getLogger(GT.class.getName());
+  private static Log LOGGER = Logger.getLogger(GT.class.getName());
 
   public static String tr(String message, Object... args) {
     return _gt.translate(message, args);
@@ -32,10 +32,7 @@ public class GT {
 
   private GT() {
     try {
-      //#if mvn.project.property.postgresql.jdbc.spec < "JDBC4.1"     
       _bundle = ResourceBundle.getBundle("org.postgresql.translation.messages");
-      //else
-      _bundle = ResourceBundle.getBundle("org.postgresql.translation.messages", Locale.getDefault(Locale.Categery.DISPLAY));
       //#endif
     } catch (MissingResourceException mre) {
       // translation files have not been installed
@@ -50,7 +47,7 @@ public class GT {
       } catch (MissingResourceException mre) {
           // If we can't find a translation, just
           // use the untranslated message.
-          LOGGER.log(Level.FINEST, "Catch MissingResourceException while translation. ", mre);
+          LOGGER.trace("Catch MissingResourceException while translation. ", mre);
       }
     }
 

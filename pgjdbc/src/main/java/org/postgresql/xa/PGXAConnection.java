@@ -12,6 +12,8 @@ import org.postgresql.ds.PGPooledConnection;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -22,8 +24,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.LinkedList;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.sql.XAConnection;
 import javax.transaction.xa.XAException;
@@ -42,7 +42,7 @@ import javax.transaction.xa.Xid;
  */
 public class PGXAConnection extends PGPooledConnection implements XAConnection, XAResource {
 
-  private static final Logger LOGGER = Logger.getLogger(PGXAConnection.class.getName());
+  private static Log LOGGER = Logger.getLogger(PGXAConnection.class.getName());
 
   /**
    * Underlying physical database connection. It's used for issuing PREPARE TRANSACTION/ COMMIT
@@ -64,8 +64,8 @@ public class PGXAConnection extends PGPooledConnection implements XAConnection, 
   private boolean localAutoCommitMode = true;
 
   private void debug(String s) {
-    if (LOGGER.isLoggable(Level.FINEST)) {
-      LOGGER.log(Level.FINEST, "XAResource {0}: {1}", new Object[]{Integer.toHexString(this.hashCode()), s});
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("XAResource " + Integer.toHexString(this.hashCode()) + ": " + s);
     }
   }
 
@@ -176,7 +176,7 @@ public class PGXAConnection extends PGPooledConnection implements XAConnection, 
    */
   @Override
   public void start(Xid xid, int flags) throws XAException {
-    if (LOGGER.isLoggable(Level.FINEST)) {
+    if (LOGGER.isTraceEnabled()) {
       debug("starting transaction xid = " + xid);
     }
 
@@ -261,7 +261,7 @@ public class PGXAConnection extends PGPooledConnection implements XAConnection, 
    */
   @Override
   public void end(Xid xid, int flags) throws XAException {
-    if (LOGGER.isLoggable(Level.FINEST)) {
+    if (LOGGER.isTraceEnabled()) {
       debug("ending transaction xid = " + xid);
     }
 
@@ -312,13 +312,13 @@ public class PGXAConnection extends PGPooledConnection implements XAConnection, 
    */
   @Override
   public int prepare(Xid xid) throws XAException {
-    if (LOGGER.isLoggable(Level.FINEST)) {
+    if (LOGGER.isTraceEnabled()) {
       debug("preparing transaction xid = " + xid);
     }
 
     // Check preconditions
     if (currentXid == null && preparedXid != null) {
-      if (LOGGER.isLoggable(Level.FINEST)) {
+      if (LOGGER.isTraceEnabled()) {
         debug("Prepare xid " + xid + " but current connection is not attached to a transaction"
             + " while it was prepared in past with prepared xid " + preparedXid);
       }
@@ -329,7 +329,7 @@ public class PGXAConnection extends PGPooledConnection implements XAConnection, 
           "Current connection does not have an associated xid. prepare xid={0}", xid), XAException.XAER_NOTA);
     }
     if (!currentXid.equals(xid)) {
-      if (LOGGER.isLoggable(Level.FINEST)) {
+      if (LOGGER.isTraceEnabled()) {
         debug("Error to prepare xid " + xid + ", the current connection already bound with xid " + currentXid);
       }
       throw new PGXAException(GT.tr(
@@ -436,7 +436,7 @@ public class PGXAConnection extends PGPooledConnection implements XAConnection, 
    */
   @Override
   public void rollback(Xid xid) throws XAException {
-    if (LOGGER.isLoggable(Level.FINEST)) {
+    if (LOGGER.isTraceEnabled()) {
       debug("rolling back xid = " + xid);
     }
 
@@ -467,7 +467,7 @@ public class PGXAConnection extends PGPooledConnection implements XAConnection, 
 
   @Override
   public void commit(Xid xid, boolean onePhase) throws XAException {
-    if (LOGGER.isLoggable(Level.FINEST)) {
+    if (LOGGER.isTraceEnabled()) {
       debug("committing xid = " + xid + (onePhase ? " (one phase) " : " (two phase)"));
     }
 
@@ -577,7 +577,7 @@ public class PGXAConnection extends PGPooledConnection implements XAConnection, 
       int errorCode = XAException.XAER_RMERR;
       if (PSQLState.UNDEFINED_OBJECT.getState().equals(ex.getSQLState())) {
         if (committedOrRolledBack || !xid.equals(preparedXid)) {
-          if (LOGGER.isLoggable(Level.FINEST)) {
+          if (LOGGER.isTraceEnabled()) {
             debug("committing xid " + xid + " while the connection prepared xid is " + preparedXid
                 + (committedOrRolledBack ? ", but the connection was already committed/rolled-back" : ""));
           }
@@ -585,7 +585,7 @@ public class PGXAConnection extends PGPooledConnection implements XAConnection, 
         }
       }
       if (PSQLState.isConnectionError(ex.getSQLState())) {
-        if (LOGGER.isLoggable(Level.FINEST)) {
+        if (LOGGER.isTraceEnabled()) {
           debug("commit connection failure (sql error code " + ex.getSQLState() + "), reconnection could be expected");
         }
         errorCode = XAException.XAER_RMFAIL;

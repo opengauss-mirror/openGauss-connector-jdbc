@@ -20,6 +20,8 @@ import org.postgresql.core.SqlCommand;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -32,12 +34,10 @@ import java.util.TimerTask;
 import org.postgresql.core.v3.ConnectionFactoryImpl;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class PgStatement implements Statement, BaseStatement {
   private static final String[] NO_RETURNING_COLUMNS = new String[0];
-  private static final Logger LOGGER = Logger.getLogger(PgStatement.class.getName());
+  private static Log LOGGER = Logger.getLogger(PgStatement.class.getName());
   /**
    * Default state for use or not binary transfers. Can use only for testing purposes
    */
@@ -595,8 +595,8 @@ public class PgStatement implements Statement, BaseStatement {
 	    try{
 	    	listener.noticeReceived(warn);
 		}catch(Exception e){
-		    LOGGER.log(Level.FINEST, "noticeReceived failed. {0}", e.toString());
-        }
+        LOGGER.trace("noticeReceived failed. " + e.toString());
+        } 
     }
 
   }
@@ -982,7 +982,7 @@ public class PgStatement implements Statement, BaseStatement {
           }
           PgStatement.this.cancel();
         } catch (SQLException e) {
-            LOGGER.log(Level.FINEST, "Catch SQLException while cancel this Statement. ", e);
+            LOGGER.trace("Catch SQLException while cancel this Statement. ", e);
         }
       }
     };

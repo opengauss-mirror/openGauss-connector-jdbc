@@ -309,6 +309,11 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
   int getProtocolVersion();
 
   /**
+   * @return GaussDB version information
+   */
+  String getGaussdbVersion();
+
+  /**
    * Sets the oids that should be received using binary encoding.
    *
    * @param useBinaryForOids The oids to request with binary encoding.
@@ -450,7 +455,7 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
    * @return application_name connection property
    */
   String getApplicationName();
-
+  String getApplicationType();
   boolean isColumnSanitiserDisabled();
 
   PreferQueryMode getPreferQueryMode();
@@ -480,4 +485,8 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
   int getNetworkTimeout() throws IOException;
 
   void setProtocolVersion(int protocolVerion);
+
+  String getSocketAddress();
+
+  void setGaussdbVersion(String gaussdbVersion);
 }

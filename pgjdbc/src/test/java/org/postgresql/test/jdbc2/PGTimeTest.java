@@ -48,6 +48,86 @@ public class PGTimeTest extends BaseTest4 {
   }
 
   /**
+   * Tests that adding a <code>PGInterval</code> object to a <code>PGTime</code> object when
+   * performed as a casted string and object.
+   *
+   * @throws SQLException if a JDBC or database problem occurs.
+   */
+  @Test
+  public void testTimeWithInterval() throws SQLException {
+    assumeTrue(TestUtil.haveIntegerDateTimes(con));
+
+    Calendar cal = Calendar.getInstance();
+    cal.set(1970, Calendar.JANUARY, 1);
+
+    final long now = cal.getTimeInMillis();
+    verifyTimeWithInterval(new PGTime(now), new PGInterval(0, 0, 0, 1, 2, 3.14), true);
+    verifyTimeWithInterval(new PGTime(now), new PGInterval(0, 0, 0, 1, 2, 3.14), false);
+
+    verifyTimeWithInterval(new PGTime(now, Calendar.getInstance(TimeZone.getTimeZone("GMT"))),
+        new PGInterval(0, 0, 0, 1, 2, 3.14), true);
+    verifyTimeWithInterval(new PGTime(now, Calendar.getInstance(TimeZone.getTimeZone("GMT"))),
+        new PGInterval(0, 0, 0, 1, 2, 3.14), false);
+
+    verifyTimeWithInterval(new PGTime(now, Calendar.getInstance(TimeZone.getTimeZone("GMT+01:00"))),
+        new PGInterval(0, 0, 0, 1, 2, 3.456), true);
+    verifyTimeWithInterval(new PGTime(now, Calendar.getInstance(TimeZone.getTimeZone("GMT+01:00"))),
+        new PGInterval(0, 0, 0, 1, 2, 3.456), false);
+  }
+
+  /**
+   * Verifies that adding the given <code>PGInterval</code> object to a <code>PGTime</code> produces
+   * the correct results when performed as a casted string and object.
+   *
+   * @param time the time to test.
+   * @param interval the time interval.
+   * @param useSetObject <code>true</code> if the setObject method should be used instead of
+   *        setTime.
+   * @throws SQLException if a JDBC or database problem occurs.
+   */
+  private void verifyTimeWithInterval(PGTime time, PGInterval interval, boolean useSetObject)
+      throws SQLException {
+    // Construct the SQL query.
+    String sql;
+    if (time.getCalendar() != null) {
+      sql = "SELECT ?::time with time zone + ?";
+    } else {
+      sql = "SELECT ?::time + ?";
+    }
+
+    SimpleDateFormat sdf = createSimpleDateFormat(time);
+
+    // Execute a query using a casted time string + PGInterval.
+    PreparedStatement stmt = con.prepareStatement(sql);
+    stmt.setString(1, sdf.format(time));
+    stmt.setObject(2, interval);
+
+    ResultSet rs = stmt.executeQuery();
+    assertTrue(rs.next());
+
+    Time result1 = rs.getTime(1);
+    // System.out.println(stmt + " = " + sdf.format(result1));
+    stmt.close();
+
+    // Execute a query using with PGTime + PGInterval.
+    stmt = con.prepareStatement("SELECT ? + ?");
+    if (useSetObject) {
+      stmt.setObject(1, time);
+    } else {
+      stmt.setTime(1, time);
+    }
+    stmt.setObject(2, interval);
+
+    rs = stmt.executeQuery();
+    assertTrue(rs.next());
+
+    Time result2 = rs.getTime(1);
+    // System.out.println(stmt + " = " + sdf.format(result2));
+    assertEquals(result1, result2);
+    stmt.close();
+  }
+
+  /**
    * Tests inserting and selecting <code>PGTime</code> objects with <code>time</code> and <code>time
    * with time zone</code> columns.
    *

@@ -18,9 +18,6 @@ import java.sql.SQLException;
  * lead to disconnect by timeout from server.
  */
 public interface PGReplicationStream
-//    //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.1"
-//    extends AutoCloseable
-//    //#endif
     /* hi, checkstyle */ {
 
   /**

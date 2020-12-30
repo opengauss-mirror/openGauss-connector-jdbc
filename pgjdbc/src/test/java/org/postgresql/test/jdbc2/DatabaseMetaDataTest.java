@@ -78,6 +78,9 @@ public class DatabaseMetaDataTest {
       stmt.execute(
           "CREATE OR REPLACE FUNCTION f5() RETURNS TABLE (i int) LANGUAGE sql AS 'SELECT 1'");
     }
+
+    TestUtil.createDomain(con, "nndom", "int not null");
+    TestUtil.createTable(con, "domaintable", "id nndom");
     stmt.close();
   }
 
@@ -103,6 +106,8 @@ public class DatabaseMetaDataTest {
     stmt.execute("DROP FUNCTION f1(int, varchar)");
     stmt.execute("DROP FUNCTION f2(int, varchar)");
     stmt.execute("DROP FUNCTION f3(int, varchar)");
+    TestUtil.dropType(con, "domaintable");
+    TestUtil.dropDomain(con, "nndom");
 
     TestUtil.closeDB(con);
   }
@@ -131,6 +136,34 @@ public class DatabaseMetaDataTest {
     rs = dbmd.getColumns(null, null, "intarraytable", "b");
     assertTrue(rs.next());
     assertEquals("_int4", rs.getString("TYPE_NAME")); // even int4[][] is represented as _int4
+  }
+
+  @Test
+  public void testCustomArrayTypeInfo() throws SQLException {
+    DatabaseMetaData dbmd = con.getMetaData();
+    ResultSet res = dbmd.getColumns(null, null, "customtable", null);
+    assertTrue(res.next());
+    assertEquals("custom", res.getString("TYPE_NAME"));
+    assertTrue(res.next());
+    assertEquals("_custom", res.getString("TYPE_NAME"));
+    if (TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_3)) {
+      assertTrue(res.next());
+      assertEquals("__custom", res.getString("TYPE_NAME"));
+      assertTrue(res.next());
+      assertEquals("___custom", res.getString("TYPE_NAME"));
+    }
+    if (TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_3)) {
+      con.createArrayOf("custom", new Object[]{});
+      res = dbmd.getColumns(null, null, "customtable", null);
+      assertTrue(res.next());
+      assertEquals("custom", res.getString("TYPE_NAME"));
+      assertTrue(res.next());
+      assertEquals("_custom", res.getString("TYPE_NAME"));
+      assertTrue(res.next());
+      assertEquals("__custom", res.getString("TYPE_NAME"));
+      assertTrue(res.next());
+      assertEquals("___custom", res.getString("TYPE_NAME"));
+    }
   }
 
   @Test
@@ -163,6 +196,260 @@ public class DatabaseMetaDataTest {
     assertEquals("metadatatest", rs.getString("TABLE_NAME"));
     assertEquals("updated", rs.getString("COLUMN_NAME"));
     assertEquals(java.sql.Types.TIMESTAMP, rs.getInt("DATA_TYPE"));
+  }
+
+  @Test
+  public void testCrossReference() throws Exception {
+    Connection con1 = TestUtil.openDB();
+
+    TestUtil.createTable(con1, "vv", "a int not null, b int not null, primary key ( a, b )");
+
+    TestUtil.createTable(con1, "ww",
+        "m int not null, n int not null, primary key ( m, n ), foreign key ( m, n ) references vv ( a, b )");
+
+
+    DatabaseMetaData dbmd = con.getMetaData();
+    assertNotNull(dbmd);
+
+    ResultSet rs = dbmd.getCrossReference(null, "", "vv", null, "", "ww");
+
+    for (int j = 1; rs.next(); j++) {
+
+      String pkTableName = rs.getString("PKTABLE_NAME");
+      assertEquals("vv", pkTableName);
+
+      String pkColumnName = rs.getString("PKCOLUMN_NAME");
+      assertTrue(pkColumnName.equals("a") || pkColumnName.equals("b"));
+
+      String fkTableName = rs.getString("FKTABLE_NAME");
+      assertEquals("ww", fkTableName);
+
+      String fkColumnName = rs.getString("FKCOLUMN_NAME");
+      assertTrue(fkColumnName.equals("m") || fkColumnName.equals("n"));
+
+      String fkName = rs.getString("FK_NAME");
+      assertEquals("ww_m_fkey", fkName);
+
+      String pkName = rs.getString("PK_NAME");
+      assertEquals("vv_pkey", pkName);
+
+      int keySeq = rs.getInt("KEY_SEQ");
+      assertEquals(j, keySeq);
+    }
+
+
+    TestUtil.dropTable(con1, "vv");
+    TestUtil.dropTable(con1, "ww");
+    TestUtil.closeDB(con1);
+  }
+
+  @Test
+  public void testForeignKeyActions() throws Exception {
+    Connection conn = TestUtil.openDB();
+    TestUtil.createTable(conn, "pkt", "id int primary key");
+    TestUtil.createTable(conn, "fkt1",
+        "id int references pkt on update restrict on delete cascade");
+    TestUtil.createTable(conn, "fkt2",
+        "id int references pkt on update set null on delete set default");
+    DatabaseMetaData dbmd = conn.getMetaData();
+
+    ResultSet rs = dbmd.getImportedKeys(null, "", "fkt1");
+    assertTrue(rs.next());
+    assertEquals(DatabaseMetaData.importedKeyRestrict, rs.getInt("UPDATE_RULE"));
+    assertEquals(DatabaseMetaData.importedKeyCascade, rs.getInt("DELETE_RULE"));
+    rs.close();
+
+    rs = dbmd.getImportedKeys(null, "", "fkt2");
+    assertTrue(rs.next());
+    assertEquals(DatabaseMetaData.importedKeySetNull, rs.getInt("UPDATE_RULE"));
+    assertEquals(DatabaseMetaData.importedKeySetDefault, rs.getInt("DELETE_RULE"));
+    rs.close();
+
+    TestUtil.dropTable(conn, "fkt2");
+    TestUtil.dropTable(conn, "fkt1");
+    TestUtil.dropTable(conn, "pkt");
+    TestUtil.closeDB(conn);
+  }
+
+  @Test
+  public void testForeignKeysToUniqueIndexes() throws Exception {
+    Connection con1 = TestUtil.openDB();
+    TestUtil.createTable(con1, "pkt",
+        "a int not null, b int not null, CONSTRAINT pkt_pk_a PRIMARY KEY (a), CONSTRAINT pkt_un_b UNIQUE (b)");
+    TestUtil.createTable(con1, "fkt",
+        "c int, d int, CONSTRAINT fkt_fk_c FOREIGN KEY (c) REFERENCES pkt(b)");
+
+    DatabaseMetaData dbmd = con.getMetaData();
+    ResultSet rs = dbmd.getImportedKeys("", "", "fkt");
+    int j = 0;
+    for (; rs.next(); j++) {
+      assertEquals("pkt", rs.getString("PKTABLE_NAME"));
+      assertEquals("fkt", rs.getString("FKTABLE_NAME"));
+      assertEquals("pkt_un_b", rs.getString("PK_NAME"));
+      assertEquals("b", rs.getString("PKCOLUMN_NAME"));
+    }
+    assertEquals(1, j);
+
+    TestUtil.dropTable(con1, "fkt");
+    TestUtil.dropTable(con1, "pkt");
+    con1.close();
+  }
+
+  @Test
+  public void testMultiColumnForeignKeys() throws Exception {
+    Connection con1 = TestUtil.openDB();
+    TestUtil.createTable(con1, "pkt",
+        "a int not null, b int not null, CONSTRAINT pkt_pk PRIMARY KEY (a,b)");
+    TestUtil.createTable(con1, "fkt",
+        "c int, d int, CONSTRAINT fkt_fk_pkt FOREIGN KEY (c,d) REFERENCES pkt(b,a)");
+
+    DatabaseMetaData dbmd = con.getMetaData();
+    ResultSet rs = dbmd.getImportedKeys("", "", "fkt");
+    int j = 0;
+    for (; rs.next(); j++) {
+      assertEquals("pkt", rs.getString("PKTABLE_NAME"));
+      assertEquals("fkt", rs.getString("FKTABLE_NAME"));
+      assertEquals(j + 1, rs.getInt("KEY_SEQ"));
+      if (j == 0) {
+        assertEquals("b", rs.getString("PKCOLUMN_NAME"));
+        assertEquals("c", rs.getString("FKCOLUMN_NAME"));
+      } else {
+        assertEquals("a", rs.getString("PKCOLUMN_NAME"));
+        assertEquals("d", rs.getString("FKCOLUMN_NAME"));
+      }
+    }
+    assertEquals(2, j);
+
+    TestUtil.dropTable(con1, "fkt");
+    TestUtil.dropTable(con1, "pkt");
+    con1.close();
+  }
+
+  @Test
+  public void testSameTableForeignKeys() throws Exception {
+    Connection con1 = TestUtil.openDB();
+
+    TestUtil.createTable(con1, "person",
+        "FIRST_NAME character varying(100) NOT NULL," + "LAST_NAME character varying(100) NOT NULL,"
+            + "FIRST_NAME_PARENT_1 character varying(100),"
+            + "LAST_NAME_PARENT_1 character varying(100),"
+            + "FIRST_NAME_PARENT_2 character varying(100),"
+            + "LAST_NAME_PARENT_2 character varying(100),"
+            + "CONSTRAINT PERSON_pkey PRIMARY KEY (FIRST_NAME , LAST_NAME ),"
+            + "CONSTRAINT PARENT_1_fkey FOREIGN KEY (FIRST_NAME_PARENT_1, LAST_NAME_PARENT_1)"
+            + "REFERENCES PERSON (FIRST_NAME, LAST_NAME) MATCH SIMPLE "
+            + "ON UPDATE CASCADE ON DELETE CASCADE,"
+            + "CONSTRAINT PARENT_2_fkey FOREIGN KEY (FIRST_NAME_PARENT_2, LAST_NAME_PARENT_2)"
+            + "REFERENCES PERSON (FIRST_NAME, LAST_NAME) MATCH SIMPLE "
+            + "ON UPDATE CASCADE ON DELETE CASCADE");
+
+
+    DatabaseMetaData dbmd = con.getMetaData();
+    assertNotNull(dbmd);
+    ResultSet rs = dbmd.getImportedKeys(null, "", "person");
+
+    final List<String> fkNames = new ArrayList<String>();
+
+    int lastFieldCount = -1;
+    while (rs.next()) {
+      // destination table (all foreign keys point to the same)
+      String pkTableName = rs.getString("PKTABLE_NAME");
+      assertEquals("person", pkTableName);
+
+      // destination fields
+      String pkColumnName = rs.getString("PKCOLUMN_NAME");
+      assertTrue("first_name".equals(pkColumnName) || "last_name".equals(pkColumnName));
+
+      // source table (all foreign keys are in the same)
+      String fkTableName = rs.getString("FKTABLE_NAME");
+      assertEquals("person", fkTableName);
+
+      // foreign key name
+      String fkName = rs.getString("FK_NAME");
+      // sequence number within the foreign key
+      int seq = rs.getInt("KEY_SEQ");
+      if (seq == 1) {
+        // begin new foreign key
+        assertFalse(fkNames.contains(fkName));
+        fkNames.add(fkName);
+        // all foreign keys have 2 fields
+        assertTrue(lastFieldCount < 0 || lastFieldCount == 2);
+      } else {
+        // continue foreign key, i.e. fkName matches the last foreign key
+        assertEquals(fkNames.get(fkNames.size() - 1), fkName);
+        // see always increases by 1
+        assertEquals(seq, lastFieldCount + 1);
+      }
+      lastFieldCount = seq;
+    }
+    // there's more than one foreign key from a table to another
+    assertEquals(2, fkNames.size());
+
+    TestUtil.dropTable(con1, "person");
+    TestUtil.closeDB(con1);
+
+
+  }
+
+  @Test
+  public void testForeignKeys() throws Exception {
+    Connection con1 = TestUtil.openDB();
+    TestUtil.createTable(con1, "people", "id int4 primary key, name text");
+    TestUtil.createTable(con1, "policy", "id int4 primary key, name text");
+
+    TestUtil.createTable(con1, "users",
+        "id int4 primary key, people_id int4, policy_id int4,"
+            + "CONSTRAINT people FOREIGN KEY (people_id) references people(id),"
+            + "constraint policy FOREIGN KEY (policy_id) references policy(id)");
+
+
+    DatabaseMetaData dbmd = con.getMetaData();
+    assertNotNull(dbmd);
+
+    ResultSet rs = dbmd.getImportedKeys(null, "", "users");
+    int j = 0;
+    for (; rs.next(); j++) {
+
+      String pkTableName = rs.getString("PKTABLE_NAME");
+      assertTrue(pkTableName.equals("people") || pkTableName.equals("policy"));
+
+      String pkColumnName = rs.getString("PKCOLUMN_NAME");
+      assertEquals("id", pkColumnName);
+
+      String fkTableName = rs.getString("FKTABLE_NAME");
+      assertEquals("users", fkTableName);
+
+      String fkColumnName = rs.getString("FKCOLUMN_NAME");
+      assertTrue(fkColumnName.equals("people_id") || fkColumnName.equals("policy_id"));
+
+      String fkName = rs.getString("FK_NAME");
+      assertTrue(fkName.startsWith("people") || fkName.startsWith("policy"));
+
+      String pkName = rs.getString("PK_NAME");
+      assertTrue(pkName.equals("people_pkey") || pkName.equals("policy_pkey"));
+
+    }
+
+    assertEquals(2, j);
+
+    rs = dbmd.getExportedKeys(null, "", "people");
+
+    // this is hacky, but it will serve the purpose
+    assertTrue(rs.next());
+
+    assertEquals("people", rs.getString("PKTABLE_NAME"));
+    assertEquals("id", rs.getString("PKCOLUMN_NAME"));
+
+    assertEquals("users", rs.getString("FKTABLE_NAME"));
+    assertEquals("people_id", rs.getString("FKCOLUMN_NAME"));
+
+    assertTrue(rs.getString("FK_NAME").startsWith("people"));
+
+
+    TestUtil.dropTable(con1, "users");
+    TestUtil.dropTable(con1, "people");
+    TestUtil.dropTable(con1, "policy");
+    TestUtil.closeDB(con1);
   }
 
   @Test
@@ -346,6 +633,16 @@ public class DatabaseMetaDataTest {
     assertTrue(!rs.next());
 
     rs.close();
+  }
+
+  @Test
+  public void testNotNullDomainColumn() throws SQLException {
+    DatabaseMetaData dbmd = con.getMetaData();
+    ResultSet rs = dbmd.getColumns("", "", "domaintable", "");
+    assertTrue(rs.next());
+    assertEquals("id", rs.getString("COLUMN_NAME"));
+    assertEquals("NO", rs.getString("IS_NULLABLE"));
+    assertTrue(!rs.next());
   }
 
   @Test
@@ -668,6 +965,104 @@ public class DatabaseMetaDataTest {
       }
     }
 
+  }
+
+  @Test
+  public void testGetUDT1() throws Exception {
+    try {
+      Statement stmt = con.createStatement();
+      stmt.execute("create domain testint8 as int8");
+      stmt.execute("comment on domain testint8 is 'jdbc123'");
+      DatabaseMetaData dbmd = con.getMetaData();
+      ResultSet rs = dbmd.getUDTs(null, null, "testint8", null);
+      assertTrue(rs.next());
+
+      String cat = rs.getString("type_cat");
+      String schema = rs.getString("type_schem");
+      String typeName = rs.getString("type_name");
+      String className = rs.getString("class_name");
+      int dataType = rs.getInt("data_type");
+      String remarks = rs.getString("remarks");
+
+      int baseType = rs.getInt("base_type");
+      assertTrue("base type", !rs.wasNull());
+      assertEquals("data type", Types.DISTINCT, dataType);
+      assertEquals("type name ", "testint8", typeName);
+      assertEquals("remarks", "jdbc123", remarks);
+
+    } finally {
+      try {
+        Statement stmt = con.createStatement();
+        stmt.execute("drop domain testint8");
+      } catch (Exception ex) {
+      }
+    }
+  }
+
+
+  @Test
+  public void testGetUDT2() throws Exception {
+    try {
+      Statement stmt = con.createStatement();
+      stmt.execute("create domain testint8 as int8");
+      stmt.execute("comment on domain testint8 is 'jdbc123'");
+      DatabaseMetaData dbmd = con.getMetaData();
+      ResultSet rs = dbmd.getUDTs(null, null, "testint8", new int[]{Types.DISTINCT, Types.STRUCT});
+      assertTrue(rs.next());
+      String typeName;
+
+      String cat = rs.getString("type_cat");
+      String schema = rs.getString("type_schem");
+      typeName = rs.getString("type_name");
+      String className = rs.getString("class_name");
+      int dataType = rs.getInt("data_type");
+      String remarks = rs.getString("remarks");
+
+      int baseType = rs.getInt("base_type");
+      assertTrue("base type", !rs.wasNull());
+      assertEquals("data type", Types.DISTINCT, dataType);
+      assertEquals("type name ", "testint8", typeName);
+      assertEquals("remarks", "jdbc123", remarks);
+
+    } finally {
+      try {
+        Statement stmt = con.createStatement();
+        stmt.execute("drop domain testint8");
+      } catch (Exception ex) {
+      }
+    }
+  }
+
+  @Test
+  public void testGetUDT3() throws Exception {
+    try {
+      Statement stmt = con.createStatement();
+      stmt.execute("create domain testint8 as int8");
+      stmt.execute("comment on domain testint8 is 'jdbc123'");
+      DatabaseMetaData dbmd = con.getMetaData();
+      ResultSet rs = dbmd.getUDTs(null, null, "testint8", new int[]{Types.DISTINCT});
+      assertTrue(rs.next());
+
+      String cat = rs.getString("type_cat");
+      String schema = rs.getString("type_schem");
+      String typeName = rs.getString("type_name");
+      String className = rs.getString("class_name");
+      int dataType = rs.getInt("data_type");
+      String remarks = rs.getString("remarks");
+
+      int baseType = rs.getInt("base_type");
+      assertTrue("base type", !rs.wasNull());
+      assertEquals("data type", Types.DISTINCT, dataType);
+      assertEquals("type name ", "testint8", typeName);
+      assertEquals("remarks", "jdbc123", remarks);
+
+    } finally {
+      try {
+        Statement stmt = con.createStatement();
+        stmt.execute("drop domain testint8");
+      } catch (Exception ex) {
+      }
+    }
   }
 
   @Test

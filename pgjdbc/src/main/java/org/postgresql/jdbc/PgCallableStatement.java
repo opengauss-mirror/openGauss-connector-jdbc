@@ -8,6 +8,7 @@ package org.postgresql.jdbc;
 import org.postgresql.Driver;
 import org.postgresql.core.ParameterList;
 import org.postgresql.core.Query;
+import org.postgresql.core.types.PGBlob;
 import org.postgresql.core.types.PGClob;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
@@ -28,7 +29,6 @@ import java.sql.SQLException;
 import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.sql.Date;
 import java.sql.Types;
 import java.util.Calendar;
 import java.util.Map;
@@ -176,9 +176,8 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
         else if ( columnType == Types.OTHER && functionReturnType[j] == -10 )
         {                        
         }
-        else if (columnType == Types.TIMESTAMP && functionReturnType[j] == Types.DATE) {
-          if ( callResult[j] != null)
-            callResult[j] = new Date(((Timestamp)callResult[j]).getTime());
+        else if ( columnType == Types.OTHER && functionReturnType[j] == Types.BLOB )
+        {
         }
         else {
           throw new PSQLException(GT.tr(
@@ -524,7 +523,10 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
   }
 
   public Blob getBlob(int i) throws SQLException {
-    throw Driver.notImplemented(this.getClass(), "getBlob(int)");
+    byte[] byt = (byte[]) callResult[i - 1];
+    PGBlob blob = new PGBlob();
+    blob.setBytes(1, byt);
+    return blob;
   }
 
   public Clob getClob(int i) throws SQLException {
@@ -585,32 +587,6 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
       throws SQLException {
     throw Driver.notImplemented(this.getClass(), "registerOutParameter(int,int,String)");
   }
-
-//  //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//      int scaleOrLength) throws SQLException {
-//  }
-//
-//      throws SQLException {
-//  }
-//
-//      throws SQLException {
-//  }
-//
-//      throws SQLException {
-//  }
-//
-//      throws SQLException {
-//  }
-//
-//      throws SQLException {
-//  }
-//
-//      throws SQLException {
-//  }
-//
-//      throws SQLException {
-//  }
-//  //#endif
 
   public RowId getRowId(int parameterIndex) throws SQLException {
     throw Driver.notImplemented(this.getClass(), "getRowId(int)");

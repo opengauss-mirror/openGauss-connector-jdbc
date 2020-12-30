@@ -6,6 +6,8 @@
 package org.postgresql.ssl;
 
 import org.postgresql.util.GT;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.net.IDN;
 import java.security.cert.CertificateParsingException;
@@ -15,8 +17,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
@@ -26,7 +26,7 @@ import javax.net.ssl.SSLSession;
 import javax.security.auth.x500.X500Principal;
 
 public class PGjdbcHostnameVerifier implements HostnameVerifier {
-  private static final Logger LOGGER = Logger.getLogger(PGjdbcHostnameVerifier.class.getName());
+  private static Log LOGGER = Logger.getLogger(PGjdbcHostnameVerifier.class.getName());
 
   public static final PGjdbcHostnameVerifier INSTANCE = new PGjdbcHostnameVerifier();
 
@@ -80,13 +80,14 @@ public class PGjdbcHostnameVerifier implements HostnameVerifier {
     try {
       peerCerts = (X509Certificate[]) session.getPeerCertificates();
     } catch (SSLPeerUnverifiedException e) {
-      LOGGER.log(Level.SEVERE,
-          GT.tr("Unable to parse X509Certificate for hostname {0}", hostname), e);
+      LOGGER.error(
+          GT.tr("Unable to parse X509Certificate for hostname " + hostname), e);
+
       return false;
     }
     if (peerCerts == null || peerCerts.length == 0) {
-      LOGGER.log(Level.SEVERE,
-          GT.tr("No certificates found for hostname {0}", hostname));
+      LOGGER.error(
+          GT.tr("No certificates found for hostname " + hostname));
       return false;
     }
 
@@ -98,14 +99,13 @@ public class PGjdbcHostnameVerifier implements HostnameVerifier {
       // This converts unicode domain name to ASCII
       try {
         canonicalHostname = IDN.toASCII(hostname);
-        if (LOGGER.isLoggable(Level.FINEST)) {
-          LOGGER.log(Level.FINEST, "Canonical host name for {0} is {1}",
-              new Object[]{hostname, canonicalHostname});
+        if (LOGGER.isTraceEnabled()) {
+          LOGGER.trace("Canonical host name for " + hostname + " is " + canonicalHostname);
         }
       } catch (IllegalArgumentException e) {
         // e.g. hostname is invalid
-        LOGGER.log(Level.SEVERE,
-            GT.tr("Hostname {0} is invalid", hostname), e);
+        LOGGER.error(
+            GT.tr("Hostname " + hostname + " is invalid"), e);
         return false;
       }
     }
@@ -121,8 +121,8 @@ public class PGjdbcHostnameVerifier implements HostnameVerifier {
         subjectAltNames = Collections.emptyList();
       }
     } catch (CertificateParsingException e) {
-      LOGGER.log(Level.SEVERE,
-          GT.tr("Unable to parse certificates for hostname {0}", hostname), e);
+      LOGGER.error(
+          GT.tr("Unable to parse certificates for hostname " + hostname), e);
       return false;
     }
 
@@ -151,9 +151,9 @@ public class PGjdbcHostnameVerifier implements HostnameVerifier {
       }
       anyDnsSan |= sanType == TYPE_DNS_NAME;
       if (verifyHostName(canonicalHostname, san)) {
-        if (LOGGER.isLoggable(Level.FINEST)) {
-          LOGGER.log(Level.SEVERE,
-              GT.tr("Server name validation pass for {0}, subjectAltName {1}", hostname, san));
+        if (LOGGER.isTraceEnabled()) {
+          LOGGER.error(
+              GT.tr("Server name validation pass for " + hostname + ", subjectAltName " + san));
         }
         return true;
       }
@@ -168,9 +168,10 @@ public class PGjdbcHostnameVerifier implements HostnameVerifier {
        * the use of the Common Name is existing practice, it is deprecated and
        * Certification Authorities are encouraged to use the dNSName instead.
        */
-      LOGGER.log(Level.SEVERE,
-          GT.tr("Server name validation failed: certificate for host {0} dNSName entries subjectAltName,"
-              + " but none of them match. Assuming server name validation failed", hostname));
+  
+      LOGGER.error(
+          GT.tr("Server name validation failed: certificate for host " + hostname + " dNSName entries subjectAltName,"
+              + " but none of them match. Assuming server name validation failed"));
       return false;
     }
 
@@ -179,9 +180,9 @@ public class PGjdbcHostnameVerifier implements HostnameVerifier {
     try {
       DN = new LdapName(serverCert.getSubjectX500Principal().getName(X500Principal.RFC2253));
     } catch (InvalidNameException e) {
-      LOGGER.log(Level.SEVERE,
+      LOGGER.error(
           GT.tr("Server name validation failed: unable to extract common name"
-              + " from X509Certificate for hostname {0}", hostname), e);
+              + " from X509Certificate for hostname " + hostname), e);
       return false;
     }
 
@@ -192,10 +193,9 @@ public class PGjdbcHostnameVerifier implements HostnameVerifier {
       }
     }
     if (commonNames.isEmpty()) {
-      LOGGER.log(Level.SEVERE,
-          GT.tr("Server name validation failed: certificate for hostname {0} has no DNS subjectAltNames,"
-                  + " and it CommonName is missing as well",
-              hostname));
+      LOGGER.error(
+          GT.tr("Server name validation failed: certificate for hostname " + hostname + " has no DNS subjectAltNames,"
+                  + " and it CommonName is missing as well"));
       return false;
     }
     if (commonNames.size() > 1) {
@@ -212,9 +212,8 @@ public class PGjdbcHostnameVerifier implements HostnameVerifier {
     String commonName = commonNames.get(commonNames.size() - 1);
     boolean result = verifyHostName(canonicalHostname, commonName);
     if (!result) {
-      LOGGER.log(Level.SEVERE,
-          GT.tr("Server name validation failed: hostname {0} does not match common name {1}",
-              hostname, commonName));
+      LOGGER.error(
+          GT.tr("Server name validation failed: hostname " + hostname + " does not match common name " + commonName));
     }
     return result;
   }

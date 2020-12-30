@@ -9,6 +9,8 @@ import org.postgresql.core.PGStream;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import org.ietf.jgss.GSSCredential;
 
@@ -17,8 +19,6 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.sql.SQLException;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
@@ -26,12 +26,12 @@ import javax.security.auth.login.LoginContext;
 
 public class MakeGSS {
 
-  private static final Logger LOGGER = Logger.getLogger(MakeGSS.class.getName());
+  private static Log LOGGER = Logger.getLogger(MakeGSS.class.getName());
 
   public static void authenticate(PGStream pgStream, String host, String user, String password,
       String jaasApplicationName, String kerberosServerName, boolean useSpnego, boolean jaasLogin)
           throws IOException, SQLException {
-    LOGGER.log(Level.FINEST, " <=BE AuthenticationReqGSS");
+    LOGGER.trace(" <=BE AuthenticationReqGSS");
 
     if (jaasApplicationName == null) {
       jaasApplicationName = "pgjdbc";

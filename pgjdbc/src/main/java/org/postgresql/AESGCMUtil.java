@@ -1,5 +1,5 @@
 /*
- * AESGCMUtil
+ * Copyright (c) Huawei Technologies Co., Ltd. 2019-2019. All rights reserved.
  */
 
 package org.postgresql;
@@ -9,8 +9,9 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
+
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -27,7 +28,7 @@ import javax.xml.bind.DatatypeConverter;
  * This class provide encrypt and decrypt method.
  */
 public class AESGCMUtil {
-    private static final Logger LOGGER = Logger.getLogger(AESGCMUtil.class.getName());
+    private static Log LOGGER = Logger.getLogger(AESGCMUtil.class.getName());
 
     /* length of authentication tag */
     public static final int GCM_TAG_LENGTH = 16;
@@ -80,9 +81,9 @@ public class AESGCMUtil {
         } catch (InvalidKeyException | InvalidAlgorithmParameterException | NoSuchPaddingException
                 | NoSuchAlgorithmException | UnsupportedEncodingException | ShortBufferException
                 | IllegalBlockSizeException | BadPaddingException e) {
-            LOGGER.log(Level.INFO, "encropt failed. except error", e);
+            LOGGER.info("encropt failed. except error", e);
         } catch (Exception e) {
-            LOGGER.log(Level.INFO, "encropt failed.", e);
+            LOGGER.info("encropt failed.", e);
         }
         return "";
     }
@@ -114,9 +115,9 @@ public class AESGCMUtil {
             return new String(plaintext, "UTF-8");
         } catch (NoSuchPaddingException | NoSuchAlgorithmException | IllegalBlockSizeException | BadPaddingException
                 | UnsupportedEncodingException e) {
-            LOGGER.log(Level.INFO, "decropt failed. except error", e);
+            LOGGER.info("decropt failed. except error", e);
         } catch (Exception e) {
-            LOGGER.log(Level.INFO, "decropt failed. except error", e);
+            LOGGER.info("decropt failed. except error", e);
         }
         return "";
     }

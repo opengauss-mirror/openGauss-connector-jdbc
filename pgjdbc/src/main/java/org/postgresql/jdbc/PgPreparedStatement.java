@@ -29,6 +29,8 @@ import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.util.ReaderInputStream;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,23 +59,19 @@ import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
-////#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-////#endif
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.Locale;
 
 class PgPreparedStatement extends PgStatement implements PreparedStatement {
   protected final CachedQuery preparedQuery; // Query fragments for prepared statement.
   protected final ParameterList preparedParameters; // Parameter values for prepared statement.
 
-  private static final Logger LOGGER = Logger.getLogger(PgPreparedStatement.class.getName());
+  private static Log LOGGER = Logger.getLogger(PgPreparedStatement.class.getName());
   private TimeZone defaultTimeZone;
 
   PgPreparedStatement(PgConnection connection, String sql, int rsType, int rsConcurrency,
@@ -557,9 +555,6 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
           java.sql.Date tmpd;
           if (in instanceof java.util.Date) {
             tmpd = new java.sql.Date(((java.util.Date) in).getTime());
-//            //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//            break;
-//            //#endif
           } else {
             tmpd = connection.getTimestampUtils().toDate(getDefaultCalendar(), in.toString());
           }
@@ -573,9 +568,6 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
           java.sql.Time tmpt;
           if (in instanceof java.util.Date) {
             tmpt = new java.sql.Time(((java.util.Date) in).getTime());
-//            //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//            break;
-//            //#endif
           } else {
             tmpt = connection.getTimestampUtils().toTime(getDefaultCalendar(), in.toString());
           }
@@ -591,21 +583,12 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
           java.sql.Timestamp tmpts;
           if (in instanceof java.util.Date) {
             tmpts = new java.sql.Timestamp(((java.util.Date) in).getTime());
-//            //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//            break;
-//            //#endif
           } else {
             tmpts = connection.getTimestampUtils().toTimestamp(getDefaultCalendar(), in.toString());
           }
           setTimestamp(parameterIndex, tmpts);
         }
         break;
-//      //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//      case Types.TIMESTAMP_WITH_TIMEZONE:
-//              PSQLState.INVALID_PARAMETER_TYPE);
-//        }
-//        break;
-//      //#endif
       case Types.BOOLEAN:
       case Types.BIT:
         setBoolean(parameterIndex, BooleanTypeUtil.castToBoolean(in));
@@ -891,8 +874,6 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
             setString(parameterIndex, (String) x);
         } else if (x instanceof Character) {
             setString(parameterIndex, ((Character) x).toString());
-//          //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//          //#endif
         }
   }
   private void setObjectOfFigure(int parameterIndex, Object x) throws SQLException {
@@ -1123,7 +1104,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
      try {
        outputStream.close();
      } catch (Exception e) {
-         LOGGER.log(Level.FINEST, "Catch Exception on outputStream close:", e);
+         LOGGER.trace("Catch Exception on outputStream close:", e);
      }
    }
    return oid;
@@ -1337,30 +1318,10 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
    bindString(i, connection.getTimestampUtils().toString(cal, t), oid);
  }
 
-// //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-// }
-//
-// }
-//
-// }
-//
-// }
-// //#endif
-
  public ParameterMetaData createParameterMetaData(BaseConnection conn, int[] oids)
      throws SQLException {
    return new PgParameterMetaData(conn, oids);
  }
-
-
-// //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//     int scaleOrLength) throws SQLException {
-// }
-//
-//     throws SQLException {
-// }
-// //#endif
-
 
  public void setRowId(int parameterIndex, RowId x) throws SQLException {
    throw Driver.notImplemented(this.getClass(), "setRowId(int, RowId)");

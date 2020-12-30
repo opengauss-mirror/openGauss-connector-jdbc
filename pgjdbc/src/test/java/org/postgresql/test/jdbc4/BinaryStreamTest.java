@@ -92,6 +92,41 @@ public class BinaryStreamTest extends BaseTest4 {
   }
 
   @Test
+  public void testKnownLengthEmpty() throws Exception {
+    byte[] data = new byte[0];
+    insertStreamKownLength(data);
+    validateContent(data);
+  }
+
+  @Test
+  public void testKnownLength2Kb() throws Exception {
+    byte[] data = getTestData(2 * 1024);
+    insertStreamKownLength(data);
+    validateContent(data);
+  }
+
+  @Test
+  public void testKnownLength10Kb() throws Exception {
+    byte[] data = getTestData(10 * 1024);
+    insertStreamKownLength(data);
+    validateContent(data);
+  }
+
+  @Test
+  public void testKnownLength100Kb() throws Exception {
+    byte[] data = getTestData(100 * 1024);
+    insertStreamKownLength(data);
+    validateContent(data);
+  }
+
+  @Test
+  public void testKnownLength200Kb() throws Exception {
+    byte[] data = getTestData(200 * 1024);
+    insertStreamKownLength(data);
+    validateContent(data);
+  }
+
+  @Test
   public void testUnknownLengthEmpty() throws Exception {
     byte[] data = getTestData(2 * 1024);
     insertStreamUnkownLength(data);

@@ -190,6 +190,34 @@ public abstract class BaseDataSourceTest {
   }
 
   /**
+   * Eventually, we must test stuffing the DataSource in JNDI and then getting it back out and make
+   * sure it's still usable. This should ideally test both Serializable and Referenceable
+   * mechanisms. Will probably be multiple tests when implemented.
+   */
+  @Test
+  public void testJndi() {
+    initializeDataSource();
+    BaseDataSource oldbds = bds;
+    String oldurl = bds.getURL();
+    InitialContext ic = getInitialContext();
+    try {
+      ic.rebind(DATA_SOURCE_JNDI, bds);
+      bds = (BaseDataSource) ic.lookup(DATA_SOURCE_JNDI);
+      assertNotNull("Got null looking up DataSource from JNDI!", bds);
+      compareJndiDataSource(oldbds, bds);
+    } catch (NamingException e) {
+      fail(e.getMessage());
+    }
+    oldbds = bds;
+    String url = bds.getURL();
+    testUseConnection();
+    assertSame("Test should not have changed DataSource (" + bds + " != " + oldbds + ")!",
+        oldbds , bds);
+    assertEquals("Test should not have changed DataSource URL",
+        oldurl, url);
+  }
+
+  /**
    * Uses the mini-JNDI implementation for testing purposes.
    */
   protected InitialContext getInitialContext() {

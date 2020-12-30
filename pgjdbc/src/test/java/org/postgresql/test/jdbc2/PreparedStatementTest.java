@@ -105,6 +105,28 @@ public class PreparedStatementTest extends BaseTest4 {
   }
 
   @Test
+  public void testSetBinaryStream() throws SQLException {
+    assumeByteaSupported();
+    ByteArrayInputStream bais;
+    byte[] buf = new byte[10];
+    for (int i = 0; i < buf.length; i++) {
+      buf[i] = (byte) i;
+    }
+
+    bais = null;
+    doSetBinaryStream(bais, 0);
+
+    bais = new ByteArrayInputStream(new byte[0]);
+    doSetBinaryStream(bais, 0);
+
+    bais = new ByteArrayInputStream(buf);
+    doSetBinaryStream(bais, 0);
+
+    bais = new ByteArrayInputStream(buf);
+    doSetBinaryStream(bais, 10);
+  }
+
+  @Test
   public void testSetAsciiStream() throws Exception {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     PrintWriter pw = new PrintWriter(new OutputStreamWriter(baos, "ASCII"));
@@ -144,6 +166,30 @@ public class PreparedStatementTest extends BaseTest4 {
       fail("Expected an exception when executing a new SQL statement on a prepared statement");
     } catch (SQLException e) {
     }
+  }
+
+  @Test
+  public void testBinaryStreamErrorsRestartable() throws SQLException {
+    byte[] buf = new byte[10];
+    for (int i = 0; i < buf.length; i++) {
+      buf[i] = (byte) i;
+    }
+
+    // InputStream is shorter than the length argument implies.
+    InputStream is = new ByteArrayInputStream(buf);
+    runBrokenStream(is, buf.length + 1);
+
+    // InputStream throws an Exception during read.
+    is = new BrokenInputStream(new ByteArrayInputStream(buf), buf.length / 2);
+    runBrokenStream(is, buf.length);
+
+    // Invalid length < 0.
+    is = new ByteArrayInputStream(buf);
+    runBrokenStream(is, -1);
+
+    // Total Bind message length too long.
+    is = new ByteArrayInputStream(buf);
+    runBrokenStream(is, Integer.MAX_VALUE);
   }
 
   private void runBrokenStream(InputStream is, int length) throws SQLException {
@@ -210,6 +256,24 @@ public class PreparedStatementTest extends BaseTest4 {
     pstmt.close();
   }
 
+  @Test
+  public void testBinds() throws SQLException {
+    // braces around (42) are required to puzzle the parser
+    String query = "INSERT INTO inttable(a) VALUES (?);SELECT (42)";
+    PreparedStatement ps = con.prepareStatement(query);
+    ps.setInt(1, 100500);
+    ps.execute();
+    ResultSet rs = ps.getResultSet();
+    Assert.assertNull("insert produces no results ==> getResultSet should be null", rs);
+    Assert.assertTrue("There are two statements => getMoreResults should be true", ps.getMoreResults());
+    rs = ps.getResultSet();
+    Assert.assertNotNull("select produces results ==> getResultSet should be not null", rs);
+    Assert.assertTrue("select produces 1 row ==> rs.next should be true", rs.next());
+    Assert.assertEquals("second result of query " + query, 42, rs.getInt(1));
+
+    TestUtil.closeQuietly(rs);
+    TestUtil.closeQuietly(ps);
+  }
 
   @Test
   public void testSetNull() throws SQLException {
@@ -792,6 +856,62 @@ public class PreparedStatementTest extends BaseTest4 {
   }
 
   @Test
+  public void testSetTinyIntFloat() throws SQLException {
+    PreparedStatement pstmt = con
+        .prepareStatement("CREATE temp TABLE tiny_int (max_val int4, min_val int4, null_val int4)");
+    pstmt.executeUpdate();
+    pstmt.close();
+
+    Integer maxInt = new Integer(127);
+    Integer minInt = new Integer(-127);
+    Float maxIntFloat = new Float(127);
+    Float minIntFloat = new Float(-127);
+
+    pstmt = con.prepareStatement("insert into tiny_int values (?,?,?)");
+    pstmt.setObject(1, maxIntFloat, Types.TINYINT);
+    pstmt.setObject(2, minIntFloat, Types.TINYINT);
+    pstmt.setNull(3, Types.TINYINT);
+    pstmt.executeUpdate();
+    pstmt.close();
+
+    pstmt = con.prepareStatement("select * from tiny_int");
+    ResultSet rs = pstmt.executeQuery();
+    assertTrue(rs.next());
+
+    assertEquals("maxInt as rs.getObject", maxInt, rs.getObject(1));
+    assertEquals("minInt as rs.getObject", minInt, rs.getObject(2));
+    rs.getObject(3);
+    assertTrue("rs.wasNull after rs.getObject", rs.wasNull());
+    assertEquals("maxInt as rs.getInt", maxInt, (Integer) rs.getInt(1));
+    assertEquals("minInt as rs.getInt", minInt, (Integer) rs.getInt(2));
+    rs.getInt(3);
+    assertTrue("rs.wasNull after rs.getInt", rs.wasNull());
+    assertEquals("maxInt as rs.getLong", Long.valueOf(maxInt), (Long) rs.getLong(1));
+    assertEquals("minInt as rs.getLong", Long.valueOf(minInt), (Long) rs.getLong(2));
+    rs.getLong(3);
+    assertTrue("rs.wasNull after rs.getLong", rs.wasNull());
+    assertEquals("maxInt as rs.getBigDecimal", BigDecimal.valueOf(maxInt), rs.getBigDecimal(1));
+    assertEquals("minInt as rs.getBigDecimal", BigDecimal.valueOf(minInt), rs.getBigDecimal(2));
+    assertNull("rs.getBigDecimal", rs.getBigDecimal(3));
+    assertTrue("rs.getBigDecimal after rs.getLong", rs.wasNull());
+    assertEquals("maxInt as rs.getBigDecimal(scale=0)", BigDecimal.valueOf(maxInt),
+        rs.getBigDecimal(1, 0));
+    assertEquals("minInt as rs.getBigDecimal(scale=0)", BigDecimal.valueOf(minInt),
+        rs.getBigDecimal(2, 0));
+    assertNull("rs.getBigDecimal(scale=0)", rs.getBigDecimal(3, 0));
+    assertTrue("rs.getBigDecimal after rs.getLong", rs.wasNull());
+    assertEquals("maxInt as rs.getBigDecimal(scale=1)",
+        BigDecimal.valueOf(maxInt).setScale(1, BigDecimal.ROUND_HALF_EVEN), rs.getBigDecimal(1, 1));
+    assertEquals("minInt as rs.getBigDecimal(scale=1)",
+        BigDecimal.valueOf(minInt).setScale(1, BigDecimal.ROUND_HALF_EVEN), rs.getBigDecimal(2, 1));
+    rs.getFloat(3);
+    assertTrue(rs.wasNull());
+    rs.close();
+    pstmt.close();
+
+  }
+
+  @Test
   public void testSetSmallIntFloat() throws SQLException {
     PreparedStatement pstmt = con.prepareStatement(
         "CREATE temp TABLE small_int (max_val int4, min_val int4, null_val int4)");
@@ -1094,6 +1214,24 @@ public class PreparedStatementTest extends BaseTest4 {
 
     psinsert.close();
     psselect.close();
+  }
+
+  @Test
+  public void testUnknownSetObject() throws SQLException {
+    PreparedStatement pstmt = con.prepareStatement("INSERT INTO intervaltable(i) VALUES (?)");
+
+    pstmt.setString(1, "1 week");
+    try {
+      pstmt.executeUpdate();
+      assertTrue("When using extended protocol, interval vs character varying type mismatch error is expected",
+          preferQueryMode == PreferQueryMode.SIMPLE);
+    } catch (SQLException sqle) {
+      // ERROR: column "i" is of type interval but expression is of type character varying
+    }
+
+    pstmt.setObject(1, "1 week", Types.OTHER);
+    pstmt.executeUpdate();
+    pstmt.close();
   }
 
   /**

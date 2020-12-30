@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 /**
  * Simple container for host and port.
  */
-public class HostSpec {
+public class HostSpec implements Comparable {
   public static String DEFAULT_NON_PROXY_HOSTS = "localhost|127.*|[::1]|0.0.0.0|[::0]";
 
   protected final String host;
@@ -40,6 +40,11 @@ public class HostSpec {
   public boolean equals(Object obj) {
     return obj instanceof HostSpec && port == ((HostSpec) obj).port
         && host.equals(((HostSpec) obj).host);
+  }
+
+  @Override
+  public int compareTo(Object o) {
+    return this.toString().compareTo(o.toString());
   }
 
   @Override

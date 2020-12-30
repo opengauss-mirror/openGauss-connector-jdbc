@@ -4,17 +4,17 @@
  */
 
 package org.postgresql.util;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.util.Timer;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class SharedTimer {
   // Incremented for each Timer created, this allows each to have a unique Timer name
   private static final AtomicInteger timerCount = new AtomicInteger(0);
 
-  private static final Logger LOGGER = Logger.getLogger(SharedTimer.class.getName());
+  private static Log LOGGER = Logger.getLogger(SharedTimer.class.getName());
   private volatile Timer timer = null;
   private final AtomicInteger refCount = new AtomicInteger(0);
 
@@ -53,17 +53,17 @@ public class SharedTimer {
     int count = refCount.decrementAndGet();
     if (count > 0) {
       // There are outstanding references to the timer so do nothing
-      LOGGER.log(Level.FINEST, "Outstanding references still exist so not closing shared Timer");
+      LOGGER.trace("Outstanding references still exist so not closing shared Timer");
     } else if (count == 0) {
       // This is the last usage of the Timer so cancel it so it's resources can be release.
-      LOGGER.log(Level.FINEST, "No outstanding references to shared Timer, will cancel and close it");
+      LOGGER.trace("No outstanding references to shared Timer, will cancel and close it");
       if (timer != null) {
         timer.cancel();
         timer = null;
       }
     } else {
       // Should not get here under normal circumstance, probably a bug in app code.
-      LOGGER.log(Level.WARNING,
+      LOGGER.warn(
           "releaseTimer() called too many times; there is probably a bug in the calling code");
       refCount.set(0);
     }

@@ -12,8 +12,8 @@ import org.postgresql.util.PSQLState;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 /**
  * Provides constants for well-known backend OIDs for the types we commonly use.
@@ -84,12 +84,11 @@ public class Oid {
   public static final int REF_CURSOR = 1790;
   public static final int REF_CURSOR_ARRAY = 2201;
   public static final int BLOB = 88;
-  public static final int CLOB = 90;
 
   private static final Map<Integer, String> OID_TO_NAME = new HashMap<Integer, String>(100);
   private static final Map<String, Integer> NAME_TO_OID = new HashMap<String, Integer>(100);
 
-  private static final Logger LOGGER = Logger.getLogger(Oid.class.getName());
+  private static Log LOGGER = Logger.getLogger(Oid.class.getName());
   static {
     for (Field field : Oid.class.getFields()) {
       try {
@@ -99,7 +98,7 @@ public class Oid {
         NAME_TO_OID.put(name, oid);
       } catch (IllegalAccessException e) {
           // ignore
-          LOGGER.log(Level.WARNING, "Catch IllegalAccessException while get information from field. ", e);
+          LOGGER.warn("Catch IllegalAccessException while get information from field. ", e);
       }
     }
   }
@@ -133,7 +132,7 @@ public class Oid {
         // OID are unsigned 32bit integers, so Integer.parseInt is not enough
         return (int) Long.parseLong(oid);
       } catch (NumberFormatException ex) {
-          LOGGER.log(Level.WARNING, "Catch NumberFormatException while format oid to long. ", ex);
+          LOGGER.warn("Catch NumberFormatException while format oid to long. ", ex);
       }
     }
     throw new PSQLException(GT.tr("oid type {0} not known and not a number", oid),

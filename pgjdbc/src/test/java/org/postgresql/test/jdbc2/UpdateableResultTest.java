@@ -278,6 +278,92 @@ public class UpdateableResultTest extends BaseTest4 {
   }
 
   @Test
+  public void testUpdateable() throws SQLException {
+    Statement st =
+        con.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE);
+    ResultSet rs = st.executeQuery("select * from updateable");
+    assertNotNull(rs);
+    rs.moveToInsertRow();
+    rs.updateInt(1, 1);
+    rs.updateString(2, "jake");
+    rs.updateString(3, "avalue");
+    rs.insertRow();
+    rs.first();
+
+    rs.updateInt("id", 2);
+    rs.updateString("name", "dave");
+    rs.updateRow();
+
+    assertEquals(2, rs.getInt("id"));
+    assertEquals("dave", rs.getString("name"));
+    assertEquals("avalue", rs.getString("notselected"));
+
+    rs.deleteRow();
+    rs.moveToInsertRow();
+    rs.updateInt("id", 3);
+    rs.updateString("name", "paul");
+
+    rs.insertRow();
+
+    try {
+      rs.refreshRow();
+      fail("Can't refresh when on the insert row.");
+    } catch (SQLException sqle) {
+    }
+
+    assertEquals(3, rs.getInt("id"));
+    assertEquals("paul", rs.getString("name"));
+    assertNull(rs.getString("notselected"));
+
+    rs.close();
+
+    rs = st.executeQuery("select id1, id, name, name1 from updateable, second");
+    try {
+      while (rs.next()) {
+        rs.updateInt("id", 2);
+        rs.updateString("name", "dave");
+        rs.updateRow();
+      }
+
+
+      fail("should not get here, update should fail");
+    } catch (SQLException ex) {
+    }
+
+    rs = st.executeQuery("select oid,* from updateable");
+    assertTrue(rs.first());
+    rs.updateInt("id", 3);
+    rs.updateString("name", "dave3");
+    rs.updateRow();
+    assertEquals(3, rs.getInt("id"));
+    assertEquals("dave3", rs.getString("name"));
+
+    rs.moveToInsertRow();
+    rs.updateInt("id", 4);
+    rs.updateString("name", "dave4");
+
+    rs.insertRow();
+    rs.updateInt("id", 5);
+    rs.updateString("name", "dave5");
+    rs.insertRow();
+
+    rs.moveToCurrentRow();
+    assertEquals(3, rs.getInt("id"));
+    assertEquals("dave3", rs.getString("name"));
+
+    assertTrue(rs.next());
+    assertEquals(4, rs.getInt("id"));
+    assertEquals("dave4", rs.getString("name"));
+
+    assertTrue(rs.next());
+    assertEquals(5, rs.getInt("id"));
+    assertEquals("dave5", rs.getString("name"));
+
+    rs.close();
+    st.close();
+  }
+
+  @Test
   public void testInsertRowIllegalMethods() throws Exception {
     Statement st =
         con.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE);

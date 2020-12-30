@@ -13,22 +13,22 @@ import org.postgresql.util.GT;
 import org.postgresql.util.ObjectFactory;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.IOException;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
 public class MakeSSL extends ObjectFactory {
 
-  private static final Logger LOGGER = Logger.getLogger(MakeSSL.class.getName());
+  private static Log LOGGER = Logger.getLogger(MakeSSL.class.getName());
 
   public static void convert(PGStream stream, Properties info)
       throws PSQLException, IOException {
-    LOGGER.log(Level.FINE, "converting regular socket connection to ssl");
+    LOGGER.debug("converting regular socket connection to ssl");
 
     SSLSocketFactory factory = SocketFactoryFactory.getSslSocketFactory(info);
     SSLSocket newConnection;
@@ -41,7 +41,7 @@ public class MakeSSL extends ObjectFactory {
       //set supported Cipher suites before SSL handshake
       String[] suppoertedCiphersSuites = getSupportedCiphersSuites(info);
       if (suppoertedCiphersSuites != null) {
-        newConnection.setEnabledCipherSuites(suppoertedCiphersSuites);
+          newConnection.setEnabledCipherSuites(suppoertedCiphersSuites);
       }
 
       newConnection.startHandshake();
@@ -62,8 +62,8 @@ public class MakeSSL extends ObjectFactory {
   }
 
   private static String[] getSupportedCiphersSuites(Properties info) {
-    String supportedSSLCipherSuites = PGProperty.TLS_CIPHERS_SUPPERTED.get(info);
-    return supportedSSLCipherSuites.split(",");
+	  String supportedSSLCipherSuites = PGProperty.TLS_CIPHERS_SUPPERTED.get(info);
+	  return supportedSSLCipherSuites.split(",");
   }
 
   private static void verifyPeerName(PGStream stream, Properties info, SSLSocket newConnection)

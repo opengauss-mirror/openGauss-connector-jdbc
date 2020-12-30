@@ -218,6 +218,26 @@ public class CopyTest {
   }
 
   @Test
+  public void testCopyOut() throws SQLException, IOException {
+    testCopyInByRow(); // ensure we have some data.
+    String sql = "COPY copytest TO STDOUT";
+    ByteArrayOutputStream copydata = new ByteArrayOutputStream();
+    copyAPI.copyOut(sql, copydata);
+    assertEquals(dataRows, getCount());
+    // deep comparison of data written and read
+    byte[] copybytes = copydata.toByteArray();
+    assertNotNull(copybytes);
+    for (int i = 0, l = 0; i < origData.length; i++) {
+      byte[] origBytes = origData[i].getBytes();
+      assertTrue("Copy is shorter than original", copybytes.length >= l + origBytes.length);
+      for (int j = 0; j < origBytes.length; j++, l++) {
+        assertEquals("content changed at byte#" + j + ": " + origBytes[j] + copybytes[l],
+            origBytes[j], copybytes[l]);
+      }
+    }
+  }
+
+  @Test
   public void testNonCopyOut() throws SQLException, IOException {
     String sql = "SELECT 1";
     try {
@@ -316,6 +336,64 @@ public class CopyTest {
       assertEquals("42601", ex.getSQLState());
       con.rollback();
     }
+  }
+
+  @Test
+  public void testLockReleaseOnCancelFailure() throws SQLException, InterruptedException {
+    if (!TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_4)) {
+      // pg_backend_pid() requires PostgreSQL 8.4+
+      return;
+    }
+
+    // This is a fairly complex test because it is testing a
+    // deadlock that only occurs when the connection to postgres
+    // is broken during a copy operation. We'll start a copy
+    // operation, use pg_terminate_backend to rudely break it,
+    // and then cancel. The test passes if a subsequent operation
+    // on the Connection object fails to deadlock.
+    con.setAutoCommit(false);
+
+    Statement stmt = con.createStatement();
+    ResultSet rs = stmt.executeQuery("select pg_backend_pid()");
+    rs.next();
+    int pid = rs.getInt(1);
+    rs.close();
+    stmt.close();
+
+    CopyManager manager = con.unwrap(PGConnection.class).getCopyAPI();
+    CopyIn copyIn = manager.copyIn("COPY copytest FROM STDIN with " + copyParams);
+    try {
+      killConnection(pid);
+      byte[] bunchOfNulls = ",,\n".getBytes();
+      while (true) {
+        copyIn.writeToCopy(bunchOfNulls, 0, bunchOfNulls.length);
+      }
+    } catch (SQLException e) {
+      acceptIOCause(e);
+    } finally {
+      if (copyIn.isActive()) {
+        try {
+          copyIn.cancelCopy();
+          fail("cancelCopy should have thrown an exception");
+        } catch (SQLException e) {
+          acceptIOCause(e);
+        }
+      }
+    }
+
+    // Now we'll execute rollback on another thread so that if the
+    // deadlock _does_ occur the testcase doesn't just hange forever.
+    Rollback rollback = new Rollback(con);
+    rollback.start();
+    rollback.join(1000);
+    if (rollback.isAlive()) {
+      fail("rollback did not terminate");
+    }
+    SQLException rollbackException = rollback.exception();
+    if (rollbackException == null) {
+      fail("rollback should have thrown an exception");
+    }
+    acceptIOCause(rollbackException);
   }
 
   private static class Rollback extends Thread {

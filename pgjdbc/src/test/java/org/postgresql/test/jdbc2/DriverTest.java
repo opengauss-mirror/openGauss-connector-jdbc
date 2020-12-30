@@ -134,6 +134,31 @@ public class DriverTest {
     con.close();
   }
 
+  /*
+   * Test that the readOnly property works.
+   */
+  @Test
+  public void testReadOnly() throws Exception {
+    TestUtil.initDriver(); // Set up log levels, etc.
+
+    Connection con = DriverManager.getConnection(TestUtil.getURL() + "&readOnly=true",
+        TestUtil.getUser(), TestUtil.getPassword());
+    assertNotNull(con);
+    assertTrue(con.isReadOnly());
+    con.close();
+
+    con = DriverManager.getConnection(TestUtil.getURL() + "&readOnly=false", TestUtil.getUser(),
+        TestUtil.getPassword());
+    assertNotNull(con);
+    assertFalse(con.isReadOnly());
+    con.close();
+
+    con =
+        DriverManager.getConnection(TestUtil.getURL(), TestUtil.getUser(), TestUtil.getPassword());
+    assertNotNull(con);
+    assertFalse(con.isReadOnly());
+    con.close();
+  }
 
   @Test
   public void testRegistration() throws Exception {

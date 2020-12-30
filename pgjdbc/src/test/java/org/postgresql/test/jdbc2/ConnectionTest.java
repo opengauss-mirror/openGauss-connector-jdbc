@@ -220,17 +220,21 @@ public class ConnectionTest {
     con.setAutoCommit(true);
 
     assertEquals(defaultLevel, con.getTransactionIsolation());
-    // openGauss not support TRANSACTION_SERIALIZABLE, it is equal to TRANSACTION_REPEATABLE_READ
+
     con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-    assertEquals(Connection.TRANSACTION_REPEATABLE_READ, con.getTransactionIsolation());
+    assertEquals(Connection.TRANSACTION_SERIALIZABLE, con.getTransactionIsolation());
 
     con.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
     assertEquals(Connection.TRANSACTION_READ_COMMITTED, con.getTransactionIsolation());
 
     // Test if a change of isolation level before beginning the
     // transaction affects the isolation level inside the transaction.
-
+    con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+    assertEquals(Connection.TRANSACTION_SERIALIZABLE, con.getTransactionIsolation());
+    con.setAutoCommit(false);
+    assertEquals(Connection.TRANSACTION_SERIALIZABLE, con.getTransactionIsolation());
     con.setAutoCommit(true);
+    assertEquals(Connection.TRANSACTION_SERIALIZABLE, con.getTransactionIsolation());
     con.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
     assertEquals(Connection.TRANSACTION_READ_COMMITTED, con.getTransactionIsolation());
     con.setAutoCommit(false);

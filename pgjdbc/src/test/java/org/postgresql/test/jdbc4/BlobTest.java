@@ -36,16 +36,27 @@ public class BlobTest {
   @Before
   public void setUp() throws Exception {
     _conn = TestUtil.openDB();
-    TestUtil.createTable(_conn, "testblob", "id name,lo blob");
+    TestUtil.createTable(_conn, "testblob", "id name,lo oid");
     _conn.setAutoCommit(false);
   }
 
   @After
   public void tearDown() throws Exception {
     _conn.setAutoCommit(true);
-
-    TestUtil.dropTable(_conn, "testblob");
-    TestUtil.closeDB(_conn);
+    try {
+      Statement stmt = _conn.createStatement();
+      try {
+        stmt.execute("SELECT lo_unlink(lo) FROM testblob");
+      } finally {
+        try {
+          stmt.close();
+        } catch (Exception e) {
+        }
+      }
+    } finally {
+      TestUtil.dropTable(_conn, "testblob");
+      TestUtil.closeDB(_conn);
+    }
   }
 
   @Test
@@ -131,6 +142,23 @@ public class BlobTest {
       assertEquals("vestibulum", new String(actualData, "UTF-8"));
     } finally {
       selectStmt.close();
+    }
+  }
+
+  @Test
+  public void testFree() throws SQLException {
+    Statement stmt = _conn.createStatement();
+    stmt.execute("INSERT INTO testblob(lo) VALUES(lo_creat(-1))");
+    ResultSet rs = stmt.executeQuery("SELECT lo FROM testblob");
+    assertTrue(rs.next());
+
+    Blob blob = rs.getBlob(1);
+    blob.free();
+    try {
+      blob.length();
+      fail("Should have thrown an Exception because it was freed.");
+    } catch (SQLException sqle) {
+      // expected
     }
   }
 }

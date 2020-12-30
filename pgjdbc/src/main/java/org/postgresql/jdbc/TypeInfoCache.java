@@ -88,9 +88,6 @@ public class TypeInfoCache implements TypeInfo {
       {"smalldatetime", Oid.SMALLDATETIME, Types.TIMESTAMP, "java.lang.Timestamp", Oid.SMALLDATETIME_ARRAY},
       {"timestamptz", Oid.TIMESTAMPTZ, Types.TIMESTAMP, "java.sql.Timestamp",
           Oid.TIMESTAMPTZ_ARRAY},
-//      //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//      {"refcursor", Oid.REF_CURSOR, Types.REF_CURSOR, "java.sql.ResultSet", Oid.REF_CURSOR_ARRAY},
-//      //#endif
       {"json", Oid.JSON, Types.OTHER, "org.postgresql.util.PGobject", Oid.JSON_ARRAY},
       {"point", Oid.POINT, Types.OTHER, "org.postgresql.geometric.PGpoint", Oid.POINT_ARRAY}
   };
@@ -623,7 +620,6 @@ public class TypeInfoCache implements TypeInfo {
       oidToInteger.put(Oid.CHAR, 1);
       oidToInteger.put(Oid.BOOL, 1);
       oidToInteger.put(Oid.DATE, 13); // "4713-01-01 BC" to "01/01/4713 BC" - "31/12/32767"
-      // SELECT LENGTH('-123456789 years 11 months 33 days 23 hours 10.123456 seconds'::interval);
       oidToInteger.put(Oid.INTERVAL, 49);
   }
   private int getValueOfTime(int oid, int typmod) {

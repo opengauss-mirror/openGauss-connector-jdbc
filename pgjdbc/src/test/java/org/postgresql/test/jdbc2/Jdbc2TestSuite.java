@@ -12,6 +12,7 @@ import org.postgresql.core.OidValueOfTest;
 import org.postgresql.core.ParserTest;
 import org.postgresql.core.ReturningParserTest;
 import org.postgresql.core.v3.V3ParameterListTests;
+import org.postgresql.jdbc.DeepBatchedInsertStatementTest;
 import org.postgresql.jdbc.PrimitiveArraySupportTest;
 import org.postgresql.test.core.JavaVersionTest;
 import org.postgresql.test.core.NativeQueryBindLengthTest;
@@ -37,6 +38,7 @@ import org.junit.runners.Suite;
         DateStyleTest.class,
         DatabaseMetaDataTest.class,
         DatabaseMetaDataPropertiesTest.class,
+        SearchPathLookupTest.class,
         EncodingTest.class,
         ExpressionPropertiesTest.class,
         ColumnSanitiserDisabledTest.class,
@@ -50,6 +52,7 @@ import org.junit.runners.Suite;
         ConnectionTest.class,
         DatabaseMetaDataTest.class,
         DatabaseMetaDataPropertiesTest.class,
+        SearchPathLookupTest.class,
         EncodingTest.class,
         ExpressionPropertiesTest.class,
         ColumnSanitiserDisabledTest.class,
@@ -63,8 +66,11 @@ import org.junit.runners.Suite;
 
         ResultSetTest.class,
         ResultSetMetaDataTest.class,
+        StringTypeUnspecifiedArrayTest.class,
         ArrayTest.class,
         PrimitiveArraySupportTest.class,
+        RefCursorTest.class,
+
         DateTest.class,
         TimeTest.class,
         TimestampTest.class,
@@ -81,16 +87,26 @@ import org.junit.runners.Suite;
         OidToStringTest.class,
         OidValueOfTest.class,
 
+        PreparedStatementTest.class,
         StatementTest.class,
         QuotationTest.class,
 
         ServerPreparedStmtTest.class,
 
+        BatchExecuteTest.class,
+        BatchFailureTest.class,
+
+        BatchedInsertReWriteEnabledTest.class,
         NativeQueryBindLengthTest.class,
+        DeepBatchedInsertStatementTest.class,
         JBuilderTest.class,
         MiscTest.class,
+        NotifyTest.class,
         DatabaseEncodingTest.class,
         ClientEncodingTest.class,
+
+        BlobTest.class,
+        BlobTransactionTest.class,
 
         UpdateableResultTest.class,
 
@@ -100,6 +116,7 @@ import org.junit.runners.Suite;
         ServerCursorTest.class,
 
         IntervalTest.class,
+        GeometricTest.class,
 
         LoginTimeoutTest.class,
         TestACL.class,
@@ -112,6 +129,7 @@ import org.junit.runners.Suite;
 
         CopyTest.class,
         CopyLargeFileTest.class,
+        ServerErrorTest.class,
         UpsertTest.class,
         OuterJoinSyntaxTest.class
 })

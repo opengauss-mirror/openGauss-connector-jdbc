@@ -1,6 +1,3 @@
-/*
- * PGBlobOutputStream
- */
 package org.postgresql;
 
 import java.io.IOException;
