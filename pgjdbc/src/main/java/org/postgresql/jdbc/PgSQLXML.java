@@ -11,6 +11,7 @@ import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.xml.DefaultPGXmlFactoryFactory;
 import org.postgresql.xml.PGXmlFactoryFactory;
+
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLReader;
 
@@ -27,7 +28,6 @@ import java.sql.SQLException;
 import java.sql.SQLXML;
 
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -83,7 +83,7 @@ public class PgSQLXML implements SQLXML {
     }
     return DefaultPGXmlFactoryFactory.INSTANCE;
   }
-  
+
   public synchronized void free() {
     _freed = true;
     _data = null;
@@ -135,11 +135,11 @@ public class PgSQLXML implements SQLXML {
 
     try {
       if (sourceClass == null || DOMSource.class.equals(sourceClass)) {
-		DocumentBuilder builder = getXmlFactoryFactory().newDocumentBuilder();
+        DocumentBuilder builder = getXmlFactoryFactory().newDocumentBuilder();
         InputSource input = new InputSource(new StringReader(_data));
         return (T) new DOMSource(builder.parse(input));
       } else if (SAXSource.class.equals(sourceClass)) {
-		XMLReader reader = getXmlFactoryFactory().createXMLReader();
+        XMLReader reader = getXmlFactoryFactory().createXMLReader();
         InputSource is = new InputSource(new StringReader(_data));
         return (T) new SAXSource(reader, is);
       } else if (StreamSource.class.equals(sourceClass)) {
@@ -295,3 +295,4 @@ public class PgSQLXML implements SQLXML {
     _initialized = true;
   }
 }
+

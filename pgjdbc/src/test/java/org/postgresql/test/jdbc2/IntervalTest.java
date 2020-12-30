@@ -45,6 +45,28 @@ public class IntervalTest {
   }
 
   @Test
+  public void testOnlineTests() throws SQLException {
+    PreparedStatement pstmt = conn.prepareStatement("INSERT INTO testinterval VALUES (?)");
+    pstmt.setObject(1, new PGInterval(2004, 13, 28, 0, 0, 43000.9013));
+    pstmt.executeUpdate();
+    pstmt.close();
+
+    Statement stmt = conn.createStatement();
+    ResultSet rs = stmt.executeQuery("SELECT v FROM testinterval");
+    assertTrue(rs.next());
+    PGInterval pgi = (PGInterval) rs.getObject(1);
+    assertEquals(2005, pgi.getYears());
+    assertEquals(1, pgi.getMonths());
+    assertEquals(28, pgi.getDays());
+    assertEquals(11, pgi.getHours());
+    assertEquals(56, pgi.getMinutes());
+    assertEquals(40.9013, pgi.getSeconds(), 0.000001);
+    assertTrue(!rs.next());
+    rs.close();
+    stmt.close();
+  }
+
+  @Test
   public void testStringToIntervalCoercion() throws SQLException {
     Statement stmt = conn.createStatement();
     stmt.executeUpdate(TestUtil.insertSQL("testdate", "'2010-01-01'"));

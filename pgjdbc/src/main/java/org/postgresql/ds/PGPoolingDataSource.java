@@ -9,6 +9,8 @@ import org.postgresql.ds.common.BaseDataSource;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -23,8 +25,6 @@ import javax.sql.ConnectionEvent;
 import javax.sql.ConnectionEventListener;
 import javax.sql.DataSource;
 import javax.sql.PooledConnection;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * DataSource which uses connection pooling. <span style="color: red;">Don't use this if your
@@ -68,7 +68,7 @@ public class PGPoolingDataSource extends BaseDataSource implements DataSource {
     return dataSources.get(name);
   }
 
-  private static final Logger LOGGER = Logger.getLogger(PGPoolingDataSource.class.getName());
+  private static Log LOGGER = Logger.getLogger(PGPoolingDataSource.class.getName());
   // Additional Data Source properties
   protected String dataSourceName; // Must be protected for subclasses to sync updates to it
   private int initialConnections = 0;
@@ -339,7 +339,7 @@ public class PGPoolingDataSource extends BaseDataSource implements DataSource {
         try {
           pci.close();
         } catch (SQLException e) {
-            LOGGER.log(Level.FINEST, "Catch SQLException on close pool connection. ", e);
+            LOGGER.trace("Catch SQLException on close pool connection. ", e);
         }
       }
       available = null;
@@ -349,7 +349,7 @@ public class PGPoolingDataSource extends BaseDataSource implements DataSource {
         try {
           pci.close();
         } catch (SQLException e) {
-            LOGGER.log(Level.FINEST, "Catch SQLException on close pool connection. ", e);
+            LOGGER.trace("Catch SQLException on close pool connection. ", e);
         }
       }
       used = null;
@@ -391,7 +391,7 @@ public class PGPoolingDataSource extends BaseDataSource implements DataSource {
             // Wake up every second at a minimum
             lock.wait(1000L);
           } catch (InterruptedException e) {
-              LOGGER.log(Level.FINEST, "Catch InterruptedException while waitting of lock. ", e);
+              LOGGER.trace("Catch InterruptedException while waitting of lock. ", e);
           }
         }
       }

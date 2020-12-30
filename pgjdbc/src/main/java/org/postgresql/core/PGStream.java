@@ -291,7 +291,7 @@ public class PGStream implements Closeable, Flushable {
   public int peekChar() throws IOException {
     int c = pg_input.peek();
     if (c < 0) {
-      throw new EOFException();
+      throw new EOFException("EOF Exception");
     }
     return c;
   }
@@ -305,7 +305,7 @@ public class PGStream implements Closeable, Flushable {
   public int receiveChar() throws IOException {
     int c = pg_input.read();
     if (c < 0) {
-      throw new EOFException();
+      throw new EOFException("EOF Exception");
     }
     return c;
   }
@@ -318,7 +318,7 @@ public class PGStream implements Closeable, Flushable {
    */
   public int receiveInteger4() throws IOException {
     if (pg_input.read(_int4buf) != 4) {
-      throw new EOFException();
+      throw new EOFException("EOF Exception");
     }
 
     return (_int4buf[0] & 0xFF) << 24 | (_int4buf[1] & 0xFF) << 16 | (_int4buf[2] & 0xFF) << 8
@@ -333,7 +333,7 @@ public class PGStream implements Closeable, Flushable {
    */
   public int receiveInteger2() throws IOException {
     if (pg_input.read(_int2buf) != 2) {
-      throw new EOFException();
+      throw new EOFException("EOF Exception");
     }
 
     return (_int2buf[0] & 0xFF) << 8 | _int2buf[1] & 0xFF;
@@ -348,7 +348,7 @@ public class PGStream implements Closeable, Flushable {
    */
   public String receiveString(int len) throws IOException {
     if (!pg_input.ensureBytes(len)) {
-      throw new EOFException();
+      throw new EOFException("EOF Exception");
     }
 
     String res = encoding.decode(pg_input.getBuffer(), pg_input.getIndex(), len);
@@ -366,7 +366,7 @@ public class PGStream implements Closeable, Flushable {
    */
   public EncodingPredictor.DecodeResult receiveErrorString(int len) throws IOException {
     if (!pg_input.ensureBytes(len)) {
-      throw new EOFException();
+      throw new EOFException("EOF Exception");
     }
 
     EncodingPredictor.DecodeResult res;
@@ -461,7 +461,7 @@ public class PGStream implements Closeable, Flushable {
     while (s < siz) {
       int w = pg_input.read(buf, off + s, siz - s);
       if (w < 0) {
-        throw new EOFException();
+        throw new EOFException("EOF Exception");
       }
       s += w;
     }
@@ -564,5 +564,51 @@ public class PGStream implements Closeable, Flushable {
 
   public int getNetworkTimeout() throws IOException {
     return connection.getSoTimeout();
+  }
+
+  /**
+   * This function returns the String which contains the server socket address and client socket address.
+   * This function is only used to distinguish different connections when we create dump file.
+   */
+  public String getConnectInfo() {
+    String clientSocketAddress = connection.getLocalSocketAddress().toString().substring(1);
+    String serverSocketAddress = connection.getRemoteSocketAddress().toString().substring(1);
+    return clientSocketAddress + "/" + serverSocketAddress;
+  }
+
+  /**
+   * This function is only for creating dump file when I/O error happens.
+   *
+   */
+  public String getInputBufferByHex() {
+    try {
+      int bufferSize=pg_input.available();
+      if (bufferSize <= 0)
+        return "buffer is empty";
+      byte []bytes=new byte[bufferSize];
+      pg_input.read(bytes);
+      return Utils.toHexString(bytes);
+    } catch (Exception e) {
+      return "exception happens";
+    }
+  }
+  /**
+   * This function is used to return socket status when I/O error happens.
+   *
+   */
+  public String getSocketStatus() {
+    StringBuilder status = new StringBuilder();
+    if (connection.isClosed()) {
+      status.append("socket is closed; ");
+    } else {
+      status.append("socket is not closed; ");
+    }
+    try {
+      this.getSocket().sendUrgentData(1);
+      status.append("Urgent packet sent to backend successfully; ");
+    } catch(IOException e) {
+      status.append("Sending Urgent packet failed, detail: " + e.getMessage() + ". ");
+    }
+    return status.toString();
   }
 }

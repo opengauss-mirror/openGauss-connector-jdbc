@@ -18,13 +18,14 @@ import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.util.StreamWrapper;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 
 /**
  * Parameter list for a single-statement V3 query.
@@ -32,7 +33,7 @@ import java.util.logging.Logger;
  * @author Oliver Jowett (oliver@opencloud.com)
  */
 class SimpleParameterList implements V3ParameterList {
-  private static final Logger LOGGER = Logger.getLogger(SimpleParameterList.class.getName());
+  private static Log LOGGER = Logger.getLogger(SimpleParameterList.class.getName());
 
   private static final byte IN = 1;
   private static final byte OUT = 2;
@@ -160,7 +161,7 @@ class SimpleParameterList implements V3ParameterList {
 			int len = stream.read(tmp);
 			// In the condition of empty Blob. Like byte[] b = {}; new ByteArrayInputStream(b);
 			if(len == -1){
-				LOGGER.log(Level.FINEST, "Failed to read the inputstream:", new SQLException("Failed to read the inputstream"));
+				LOGGER.trace("Failed to read the inputstream:", new SQLException("Failed to read the inputstream"));
 			}
 			setBlob(index, tmp, 0, tmp.length);
 		} catch (IOException e) {
@@ -176,8 +177,10 @@ class SimpleParameterList implements V3ParameterList {
   @Override
   public void setNull(int index, int oid) throws SQLException {
 
-    byte binaryTransfer = (oid == Oid.BLOB ? BINARY : TEXT);
-
+    byte binaryTransfer = TEXT;
+    if (oid == Oid.BLOB || oid == Oid.BYTEA) {
+      binaryTransfer = BINARY;
+    }
     if (transferModeRegistry.useBinaryForReceive(oid)) {
       binaryTransfer = BINARY;
     }

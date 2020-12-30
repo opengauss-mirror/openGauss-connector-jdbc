@@ -16,15 +16,15 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.sax.SAXTransformerFactory;
 
 public interface PGXmlFactoryFactory {
-  DocumentBuilder newDocumentBuilder() throws ParserConfigurationException;
+    DocumentBuilder newDocumentBuilder() throws ParserConfigurationException;
 
-  TransformerFactory newTransformerFactory();
+    TransformerFactory newTransformerFactory();
 
-  SAXTransformerFactory newSAXTransformerFactory();
+    SAXTransformerFactory newSAXTransformerFactory();
 
-  XMLInputFactory newXMLInputFactory();
+    XMLInputFactory newXMLInputFactory();
 
-  XMLOutputFactory newXMLOutputFactory();
+    XMLOutputFactory newXMLOutputFactory();
 
-  XMLReader createXMLReader() throws SAXException;
+    XMLReader createXMLReader() throws SAXException;
 }

@@ -15,6 +15,8 @@ import org.junit.runners.Suite;
 @Suite.SuiteClasses({
         DatabaseMetaDataTest.class,
         ArrayTest.class,
+        WrapperTest.class,
+        BinaryTest.class,
         IsValidTest.class,
         ClientInfoTest.class,
         PGCopyInputStreamTest.class,

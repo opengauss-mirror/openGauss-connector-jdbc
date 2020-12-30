@@ -8,9 +8,9 @@ package org.postgresql.jdbc;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * <p>Helper class to handle boolean type of PostgreSQL.</p>
@@ -20,7 +20,7 @@ import java.util.logging.Logger;
  */
 class BooleanTypeUtil {
 
-  private static final Logger LOGGER = Logger.getLogger(BooleanTypeUtil.class.getName());
+  private static Log LOGGER = Logger.getLogger(BooleanTypeUtil.class.getName());
 
   private BooleanTypeUtil() {
   }
@@ -33,8 +33,8 @@ class BooleanTypeUtil {
    * @throws PSQLException PSQLState.CANNOT_COERCE
    */
   static boolean castToBoolean(final Object in) throws PSQLException {
-    if (LOGGER.isLoggable(Level.FINE)) {
-      LOGGER.log(Level.FINE, "Cast to boolean: \"{0}\"", String.valueOf(in));
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Cast to boolean: \"" + String.valueOf(in) + "\"");
     }
     if (in instanceof Boolean) {
       return (Boolean) in;
@@ -93,8 +93,8 @@ class BooleanTypeUtil {
   }
 
   private static PSQLException cannotCoerceException(final Object value) {
-    if (LOGGER.isLoggable(Level.FINE)) {
-      LOGGER.log(Level.FINE, "Cannot cast to boolean: \"{0}\"", String.valueOf(value));
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Cannot cast to boolean: \"" + String.valueOf(value) + "\"");
     }
     return new PSQLException(GT.tr("Cannot cast to boolean: \"{0}\"", String.valueOf(value)),
         PSQLState.CANNOT_COERCE);

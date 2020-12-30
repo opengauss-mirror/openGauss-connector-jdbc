@@ -14,18 +14,19 @@ import org.postgresql.util.LruCache;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.util.ServerErrorMessage;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.IOException;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.util.ArrayList;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 
 public abstract class QueryExecutorBase implements QueryExecutor {
 
-  private static final Logger LOGGER = Logger.getLogger(QueryExecutorBase.class.getName());
+  private static Log LOGGER = Logger.getLogger(QueryExecutorBase.class.getName());
   protected final PGStream pgStream;
   private final String user;
   private final String database;
@@ -120,7 +121,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
       pgStream.getSocket().close();
     } catch (IOException e) {
         // ignore
-        LOGGER.log(Level.FINEST, "Catch IOException on close:", e);
+        LOGGER.trace("Catch IOException on close:", e);
     }
     closed = true;
   }
@@ -132,12 +133,12 @@ public abstract class QueryExecutorBase implements QueryExecutor {
     }
 
     try {
-      LOGGER.log(Level.FINEST, " FE=> Terminate");
+      LOGGER.trace(" FE=> Terminate");
       sendCloseMessage();
       pgStream.flush();
       pgStream.close();
     } catch (IOException ioe) {
-      LOGGER.log(Level.FINEST, "Discarding IOException on close:", ioe);
+      LOGGER.trace("Discarding IOException on close:", ioe);
     }
 
     closed = true;
@@ -158,8 +159,8 @@ public abstract class QueryExecutorBase implements QueryExecutor {
 
     // Now we need to construct and send a cancel packet
     try {
-      if (LOGGER.isLoggable(Level.FINEST)) {
-        LOGGER.log(Level.FINEST, " FE=> CancelRequest(pid={0},ckey={1})", new Object[]{cancelPid, cancelKey});
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace(" FE=> CancelRequest(pid=" + cancelPid + ",ckey=" + cancelKey +")");
       }
 
       cancelStream =
@@ -176,14 +177,14 @@ public abstract class QueryExecutorBase implements QueryExecutor {
       cancelStream.receiveEOF();
     } catch (IOException e) {
       // Safe to ignore.
-      LOGGER.log(Level.FINEST, "Ignoring exception on cancel request:", e);
+      LOGGER.trace("Ignoring exception on cancel request:", e);
     } finally {
       if (cancelStream != null) {
         try {
           cancelStream.close();
         } catch (IOException e) {
             // Ignored.
-            LOGGER.log(Level.FINEST, "Catch IOException on close:", e);
+            LOGGER.trace("Catch IOException on close:", e);
         }
       }
     }
@@ -350,6 +351,9 @@ public abstract class QueryExecutorBase implements QueryExecutor {
     if (PSQLState.INVALID_SQL_STATEMENT_NAME.getState().equals(e.getSQLState())) {
       return true;
     }
+    if (PSQLState.INVALID_CACHE_PLAN.getState().equals(e.getSQLState())) {
+      return true;  
+    }
     if (!PSQLState.NOT_IMPLEMENTED.getState().equals(e.getSQLState())) {
       return false;
     }
@@ -365,8 +369,9 @@ public abstract class QueryExecutorBase implements QueryExecutor {
       return false;
     }
     // "cached plan must not change result type"
-    String message = pe.getServerErrorMessage().getMessage();
-    return message.contains("cached plan must not change result type");
+    String routine = pe.getServerErrorMessage().getRoutine();
+    return "RevalidateCachedQuery".equals(routine) // 9.2+
+        || "RevalidateCachedPlan".equals(routine); // <= 9.1
   }
 
   @Override

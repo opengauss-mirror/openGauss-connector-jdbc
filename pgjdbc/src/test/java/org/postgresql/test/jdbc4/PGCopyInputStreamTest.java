@@ -46,6 +46,19 @@ public class PGCopyInputStreamTest {
   }
 
   @Test
+  public void testReadBytesCorrectlyHandlesEof() throws SQLException, IOException {
+    insertSomeData();
+
+    sut = new PGCopyInputStream((PGConnection) _conn,
+        "COPY cpinstreamtest (i) TO STDOUT WITH " + copyParams);
+
+    byte[] buf = new byte[100]; // large enough to read everything on the next step
+    assertTrue(sut.read(buf) > 0);
+
+    assertEquals(-1, sut.read(buf));
+  }
+
+  @Test
   public void testReadBytesCorrectlyReadsDataInChunks() throws SQLException, IOException {
     insertSomeData();
 
@@ -62,6 +75,21 @@ public class PGCopyInputStreamTest {
 
     assertEquals(4, chunks);
     assertEquals("0\n1\n2\n3\n", result.toString());
+  }
+
+  @Test
+  public void testStreamCanBeClosedAfterReadUp() throws SQLException, IOException {
+    insertSomeData();
+
+    sut = new PGCopyInputStream((PGConnection) _conn,
+        "COPY (select i from cpinstreamtest order by i asc) TO STDOUT WITH " + copyParams);
+
+    byte[] buff = new byte[100];
+    while (sut.read(buff) > 0) {
+      ;
+    }
+
+    sut.close();
   }
 
   private void silentlyCloseStream(PGCopyInputStream sut) {

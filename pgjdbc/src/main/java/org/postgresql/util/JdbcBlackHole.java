@@ -4,16 +4,17 @@
  */
 
 package org.postgresql.util;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 
 public class JdbcBlackHole {
-  static Logger LOGGER = Logger.getLogger(JdbcBlackHole.class.getName());
+  static Log LOGGER = Logger.getLogger(JdbcBlackHole.class.getName());
   public static void close(Connection con) {
     try {
       if (con != null) {
@@ -21,7 +22,7 @@ public class JdbcBlackHole {
       }
     } catch (SQLException e) {
         /* ignore for now */
-        LOGGER.log(Level.FINEST, "Catch SQLException on close connection :", e);
+        LOGGER.trace("Catch SQLException on close connection :", e);
     }
   }
 
@@ -32,7 +33,7 @@ public class JdbcBlackHole {
       }
     } catch (SQLException e) {
         /* ignore for now */
-        LOGGER.log(Level.FINEST, "Catch SQLException on close statement :", e);
+        LOGGER.trace("Catch SQLException on close statement :", e);
     }
   }
 
@@ -43,7 +44,7 @@ public class JdbcBlackHole {
       }
     } catch (SQLException e) {
         /* ignore for now */
-        LOGGER.log(Level.FINEST, "Catch SQLException on close resultset :", e);
+        LOGGER.trace("Catch SQLException on close resultset :", e);
     }
   }
 }

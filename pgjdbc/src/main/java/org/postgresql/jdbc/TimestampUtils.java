@@ -13,21 +13,19 @@ import org.postgresql.util.ByteConverter;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.lang.reflect.Field;
 import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
-////#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-////#endif
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.SimpleTimeZone;
 import java.util.TimeZone;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 
 /**
@@ -42,13 +40,8 @@ public class TimestampUtils {
   private static final char[][] NUMBERS;
   private static final HashMap<String, TimeZone> GMT_ZONES = new HashMap<String, TimeZone>();
   private static final int MAX_NANOS_BEFORE_WRAP_ON_ROUND = 999999500;
-//  //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//  // LocalTime.MAX is 23:59:59.999_999_999, and it wraps to 24:00:00 when nanos exceed 999_999_499
-//  // since PostgreSQL has microsecond resolution only
-//  //#endif
-
   private static final Field DEFAULT_TIME_ZONE_FIELD;
-  private static final Logger LOGGER = Logger.getLogger(TimestampUtils.class.getName());
+  private static Log LOGGER = Logger.getLogger(TimestampUtils.class.getName());
 
   private TimeZone prevDefaultZoneFieldValue;
   private TimeZone defaultTimeZoneCache;
@@ -682,51 +675,6 @@ public class TimestampUtils {
     }
   }
 
-//  //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//    }
-//
-//
-//  }
-//
-//
-//    }
-//
-//      // Technically speaking this is not a proper rounding, however
-//      // it relies on the fact that appendTime just truncates 000..999 nanosecond part
-//    }
-//  }
-//
-//
-//    }
-//
-//
-//      // Technically speaking this is not a proper rounding, however
-//      // it relies on the fact that appendTime just truncates 000..999 nanosecond part
-//    }
-//  }
-//
-//  /**
-//   * Formats {@link LocalDateTime} to be sent to the backend, thus it adds time zone.
-//   * Do not use this method in {@link java.sql.ResultSet#getString(int)}
-//   * @param localDateTime The local date to format as a String
-//   * @return The formatted local date
-//   */
-//    }
-//
-//    // LocalDateTime is always passed with time zone so backend can decide between timestamp and timestamptz
-//  }
-//
-//  }
-//
-//  }
-//
-//
-//  }
-//
-//    }
-//  }
-//  //#endif
-
   private static int skipWhitespace(char[] s, int start) {
     int slen = s.length;
     for (int i = start; i < slen; i++) {
@@ -809,7 +757,7 @@ public class TimestampUtils {
         prevDefaultZoneFieldValue = defaultTimeZone;
       } catch (Exception e) {
           // If this were to fail, fallback on slow method.
-          LOGGER.log(Level.FINEST, "Catch Exception while getting time zone. ", e);
+          LOGGER.trace("Catch Exception while getting time zone. ", e);
       }
     }
     TimeZone tz = TimeZone.getDefault();
@@ -867,26 +815,6 @@ public class TimestampUtils {
 
     return convertToTime(millis, tz); // Ensure date part is 1970-01-01
   }
-
-
-//  //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//  /**
-//   * Returns the SQL Time object matching the given bytes with {@link Oid#TIME}.
-//   *
-//   * @param bytes The binary encoded time value.
-//   * @return The parsed time object.
-//   * @throws PSQLException If binary format could not be parsed.
-//   */
-//          PSQLState.BAD_DATETIME_FORMAT);
-//    }
-//
-//    long micros;
-//
-//      micros = (long) (seconds * 1000000d);
-//    } else {
-//    }
-//  }
-//  //#endif
 
   /**
    * Returns the SQL Timestamp object matching the given bytes with {@link Oid#TIMESTAMP} or
@@ -977,21 +905,6 @@ public class TimestampUtils {
     ts.nanos = nanos;
     return ts;
   }
-
-//  //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.2"
-//  /**
-//   * Returns the local date time object matching the given bytes with {@link Oid#TIMESTAMP} or
-//   * {@link Oid#TIMESTAMPTZ}.
-//   *
-//   * @param tz time zone to use
-//   * @param bytes The binary encoded local date time value.
-//   * @return The parsed local date time object.
-//   * @throws PSQLException If binary format could not be parsed.
-//   */
-//
-//    }
-//  }
-//  //#endif
 
   /**
    * <p>Given a UTC timestamp {@code millis} finds another point in time that is rendered in given time

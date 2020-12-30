@@ -8,6 +8,8 @@ package org.postgresql.ssl;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,8 +44,6 @@ import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.x500.X500Principal;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * A Key manager that only loads the keys, if necessary.
@@ -56,8 +56,10 @@ public class LazyKeyManager implements X509KeyManager {
   private CallbackHandler cbh;
   private boolean defaultfile;
   private PSQLException error = null;
-  private static final Logger LOGGER = Logger.getLogger(LazyKeyManager.class.getName());
-
+  private String privateKeyFactory;
+  private Class<?> privateKeyFactoryCls;
+  private boolean pkFactoryClsNotFound = false;
+  private static Log LOGGER = Logger.getLogger(LazyKeyManager.class.getName());
   /**
    * Constructor. certfile and keyfile can be null, in that case no certificate is presented to the
    * server.
@@ -67,11 +69,12 @@ public class LazyKeyManager implements X509KeyManager {
    * @param cbh callback handler
    * @param defaultfile default file
    */
-  public LazyKeyManager(String certfile, String keyfile, CallbackHandler cbh, boolean defaultfile) {
+  public LazyKeyManager(String certfile, String keyfile, CallbackHandler cbh, boolean defaultfile, String keyFactory) {
     this.certfile = certfile;
     this.keyfile = keyfile;
     this.cbh = cbh;
     this.defaultfile = defaultfile;
+    this.privateKeyFactory = keyFactory;
   }
 
   /**
@@ -179,10 +182,7 @@ public class LazyKeyManager implements X509KeyManager {
         try {
           raf = new RandomAccessFile(new File(keyfile), "r"); // NOSONAR
         } catch (FileNotFoundException ex) {
-          if (!defaultfile) {
-            // It is not an error if there is no file at the default location
-            throw ex;
-          }
+          throwNotDefaultFileException(ex);
           return null;
         }
         byte[] keydata = new byte[(int) raf.length()];
@@ -195,8 +195,19 @@ public class LazyKeyManager implements X509KeyManager {
           KeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(keydata);
           key = kf.generatePrivate(pkcs8KeySpec);
         } catch (InvalidKeySpecException ex) {
+            if(privateKeyFactory != null) {
+              resolvePrivateKey(keydata);
+              return key;
+            }
           // The key might be password protected
-          EncryptedPrivateKeyInfo ePKInfo = new EncryptedPrivateKeyInfo(keydata);
+            EncryptedPrivateKeyInfo ePKInfo = null;
+            try {  
+              ePKInfo = new EncryptedPrivateKeyInfo(keydata);
+            } catch (Exception e) {
+              BouncyCastlePrivateKeyFactory pkFactory = new BouncyCastlePrivateKeyFactory();
+              key = pkFactory.getPrivateKeyFromEncryptedKey(keydata, getPassword());
+              return key;
+            }
           Cipher cipher;
           try {
             cipher = Cipher.getInstance(ePKInfo.getAlgName());
@@ -209,18 +220,7 @@ public class LazyKeyManager implements X509KeyManager {
           try {
             cbh.handle(new Callback[]{pwdcb});
           } catch (UnsupportedCallbackException ucex) {
-            if ((cbh instanceof LibPQFactory.ConsoleCallbackHandler)
-                && ("Console is not available".equals(ucex.getMessage()))) {
-              error = new PSQLException(GT
-                  .tr("Could not read password for SSL key file, console is not available."),
-                  PSQLState.CONNECTION_FAILURE, ucex);
-            } else {
-              error =
-                  new PSQLException(
-                      GT.tr("Could not read password for SSL key file by callbackhandler {0}.",
-                              cbh.getClass().getName()),
-                      PSQLState.CONNECTION_FAILURE, ucex);
-            }
+            throwUnsupportedException(ucex);
             return null;
           }
           try {
@@ -244,19 +244,14 @@ public class LazyKeyManager implements X509KeyManager {
         }
       }
     } catch (IOException ioex) {
-      if (raf != null) {
-        try {
-          raf.close();
-        } catch (IOException ex) {
-            LOGGER.log(Level.FINEST, "Catch IOException on close:", ex);
-        }
-      }
-
-      error = new PSQLException(GT.tr("Could not read SSL key file {0}.", keyfile),
-          PSQLState.CONNECTION_FAILURE, ioex);
+      throwIOException(raf, ioex);
     } catch (NoSuchAlgorithmException ex) {
       error = new PSQLException(GT.tr("Could not find a java cryptographic algorithm: {0}.",
               ex.getMessage()), PSQLState.CONNECTION_FAILURE, ex);
+      return null;
+    } catch (Exception ex) {
+      error = new PSQLException(GT.tr("Could not get primary key: {0}.", ex.getMessage()),
+                PSQLState.CONNECTION_FAILURE, ex);
       return null;
     }
 
@@ -266,5 +261,86 @@ public class LazyKeyManager implements X509KeyManager {
   @Override
   public String[] getServerAliases(String keyType, Principal[] issuers) {
     return new String[]{};
+  }
+  
+  private void throwNotDefaultFileException(FileNotFoundException ex) throws FileNotFoundException {
+    if (!defaultfile) {
+          // It is not an error if there is no file at the default location
+      throw ex;
+    }
+  }
+  
+  private void throwIOException(RandomAccessFile raf, IOException ioex) {
+    if (raf != null) {
+      try {
+        raf.close();
+      } catch (IOException ex) {
+        LOGGER.trace("Catch IOException on close:", ex);
+      }
+    }
+    
+    error = new PSQLException(GT.tr("Could not read SSL key file {0}.", keyfile),
+      PSQLState.CONNECTION_FAILURE, ioex);
+  }
+  
+  private void throwUnsupportedException(UnsupportedCallbackException ucex) {
+    if ((cbh instanceof LibPQFactory.ConsoleCallbackHandler)
+          && ("Console is not available".equals(ucex.getMessage()))) {
+      error = new PSQLException(GT
+            .tr("Could not read password for SSL key file, console is not available."),
+            PSQLState.CONNECTION_FAILURE, ucex);
+    } else {
+      error =
+            new PSQLException(
+                GT.tr("Could not read password for SSL key file by callbackhandler {0}.",
+                        cbh.getClass().getName()),
+                PSQLState.CONNECTION_FAILURE, ucex);
+    }
+  }
+  
+  private void resolvePrivateKey(byte[] keydata) throws Exception {
+    if(!pkFactoryClsNotFound) {
+      try {
+        loadPrivateKeyFacotryClass();
+      } catch (ClassNotFoundException e) {
+        pkFactoryClsNotFound = true;
+        throw e;
+      }
+      Object pkFactory = privateKeyFactoryCls.newInstance();
+      try {
+        key = ((PrivateKeyFactory)pkFactory).getPrivateKeyFromEncryptedKey(keydata, getPassword());
+      } catch (Exception e) {
+        throw e;
+      }
+    }
+   
+  }
+  
+  private void loadPrivateKeyFacotryClass() throws ClassNotFoundException {
+    if(privateKeyFactoryCls == null) {
+      synchronized (LazyKeyManager.class) {
+        if(privateKeyFactoryCls == null) {
+          privateKeyFactoryCls = Class.forName(privateKeyFactory);
+        }
+      }
+    }
+  }
+  
+  private PasswordCallback getPassword() throws IOException {
+    PasswordCallback pwdcb = new PasswordCallback(GT.tr("Enter SSL password: "), false);
+    try {
+      cbh.handle(new Callback[] { pwdcb });
+    } catch (UnsupportedCallbackException ucex) {
+      if ((cbh instanceof LibPQFactory.ConsoleCallbackHandler)
+              && ("Console is not available".equals(ucex.getMessage()))) {
+        error = new PSQLException(GT.tr("Could not read password for SSL key file, console is not available."),
+                  PSQLState.CONNECTION_FAILURE, ucex);
+      } else {
+        error = new PSQLException(GT.tr("Could not read password for SSL key file by callbackhandler {0}.",
+                  cbh.getClass().getName()), PSQLState.CONNECTION_FAILURE, ucex);
+      }
+      return null;
+    }
+    return pwdcb;
   }
 }

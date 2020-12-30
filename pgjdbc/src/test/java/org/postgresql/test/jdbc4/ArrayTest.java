@@ -183,6 +183,25 @@ public class ArrayTest extends BaseTest4 {
   }
 
   @Test
+  public void testCreateArrayWithNonStandardDelimiter() throws SQLException {
+    PGbox[] in = new PGbox[2];
+    in[0] = new PGbox(1, 2, 3, 4);
+    in[1] = new PGbox(5, 6, 7, 8);
+
+    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::box[]");
+    pstmt.setArray(1, _conn.createArrayOf("box", in));
+    ResultSet rs = pstmt.executeQuery();
+    Assert.assertTrue(rs.next());
+    Array arr = rs.getArray(1);
+    ResultSet arrRs = arr.getResultSet();
+    Assert.assertTrue(arrRs.next());
+    Assert.assertEquals(in[0], arrRs.getObject(2));
+    Assert.assertTrue(arrRs.next());
+    Assert.assertEquals(in[1], arrRs.getObject(2));
+    Assert.assertFalse(arrRs.next());
+  }
+
+  @Test
   public void testCreateArrayOfNull() throws SQLException {
     String sql = "SELECT ?";
     // We must provide the type information for V2 protocol
@@ -416,6 +435,80 @@ public class ArrayTest extends BaseTest4 {
         Assert.fail("Needs to have 3 tokens");
       }
     }
+  }
+
+  @Test
+  public void testCasingComposite() throws SQLException {
+    Assume.assumeTrue("Arrays of composite types requires PostgreSQL 8.3+",
+        TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_3));
+
+    PGobject cc = new PGobject();
+    cc.setType("\"CorrectCasing\"");
+    cc.setValue("(1)");
+    Object[] in = new Object[1];
+    in[0] = cc;
+
+    Array arr = _conn.createArrayOf("\"CorrectCasing\"", in);
+    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::\"CorrectCasing\"[]");
+    pstmt.setArray(1, arr);
+    ResultSet rs = pstmt.executeQuery();
+
+    Assert.assertTrue(rs.next());
+    Object[] resArr = (Object[]) rs.getArray(1).getArray();
+
+    Assert.assertTrue(resArr[0] instanceof PGobject);
+    PGobject resObj = (PGobject) resArr[0];
+    Assert.assertEquals("(1)", resObj.getValue());
+  }
+
+  @Test
+  public void testCasingBuiltinAlias() throws SQLException {
+    Array arr = _conn.createArrayOf("INT", new Integer[]{1, 2, 3});
+    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::INT[]");
+    pstmt.setArray(1, arr);
+    ResultSet rs = pstmt.executeQuery();
+
+    Assert.assertTrue(rs.next());
+    Integer[] resArr = (Integer[]) rs.getArray(1).getArray();
+
+    Assert.assertArrayEquals(new Integer[]{1, 2, 3}, resArr);
+  }
+
+  @Test
+  public void testCasingBuiltinNonAlias() throws SQLException {
+    Array arr = _conn.createArrayOf("INT4", new Integer[]{1, 2, 3});
+    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::INT4[]");
+    pstmt.setArray(1, arr);
+    ResultSet rs = pstmt.executeQuery();
+
+    Assert.assertTrue(rs.next());
+    Integer[] resArr = (Integer[]) rs.getArray(1).getArray();
+
+    Assert.assertArrayEquals(new Integer[]{1, 2, 3}, resArr);
+  }
+
+  @Test
+  public void testEvilCasing() throws SQLException {
+    Assume.assumeTrue("Arrays of composite types requires PostgreSQL 8.3+",
+        TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_3));
+
+    PGobject cc = new PGobject();
+    cc.setType("\"Evil.Table\"");
+    cc.setValue("(1)");
+    Object[] in = new Object[1];
+    in[0] = cc;
+
+    Array arr = _conn.createArrayOf("\"Evil.Table\"", in);
+    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::\"Evil.Table\"[]");
+    pstmt.setArray(1, arr);
+    ResultSet rs = pstmt.executeQuery();
+
+    Assert.assertTrue(rs.next());
+    Object[] resArr = (Object[]) rs.getArray(1).getArray();
+
+    Assert.assertTrue(resArr[0] instanceof PGobject);
+    PGobject resObj = (PGobject) resArr[0];
+    Assert.assertEquals("(1)", resObj.getValue());
   }
 
   @Test

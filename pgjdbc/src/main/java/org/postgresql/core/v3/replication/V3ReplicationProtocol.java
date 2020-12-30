@@ -17,16 +17,16 @@ import org.postgresql.replication.fluent.physical.PhysicalReplicationOptions;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class V3ReplicationProtocol implements ReplicationProtocol {
 
-  private static final Logger LOGGER = Logger.getLogger(V3ReplicationProtocol.class.getName());
+  private static Log LOGGER = Logger.getLogger(V3ReplicationProtocol.class.getName());
   private final QueryExecutor queryExecutor;
   private final PGStream pgStream;
 
@@ -52,7 +52,7 @@ public class V3ReplicationProtocol implements ReplicationProtocol {
   private PGReplicationStream initializeReplication(String query, CommonOptions options,
       ReplicationType replicationType)
       throws SQLException {
-    LOGGER.log(Level.FINEST, " FE=> StartReplication(query: {0})", query);
+    LOGGER.trace(" FE=> StartReplication(query: " + query + ")");
 
     configureSocketTimeout(options);
     CopyDual copyDual = (CopyDual) queryExecutor.startCopy(query, true);

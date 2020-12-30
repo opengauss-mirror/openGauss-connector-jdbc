@@ -11,11 +11,14 @@ import org.postgresql.fastpath.FastpathArg;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
+
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.logging.Level;
+
 
 /**
  * This class implements the large object interface to org.postgresql.
@@ -141,7 +144,7 @@ public class LargeObjectManager {
     res.close();
     stmt.close();
 
-    conn.getLogger().log(Level.FINE, "Large Object initialised");
+    conn.getLogger().debug("Large Object initialised");
   }
 
   /**

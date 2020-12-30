@@ -18,8 +18,8 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 /**
  * API for PostgreSQL COPY bulk data transfer.
@@ -35,7 +35,7 @@ public class CopyManager {
   private final Encoding encoding;
   private final QueryExecutor queryExecutor;
   private final BaseConnection connection;
-  private static final Logger LOGGER = Logger.getLogger(CopyManager.class.getName());
+  private static Log LOGGER = Logger.getLogger(CopyManager.class.getName());
 
   public CopyManager(BaseConnection connection) throws SQLException {
     this.encoding = connection.getEncoding();
@@ -102,7 +102,7 @@ public class CopyManager {
         while ((buf = cp.readFromCopy()) != null) {
         }
       } catch (SQLException sqlEx) {
-          LOGGER.log(Level.FINEST, "Catch SQLException while reading from copy", sqlEx);
+          LOGGER.trace("Catch SQLException while reading from copy", sqlEx);
       } // typically after several kB
       throw ioEX;
     } finally { // see to it that we do not leave the connection locked
@@ -138,7 +138,7 @@ public class CopyManager {
         while ((buf = cp.readFromCopy()) != null) {
         }
       } catch (SQLException sqlEx) {
-          LOGGER.log(Level.FINEST, "Catch SQLException while reading from copy", sqlEx);
+          LOGGER.trace("Catch SQLException while reading from copy", sqlEx);
       } // typically after several kB
       throw ioEX;
     } finally { // see to it that we do not leave the connection locked

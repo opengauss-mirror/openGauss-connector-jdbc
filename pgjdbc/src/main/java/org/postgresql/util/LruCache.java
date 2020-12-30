@@ -5,18 +5,20 @@
 
 package org.postgresql.util;
 
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
+
 import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 
 /**
  * Caches values in simple least-recently-accessed order.
  */
 public class LruCache<Key, Value extends CanEstimateSize> implements Gettable<Key, Value> {
-  private static final Logger LOGGER = Logger.getLogger(LruCache.class.getName());
+  private static Log LOGGER = Logger.getLogger(LruCache.class.getName());
   /**
    * Action that is invoked when the entry is removed from the cache.
    *
@@ -78,7 +80,7 @@ public class LruCache<Key, Value extends CanEstimateSize> implements Gettable<Ke
       onEvict.evict(value);
     } catch (SQLException e) {
         /* ignore */
-        LOGGER.log(Level.FINEST, "Catch SQLException on evict value. ", e);
+        LOGGER.trace("Catch SQLException on evict value. ", e);
     }
   }
 

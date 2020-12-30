@@ -129,4 +129,37 @@ public class StringTypeParameterTest extends BaseTest4 {
     }
     TestUtil.closeQuietly(query);
   }
+
+  @Test
+  public void testParameterUnspecified() throws Exception {
+    Assume.assumeTrue(UNSPECIFIED_STRING_TYPE.equals(stringType));
+
+    PreparedStatement update = con.prepareStatement("insert into stringtypetest (m) values (?)");
+    update.setString(1, "happy");
+    update.executeUpdate();
+    // all good
+
+    update.clearParameters();
+    update.setObject(1, "happy", Types.VARCHAR);
+    update.executeUpdate();
+    // all good
+    update.close();
+
+    PreparedStatement query = con.prepareStatement("select * from stringtypetest where m = ?");
+    query.setString(1, "happy");
+    ResultSet rs = query.executeQuery();
+    assertTrue(rs.next());
+    assertEquals("happy", rs.getObject("m"));
+    rs.close();
+
+    query.clearParameters();
+    query.setObject(1, "happy", Types.VARCHAR);
+    rs = query.executeQuery();
+    assertTrue(rs.next());
+    assertEquals("happy", rs.getObject("m"));
+
+    // all good
+    rs.close();
+    query.close();
+  }
 }

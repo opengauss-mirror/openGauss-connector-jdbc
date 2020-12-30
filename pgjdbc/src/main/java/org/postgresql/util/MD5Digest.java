@@ -4,6 +4,8 @@
  */
 
 package org.postgresql.util;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -11,8 +13,6 @@ import java.io.UnsupportedEncodingException;
 import java.security.InvalidKeyException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.Locale;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.Mac;
@@ -26,7 +26,7 @@ import javax.crypto.spec.PBEKeySpec;
  * @author Jeremy Wohl
  */
 public class MD5Digest {
-    private static final Logger LOGGER = Logger.getLogger(MD5Digest.class.getName());
+    private static Log LOGGER = Logger.getLogger(MD5Digest.class.getName());
 
   private MD5Digest() {
   }
@@ -112,7 +112,7 @@ public class MD5Digest {
             hex_digest[4] = (byte) '5';
             hex_digest[5] = (byte) '6';
         } catch (Exception e) {
-            LOGGER.log(Level.INFO, "SHA256_MD5encode failed. {0}", e.toString());
+            LOGGER.info("SHA256_MD5encode failed. " + e.toString());
         }
         return hex_digest;
     }
@@ -122,7 +122,7 @@ public class MD5Digest {
         try {
             md = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
-            LOGGER.log(Level.INFO, "SHA256_MD5encode failed. ", e);
+            LOGGER.info("SHA256_MD5encode failed. ", e);
         }
 
         if (md == null) {
@@ -177,7 +177,7 @@ public class MD5Digest {
         try {
             skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
         } catch (NoSuchAlgorithmException e) {
-            LOGGER.log(Level.INFO, "no algorithm: PBKDF2WithHmacSHA1. {0}", e.toString());
+            LOGGER.info("no algorithm: PBKDF2WithHmacSHA1. " + e.toString());
         }
 
         if (skf == null) return new byte[0];
@@ -186,7 +186,7 @@ public class MD5Digest {
         try {
             hash = skf.generateSecret(spec).getEncoded();
         } catch (InvalidKeySpecException e) {
-            LOGGER.log(Level.INFO, "mothod 'generateSecret' error. Invalid key. {0}", e.toString());
+            LOGGER.info("mothod 'generateSecret' error. Invalid key. " + e.toString());
         }
         return hash;
     }
@@ -201,7 +201,7 @@ public class MD5Digest {
         try {
             mac = Mac.getInstance(HMAC_SHA256_ALGORITHM);
         } catch (NoSuchAlgorithmException e) {
-            LOGGER.log(Level.INFO, "no algorithm: HMAC_SHA256_ALGORITHM. {0}", e.toString());
+            LOGGER.info("no algorithm: HMAC_SHA256_ALGORITHM. " + e.toString());
         }
 
         if (mac == null) {
@@ -211,7 +211,7 @@ public class MD5Digest {
         try {
             mac.init(signingKey);
         } catch (InvalidKeyException e) {
-            LOGGER.log(Level.INFO, "method 'init' error. Invalid key. {0}", e.toString());
+            LOGGER.info("method 'init' error. Invalid key. " + e.toString());
         }
         return mac.doFinal(data);
     }
@@ -247,9 +247,9 @@ public class MD5Digest {
             hex_digest[1] = (byte) 'd';
             hex_digest[2] = (byte) '5';
         } catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
-            LOGGER.log(Level.INFO, "MD5_SHA256encode failed. ", e);
+            LOGGER.info("MD5_SHA256encode failed. ", e);
         } catch (Exception e) {
-            LOGGER.log(Level.INFO, "MD5_SHA256encode failed. ", e);
+            LOGGER.info("MD5_SHA256encode failed. ", e);
         }
         return hex_digest;
     }
@@ -276,7 +276,7 @@ public class MD5Digest {
             result = new byte[h.length * 2];
             bytesToHex(h, result, 0, h.length);
         } catch (Exception e) {
-            LOGGER.log(Level.INFO, "RFC5802Algorithm failed. {0}", e.toString());
+            LOGGER.info("RFC5802Algorithm failed. " + e.toString());
         }
         return result;
     }

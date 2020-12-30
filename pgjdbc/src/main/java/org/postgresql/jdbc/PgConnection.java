@@ -28,6 +28,8 @@ import org.postgresql.core.Utils;
 import org.postgresql.core.Version;
 import org.postgresql.fastpath.Fastpath;
 import org.postgresql.largeobject.LargeObjectManager;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 import org.postgresql.replication.PGReplicationConnection;
 import org.postgresql.replication.PGReplicationConnectionImpl;
 import org.postgresql.util.GT;
@@ -74,8 +76,6 @@ import java.util.TimeZone;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Executor;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URISyntaxException;
@@ -87,7 +87,7 @@ import org.postgresql.core.types.PGBlob;
 
 public class PgConnection implements BaseConnection {
 
-  private static final Logger LOGGER = Logger.getLogger(PgConnection.class.getName());
+  private static Log LOGGER = Logger.getLogger(PgConnection.class.getName());
 
   private static final SQLPermission SQL_PERMISSION_ABORT = new SQLPermission("callAbort");
   private static final SQLPermission SQL_PERMISSION_NETWORK_TIMEOUT = new SQLPermission("setNetworkTimeout");
@@ -162,10 +162,10 @@ public class PgConnection implements BaseConnection {
   private final boolean replicationConnection;
 
   private final LruCache<FieldMetadata.Key, FieldMetadata> fieldMetadataCache;
-  
+
   private final String xmlFactoryFactoryClass;
   private PGXmlFactoryFactory xmlFactoryFactory;
-
+  private String socketAddress;
   final CachedQuery borrowQuery(String sql) throws SQLException {
     return queryExecutor.borrowQuery(sql);
   }
@@ -192,7 +192,7 @@ public class PgConnection implements BaseConnection {
   @Override
   public void setFlushCacheOnDeallocate(boolean flushCacheOnDeallocate) {
     queryExecutor.setFlushCacheOnDeallocate(flushCacheOnDeallocate);
-    LOGGER.log(Level.FINE, "  setFlushCacheOnDeallocate = {0}", flushCacheOnDeallocate);
+    LOGGER.debug("  setFlushCacheOnDeallocate = " + flushCacheOnDeallocate);
   }
 
   //
@@ -204,18 +204,16 @@ public class PgConnection implements BaseConnection {
                       Properties info,
                       String url) throws SQLException {
     // Print out the driver version number
-    LOGGER.log(Level.FINE, org.postgresql.util.DriverInfo.DRIVER_FULL_NAME);
+    LOGGER.debug(org.postgresql.util.DriverInfo.DRIVER_FULL_NAME);
     try {
         if (info.getProperty("fetchsize") != null) {
             fetchSize = Integer.parseInt(info.getProperty("fetchsize"));
             if (fetchSize < 0) {
                 fetchSize = -1;
             }
-        } else {
-            LOGGER.log(Level.FINE, "fetchSize is null.");
         }
     } catch (Exception e) {
-        LOGGER.log(Level.FINEST, "Catch Exception while transfor fetchsize to integer. ", e);
+        LOGGER.trace("Catch Exception while transfor fetchsize to integer. ", e);
     }
     try {
         String allow = info.getProperty("allowReadOnly");
@@ -225,7 +223,7 @@ public class PgConnection implements BaseConnection {
             }
         }
     } catch (Exception e) {
-        LOGGER.log(Level.FINEST, "Catch Exception while compare allow and FALSE. ", e);
+        LOGGER.trace("Catch Exception while compare allow and FALSE. ", e);
     }
 
     this.creatingURL = url;
@@ -239,15 +237,14 @@ public class PgConnection implements BaseConnection {
 
     // Now make the initial connection and set up local state
     this.queryExecutor = ConnectionFactory.openConnection(hostSpecs, user, database, info);
-
+    this.socketAddress = this.queryExecutor.getSocketAddress();
     // WARNING for unsupported servers (8.1 and lower are not supported)
-    if (LOGGER.isLoggable(Level.WARNING) && !haveMinimumServerVersion(ServerVersion.v8_2)) {
-      LOGGER.log(Level.WARNING, "Unsupported Server Version: {0}", queryExecutor.getServerVersion());
+    if (LOGGER.isWarnEnabled() && !haveMinimumServerVersion(ServerVersion.v8_2)) {
+      LOGGER.warn("Unsupported Server Version: " + queryExecutor.getServerVersion());
     }
 
 
     Set<Integer> binaryOids = getBinaryOids(info);
-
     // split for receive and send for better control
     Set<Integer> useBinarySendForOids = new HashSet<Integer>(binaryOids);
 
@@ -262,12 +259,6 @@ public class PgConnection implements BaseConnection {
     queryExecutor.setBinaryReceiveOids(useBinaryReceiveForOids);
     queryExecutor.setBinarySendOids(useBinarySendForOids);
 
-    if (LOGGER.isLoggable(Level.FINEST)) {
-      LOGGER.log(Level.FINEST, "    types using binary send = {0}", oidsToString(useBinarySendForOids));
-      LOGGER.log(Level.FINEST, "    types using binary receive = {0}", oidsToString(useBinaryReceiveForOids));
-      LOGGER.log(Level.FINEST, "    integer date/time = {0}", queryExecutor.getIntegerDateTimes());
-    }
-
     //
     // String -> text or unknown?
     //
@@ -280,7 +271,7 @@ public class PgConnection implements BaseConnection {
         bindStringAsVarchar = true;
       } else {
         throw new PSQLException(
-            GT.tr("Unsupported value for stringtype parameter: {0}", stringType),
+            GT.tr("Unsupported value for stringtype parameter: " + stringType),
             PSQLState.INVALID_PARAMETER_VALUE);
       }
     } else {
@@ -325,19 +316,22 @@ public class PgConnection implements BaseConnection {
       }
       this._clientInfo.put("ApplicationName", appName);
     }
-
+    String appType = PGProperty.APPLICATION_TYPE.get(info);
+    if(appType == null)
+        appType = "";
+    this._clientInfo.put("ApplicationType", appType);
     fieldMetadataCache = new LruCache<FieldMetadata.Key, FieldMetadata>(
             Math.max(0, PGProperty.DATABASE_METADATA_CACHE_FIELDS.getInt(info)),
             Math.max(0, PGProperty.DATABASE_METADATA_CACHE_FIELDS_MIB.getInt(info) * 1024 * 1024),
         false);
 
-    replicationConnection = PGProperty.REPLICATION.get(info) != null;	
-	xmlFactoryFactoryClass = PGProperty.XML_FACTORY_FACTORY.get(info);
-	
-	
+    xmlFactoryFactoryClass = PGProperty.XML_FACTORY_FACTORY.get(info);
+
+    replicationConnection = PGProperty.REPLICATION.get(info) != null;
     if(replicationConnection) {
       return;
     }
+
     /* Get Database GUC parameters when connection established. */
     Statement stmtGetGuc = null;
     ResultSet rsGetGuc = null;
@@ -367,12 +361,12 @@ public class PgConnection implements BaseConnection {
                 stmtSetGuc = createStatement();
                 stmtSetGuc.executeUpdate(setConnectionInfoSql);
             } else {
-                LOGGER.log(Level.FINE, "connection_info contains \";\", which is not allowed.");
+                LOGGER.debug("connection_info contains \";\", which is not allowed.");
             }
         }
     } catch (SQLException e) {
         // The connection dialing should not be interrupted whatever happens.
-        LOGGER.log(Level.FINEST, "Catch SQLException while connection. ", e);
+        LOGGER.trace("Catch SQLException while connection. ", e);
     } finally {
         if (stmtGetGuc != null) stmtGetGuc.close();
         if (rsGetGuc != null) rsGetGuc.close();
@@ -401,27 +395,25 @@ public class PgConnection implements BaseConnection {
                     }
                 }
             } catch (SQLException e) {
-                LOGGER.log(Level.FINEST, "Failed to create statement or execute query, Error: " + e.getMessage());
+                LOGGER.trace("Failed to create statement or execute query, Error: " + e.getMessage());
             } finally {
                 try {
                     if (rs != null) {
                         rs.close();
                     }
                 } catch (SQLException e) {
-                    LOGGER.log(Level.FINEST, "Failed to close resultset,Error:" + e.getMessage());
+                    LOGGER.trace("Failed to close resultset,Error:" + e.getMessage());
                 }
                 try {
                     if (stmt != null) {
                         stmt.close();
                     }
                 } catch (SQLException e) {
-                    LOGGER.log(Level.FINEST, "Failed to close statement,Error:" + e.getMessage());
+                    LOGGER.trace("Failed to close statement,Error:" + e.getMessage());
                 }
             }
             if (flag == false) {
-                LOGGER.log(
-                        Level.FINEST,
-                        "WARNING, client suggest to use batch mode while the server is not supported");
+                LOGGER.trace("WARNING, client suggest to use batch mode while the server is not supported");
                 batchInsert = false;
             }
         }
@@ -430,7 +422,7 @@ public class PgConnection implements BaseConnection {
     } else if (batchString.equalsIgnoreCase("ON")) {
         batchInsert = true;
     } else {
-        LOGGER.log(Level.FINEST, "WARNING, unrecognized batchmode type");
+        LOGGER.trace("WARNING, unrecognized batchmode type");
         batchInsert = false;
     }
 
@@ -515,7 +507,7 @@ public class PgConnection implements BaseConnection {
             connectionInfo += "}";
             return connectionInfo;
         } catch (URISyntaxException | IOException e) {
-            LOGGER.log(Level.FINEST, "Failed to make connection_info as there is an exception: " + e.getMessage());
+            LOGGER.trace("Failed to make connection_info as there is an exception: " + e.getMessage());
         }
         return "";
     }
@@ -721,8 +713,8 @@ public class PgConnection implements BaseConnection {
 
     PGobject obj = null;
 
-    if (LOGGER.isLoggable(Level.FINEST)) {
-      LOGGER.log(Level.FINEST, "Constructing object from type={0} value=<{1}>", new Object[]{type, value});
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("Constructing object from type=" + type + " value=<" + value + ">");
     }
 
     try {
@@ -882,9 +874,9 @@ public class PgConnection implements BaseConnection {
             execSQLUpdate(readOnlySql); // nb: no BEGIN triggered.
           }
         this.readOnly = readOnly;
-        LOGGER.log(Level.FINE, "  setReadOnly = {0}", readOnly);
+        LOGGER.debug("  setReadOnly = " + readOnly);
     }else {
-    	LOGGER.log(Level.FINE, "Cannot change transaction read-only property when the property allowReadOnly is set to false");
+    	LOGGER.debug("Cannot change transaction read-only property when the property allowReadOnly is set to false");
     }
   }
 
@@ -907,7 +899,7 @@ public class PgConnection implements BaseConnection {
     }
 
     this.autoCommit = autoCommit;
-    LOGGER.log(Level.FINE, "  setAutoCommit = {0}", autoCommit);
+    LOGGER.debug("  setAutoCommit = " + autoCommit);
   }
 
   @Override
@@ -1022,7 +1014,7 @@ public class PgConnection implements BaseConnection {
     String isolationLevelSQL =
         "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL " + isolationLevelName;
     execSQLUpdate(isolationLevelSQL); // nb: no BEGIN triggered
-    LOGGER.log(Level.FINE, "  setTransactionIsolation = {0}", isolationLevelName);
+    LOGGER.debug("  setTransactionIsolation = " + isolationLevelName);
   }
 
   protected String getIsolationLevelName(int level) {
@@ -1059,7 +1051,7 @@ public class PgConnection implements BaseConnection {
    */
   protected void finalize() throws Throwable {
       if (openStackTrace != null) {
-        LOGGER.log(Level.WARNING, GT.tr("Finalizing a Connection that was never closed:"), openStackTrace);
+        LOGGER.warn(GT.tr("Finalizing a Connection that was never closed:"), openStackTrace);
       }
 
       close();
@@ -1192,7 +1184,6 @@ public class PgConnection implements BaseConnection {
     }
 
     this.defaultFetchSize = fetchSize;
-    LOGGER.log(Level.FINE, "  setDefaultFetchSize = {0}", fetchSize);
   }
 
   public int getDefaultFetchSize() {
@@ -1201,7 +1192,6 @@ public class PgConnection implements BaseConnection {
 
   public void setPrepareThreshold(int newThreshold) {
     this.prepareThreshold = newThreshold;
-    LOGGER.log(Level.FINE, "  setPrepareThreshold = {0}", newThreshold);
   }
 
   public boolean getForceBinary() {
@@ -1210,14 +1200,13 @@ public class PgConnection implements BaseConnection {
 
   public void setForceBinary(boolean newValue) {
     this.forcebinary = newValue;
-    LOGGER.log(Level.FINE, "  setForceBinary = {0}", newValue);
   }
 
   public void setTypeMapImpl(Map<String, Class<?>> map) throws SQLException {
     typemap = map;
   }
 
-  public Logger getLogger() {
+  public Log getLogger() {
     return LOGGER;
   }
 
@@ -1243,17 +1232,13 @@ public class PgConnection implements BaseConnection {
     return queryExecutor.useBinaryForSend(oid);
   }
 
-  public int getBackendPID() {
-    return queryExecutor.getBackendPID();
-  }
-
   public boolean isColumnSanitiserDisabled() {
     return this.disableColumnSanitiser;
   }
 
   public void setDisableColumnSanitiser(boolean disableColumnSanitiser) {
     this.disableColumnSanitiser = disableColumnSanitiser;
-    LOGGER.log(Level.FINE, "  setDisableColumnSanitiser = {0}", disableColumnSanitiser);
+    LOGGER.debug("  setDisableColumnSanitiser = " + disableColumnSanitiser);
   }
 
   @Override
@@ -1269,7 +1254,7 @@ public class PgConnection implements BaseConnection {
   @Override
   public void setAutosave(AutoSave autoSave) {
     queryExecutor.setAutoSave(autoSave);
-    LOGGER.log(Level.FINE, "  setAutosave = {0}", autoSave.value());
+    LOGGER.debug("  setAutosave = " + autoSave.value());
   }
 
   protected void abort() {
@@ -1409,7 +1394,7 @@ public class PgConnection implements BaseConnection {
   @Override
   public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
     setTypeMapImpl(map);
-    LOGGER.log(Level.FINE, "  setTypeMap = {0}", map);
+    LOGGER.debug("  setTypeMap = " + map);
   }
 
   protected Array makeArray(int oid, String fieldString) throws SQLException {
@@ -1551,7 +1536,7 @@ public class PgConnection implements BaseConnection {
         // "current transaction aborted", assume the connection is up and running
         return true;
       }
-      LOGGER.log(Level.FINE, GT.tr("Validating connection."), e);
+      LOGGER.debug(GT.tr("Validating connection."), e);
     }
     return false;
   }
@@ -1566,17 +1551,21 @@ public class PgConnection implements BaseConnection {
       throw new SQLClientInfoException(GT.tr("This connection has been closed."), failures, cause);
     }
 
-    if (haveMinimumServerVersion(ServerVersion.v9_0) && "ApplicationName".equals(name)) {
+    if (haveMinimumServerVersion(ServerVersion.v9_0) && "ApplicationName".equals(name) || "ApplicationType".equals(name)) {
+      Map<String,String>appInfo=new HashMap<String,String>();
+      appInfo.put("ApplicationName","application_name");
+      appInfo.put("ApplicationType","application_type");
       if (value == null) {
         value = "";
       }
-      final String oldValue = queryExecutor.getApplicationName();
+
+      final String oldValue = "ApplicationName".equals(name) ? queryExecutor.getApplicationName(): queryExecutor.getApplicationType();
       if (value.equals(oldValue)) {
         return;
       }
 
       try {
-        StringBuilder sql = new StringBuilder("SET application_name = '");
+        StringBuilder sql = new StringBuilder(String.format("SET %s = '", appInfo.get(name)));  
         Utils.escapeLiteral(sql, value, getStandardConformingStrings());
         sql.append("'");
         execSQLUpdate(sql.toString());
@@ -1584,11 +1573,11 @@ public class PgConnection implements BaseConnection {
         Map<String, ClientInfoStatus> failures = new HashMap<String, ClientInfoStatus>();
         failures.put(name, ClientInfoStatus.REASON_UNKNOWN);
         throw new SQLClientInfoException(
-            GT.tr("Failed to set ClientInfo property: {0}", "ApplicationName"), sqle.getSQLState(),
+            GT.tr("Failed to set ClientInfo property: " + name), sqle.getSQLState(),
             failures, sqle);
       }
-      if (LOGGER.isLoggable(Level.FINE)) {
-        LOGGER.log(Level.FINE, "  setClientInfo = {0} {1}", new Object[]{name, value});
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("  setClientInfo = " + name + " " + value);
       }
       _clientInfo.put(name, value);
       return;
@@ -1610,10 +1599,20 @@ public class PgConnection implements BaseConnection {
       throw new SQLClientInfoException(GT.tr("This connection has been closed."), failures, cause);
     }
 
+      String gaussdbVersion = queryExecutor.getGaussdbVersion();
+      String[] result;
+      if (gaussdbVersion.equals("GaussDBKernel")) {
+          result = new String[]{"ApplicationName", "ApplicationType"};
+      } else {
+          result = new String[]{"ApplicationName"};
+      }
+
     Map<String, ClientInfoStatus> failures = new HashMap<String, ClientInfoStatus>();
-    for (String name : new String[]{"ApplicationName"}) {
+    for (String name : result) {
       try {
-        setClientInfo(name, properties.getProperty(name, null));
+        if(properties.getProperty(name) != null) {
+          setClientInfo(name, properties.getProperty(name, null));
+        }
       } catch (SQLClientInfoException e) {
         failures.putAll(e.getFailedProperties());
       }
@@ -1629,6 +1628,7 @@ public class PgConnection implements BaseConnection {
   public String getClientInfo(String name) throws SQLException {
     checkClosed();
     _clientInfo.put("ApplicationName", queryExecutor.getApplicationName());
+    _clientInfo.put("ApplicationType", queryExecutor.getApplicationType());  //revise
     return _clientInfo.getProperty(name);
   }
 
@@ -1636,6 +1636,7 @@ public class PgConnection implements BaseConnection {
   public Properties getClientInfo() throws SQLException {
     checkClosed();
     _clientInfo.put("ApplicationName", queryExecutor.getApplicationName());
+    _clientInfo.put("ApplicationType", queryExecutor.getApplicationType());
     return _clientInfo;
   }
 
@@ -1689,7 +1690,7 @@ public class PgConnection implements BaseConnection {
         Utils.escapeLiteral(sb, schema, getStandardConformingStrings());
         sb.append("'");
         stmt.executeUpdate(sb.toString());
-        LOGGER.log(Level.FINE, "  setSchema = {0}", schema);
+        LOGGER.debug("  setSchema = " + schema);
       }
     } finally {
       stmt.close();
@@ -1764,7 +1765,7 @@ public class PgConnection implements BaseConnection {
         throw new PSQLException(GT.tr("Unknown ResultSet holdability setting: {0}.", holdability),
             PSQLState.INVALID_PARAMETER_VALUE);
     }
-    LOGGER.log(Level.FINE, "  setHoldability = {0}", holdability);
+    LOGGER.debug("  setHoldability = " + holdability);
   }
 
   @Override
@@ -1895,38 +1896,41 @@ public class PgConnection implements BaseConnection {
     return ps;
   }
 
-  @Override
-  public PGXmlFactoryFactory getXmlFactoryFactory() throws SQLException {
-    if (xmlFactoryFactory == null) {
-      if (xmlFactoryFactoryClass == null || xmlFactoryFactoryClass.equals("")) {
-        xmlFactoryFactory = DefaultPGXmlFactoryFactory.INSTANCE;
-      } else if (xmlFactoryFactoryClass.equals("LEGACY_INSECURE")) {
-        xmlFactoryFactory = LegacyInsecurePGXmlFactoryFactory.INSTANCE;
-      } else {
-        Class<?> clazz;
-        try {
-          clazz = Class.forName(xmlFactoryFactoryClass);
-        } catch (ClassNotFoundException ex) {
-          throw new PSQLException(
-              GT.tr("Could not instantiate xmlFactoryFactory: {0}", xmlFactoryFactoryClass),
-              PSQLState.INVALID_PARAMETER_VALUE, ex);
+    @Override
+    public PGXmlFactoryFactory getXmlFactoryFactory() throws SQLException {
+        if (xmlFactoryFactory == null) {
+            if (xmlFactoryFactoryClass == null || xmlFactoryFactoryClass.equals("")) {
+                xmlFactoryFactory = DefaultPGXmlFactoryFactory.INSTANCE;
+            } else if (xmlFactoryFactoryClass.equals("LEGACY_INSECURE")) {
+                xmlFactoryFactory = LegacyInsecurePGXmlFactoryFactory.INSTANCE;
+            } else {
+                Class<?> clazz;
+                try {
+                    clazz = Class.forName(xmlFactoryFactoryClass);
+                } catch (ClassNotFoundException ex) {
+                    throw new PSQLException(
+                            GT.tr("Could not instantiate xmlFactoryFactory: {0}", xmlFactoryFactoryClass),
+                            PSQLState.INVALID_PARAMETER_VALUE, ex);
+                }
+                if (!clazz.isAssignableFrom(PGXmlFactoryFactory.class)) {
+                    throw new PSQLException(
+                            GT.tr("Connection property xmlFactoryFactory must implement PGXmlFactoryFactory: {0}", xmlFactoryFactoryClass),
+                            PSQLState.INVALID_PARAMETER_VALUE);
+                }
+                try {
+                    xmlFactoryFactory = (PGXmlFactoryFactory) clazz.newInstance();
+                } catch (Exception ex) {
+                    throw new PSQLException(
+                            GT.tr("Could not instantiate xmlFactoryFactory: {0}", xmlFactoryFactoryClass),
+                            PSQLState.INVALID_PARAMETER_VALUE, ex);
+                }
+            }
         }
-        if (!clazz.isAssignableFrom(PGXmlFactoryFactory.class)) {
-          throw new PSQLException(
-              GT.tr("Connection property xmlFactoryFactory must implement PGXmlFactoryFactory: {0}", xmlFactoryFactoryClass),
-              PSQLState.INVALID_PARAMETER_VALUE);
-        }
-        try {
-          xmlFactoryFactory = (PGXmlFactoryFactory) clazz.newInstance();
-        } catch (Exception ex) {
-          throw new PSQLException(
-              GT.tr("Could not instantiate xmlFactoryFactory: {0}", xmlFactoryFactoryClass),
-              PSQLState.INVALID_PARAMETER_VALUE, ex);
-        }
-      }
+        return xmlFactoryFactory;
     }
-    return xmlFactoryFactory;
-  }  
+
+
+  
     public boolean isBatchInsert() {
         return batchInsert;
     }
@@ -1941,6 +1945,10 @@ public class PgConnection implements BaseConnection {
 
     public void setFetchSize(int fetchSize) {
         this.fetchSize = fetchSize;
+    }
+
+    public String getSocketAddress() {
+        return this.socketAddress;
     }
 
 

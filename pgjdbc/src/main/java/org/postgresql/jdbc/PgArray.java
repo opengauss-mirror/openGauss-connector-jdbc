@@ -16,6 +16,8 @@ import org.postgresql.util.ByteConverter;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -25,7 +27,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
+
 
 /**
  * <p>Array is used collect one column of query result data.</p>
@@ -786,7 +788,7 @@ public class PgArray implements java.sql.Array {
       ret = oa;
     } else {
       // other datatypes not currently supported
-      connection.getLogger().log(Level.FINEST, "getArrayImpl(long,int,Map) with {0}", getBaseTypeName());
+      connection.getLogger().trace("getArrayImpl(long,int,Map) with " + getBaseTypeName());
 
       throw org.postgresql.Driver.notImplemented(this.getClass(), "getArrayImpl(long,int,Map)");
     }

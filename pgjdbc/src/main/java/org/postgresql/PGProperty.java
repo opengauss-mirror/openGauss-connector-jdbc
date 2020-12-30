@@ -80,6 +80,7 @@ public enum PGProperty {
    * <p>Parameter should be use together with {@link PGProperty#LOGGER_LEVEL}</p>
    */
   LOGGER_FILE("loggerFile", null, "File name output of the Logger"),
+  LOGGER("logger", null, "logger used by third party application, such as Slf4JLogger"),
 
   /**
    * Sets the default threshold for enabling server-side prepare. A value of {@code -1} stands for
@@ -232,6 +233,9 @@ public enum PGProperty {
   SSL_PASSWORD("sslpassword", null,
       "The password for the client's ssl key (ignored if sslpasswordcallback is set)"),
 
+  SSL_PRIVATEKEY_FACTORY("sslprivatekeyfactory", null,
+          "The privatekey factory for the client's ssl"),
+  
   /**
    * The classname instantiating {@code javax.security.auth.callback.CallbackHandler} to use.
    */
@@ -310,6 +314,8 @@ public enum PGProperty {
    * The application name (require server version &gt;= 9.0).
    */
   APPLICATION_NAME("ApplicationName", DriverInfo.DRIVER_NAME, "Name of the Application (backend >= 9.0)"),
+  
+  APPLICATION_TYPE("ApplicationType", null, "Application Type"),
 
   /**
    * Flag to enable/disable obtaining a GSS credential via JAAS login before authenticating.
@@ -427,15 +433,14 @@ public enum PGProperty {
           + "which will allow the connection to be used for logical replication "
           + "from that database. "
           + "(backend >= 9.4)"),
+
   /**
    * Supported TLS cipher suites
    */
   TLS_CIPHERS_SUPPERTED("TLSCiphersSupperted",
-          "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,"
-                  + "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,"
-                  + "TLS_DHE_RSA_WITH_AES_128_CCM,"
-                  + "TLS_DHE_RSA_WITH_AES_256_CCM,",
-          "Supported TLS cipher suites"),
+      "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,"
+          + "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,",
+      "Supported TLS cipher suites"),
 
   /**
    * Factory class to instantiate factories for XML processing.
@@ -444,11 +449,12 @@ public enum PGProperty {
    * Or specify a custom class that implements {@code org.postgresql.xml.PGXmlFactoryFactory}.
    */
   XML_FACTORY_FACTORY(
-    "xmlFactoryFactory",
-    "",
-    "Factory class to instantiate factories for XML processing"),
+          "xmlFactoryFactory",
+          "",
+          "Factory class to instantiate factories for XML processing"),
 
   ;
+
   private String _name;
   private String _defaultValue;
   private boolean _required;

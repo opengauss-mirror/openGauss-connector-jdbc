@@ -6,8 +6,8 @@
 package org.postgresql.core;
 
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 /**
  * <p>Predicts encoding for error messages based on some heuristics.</p>
@@ -33,7 +33,7 @@ public class EncodingPredictor {
       this.encoding = encoding;
     }
   }
-  private static final Logger LOGGER = Logger.getLogger(EncodingPredictor.class.getName());
+  private static Log LOGGER = Logger.getLogger(EncodingPredictor.class.getName());
 
   static class Translation {
     public final String fatalText;
@@ -97,7 +97,7 @@ public class EncodingPredictor {
               }
             } catch (IOException e) {
                 // do not care, will try other encodings
-                LOGGER.log(Level.FINEST, "Catch IOException while encoding. ", e);
+                LOGGER.trace("Catch IOException while encoding. ", e);
             }
           }
           if (!foundOne) {
@@ -115,7 +115,7 @@ public class EncodingPredictor {
           return new DecodeResult(decoded, encoder.name());
         } catch (IOException e) {
             // do not care
-            LOGGER.log(Level.FINEST, "Catch IOException while decoding. ", e);
+            LOGGER.trace("Catch IOException while decoding. ", e);
         }
       }
     }

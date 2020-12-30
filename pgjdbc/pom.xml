@@ -1,14 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <groupId>org.postgresql</groupId>
-    <artifactId>pgjdbc-core-parent</artifactId>
-    <version>1.1.5</version>
-    <relativePath />
-  </parent>
-
+  <groupId>test</groupId>
   <artifactId>postgresql</artifactId>
-  <packaging>bundle</packaging>
   <name>PostgreSQL JDBC Driver - JDBC 4.2</name>
   <version>42.2.5</version>
   <description>Java JDBC 4.2 (JRE 8+) driver for PostgreSQL database</description>
@@ -33,15 +26,20 @@
     <jdbc.specification.version>4.2</jdbc.specification.version>
     <jdbc.specification.version.nodot>42</jdbc.specification.version.nodot>
     <skip.assembly>false</skip.assembly>
-    <checkstyle.version>8.29</checkstyle.version>
+    <checkstyle.version>8.5</checkstyle.version>
   </properties>
 
   <dependencies>
-    <dependency>
-      <groupId>com.ongres.scram</groupId>
-      <artifactId>client</artifactId>
-      <version>1.0.0-beta.2</version>
-    </dependency>
+   <dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-api</artifactId>
+    <version>1.7.30</version>
+</dependency>
+<dependency>
+	<groupId>com.huawei</groupId>
+	 <artifactId>demo-0.0.1-SNAPSHOT</artifactId>
+	<version>0.0.1</version>
+		</dependency> 
   </dependencies>
 
   <profiles>
@@ -96,7 +94,7 @@
               <sourceDirectory>${project.build.sourceDirectory}</sourceDirectory>
               <outputDirectory>${project.build.sourceDirectory}</outputDirectory>
               <keysFile>messages.pot</keysFile>
-              <poDirectory>src/main/java/org/postgresql/translation</poDirectory>
+              <poDirectory>src/java/main/org/postgresql/translation</poDirectory>
               <targetBundle>org.postgresql.translation.messages</targetBundle>
               <keywords>-kGT.tr</keywords>
               <msgmergeCmd>msgmerge</msgmergeCmd>
@@ -126,7 +124,7 @@
                 <exclude>org/postgresql/sspi/SSPIClient.java</exclude>
               </excludes>
               <testExcludes>
-                <exclude>org/postgresql/test/sspi/*.java</exclude>
+                <exclude>org.postgresql/test/sspi/*.java</exclude>
               </testExcludes>
             </configuration>
           </plugin>
@@ -245,7 +243,7 @@
         <artifactId>maven-shade-plugin</artifactId>
         <version>3.1.0</version>
         <configuration>
-          <minimizeJar>true</minimizeJar>
+          <minimizeJar>false</minimizeJar>
           <filters>
             <filter>
               <artifact>com.ongres.scram:client</artifact>
@@ -313,6 +311,8 @@
             <failsOnError>true</failsOnError>
             <consoleOutput>true</consoleOutput>
             <includeTestSourceDirectory>true</includeTestSourceDirectory>
+             <source>1.8</source>
+              <target>1.8</target>
           </configuration>
         </plugin>
         <plugin>
@@ -320,6 +320,14 @@
           <artifactId>maven-javadoc-plugin</artifactId>
           <configuration>
             <failOnWarnings>true</failOnWarnings>
+          </configuration>
+        </plugin>
+        <plugin>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.1</version>
+          <configuration>
+            <source>1.8</source>
+            <target>1.8</target>
           </configuration>
         </plugin>
       </plugins>

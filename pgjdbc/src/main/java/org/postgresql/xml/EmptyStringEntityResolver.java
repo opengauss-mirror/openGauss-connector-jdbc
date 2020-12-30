@@ -13,11 +13,11 @@ import java.io.IOException;
 import java.io.StringReader;
 
 public class EmptyStringEntityResolver implements EntityResolver {
-  public static final EmptyStringEntityResolver INSTANCE = new EmptyStringEntityResolver();
+    public static final EmptyStringEntityResolver INSTANCE = new EmptyStringEntityResolver();
 
-  @Override
-  public InputSource resolveEntity(String publicId, String systemId)
-      throws SAXException, IOException {
-    return new InputSource(new StringReader(""));
-  }
+    @Override
+    public InputSource resolveEntity(String publicId, String systemId)
+            throws SAXException, IOException {
+        return new InputSource(new StringReader(""));
+    }
 }

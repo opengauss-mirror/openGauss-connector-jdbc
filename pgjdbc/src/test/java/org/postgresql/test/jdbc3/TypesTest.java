@@ -46,6 +46,27 @@ public class TypesTest extends BaseTest4 {
   }
 
   @Test
+  public void testPreparedBoolean() throws SQLException {
+    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?,?,?,?");
+    pstmt.setNull(1, Types.BOOLEAN);
+    pstmt.setObject(2, null, Types.BOOLEAN);
+    pstmt.setBoolean(3, true);
+    pstmt.setObject(4, Boolean.FALSE);
+    ResultSet rs = pstmt.executeQuery();
+    assertTrue(rs.next());
+    assertTrue(!rs.getBoolean(1));
+    assertTrue(rs.wasNull());
+    assertNull(rs.getObject(2));
+    assertTrue(rs.getBoolean(3));
+    // Only the V3 protocol return will be strongly typed.
+    // The V2 path will return a String because it doesn't know
+    // any better.
+    if (preferQueryMode != PreferQueryMode.SIMPLE) {
+      assertTrue(!((Boolean) rs.getObject(4)).booleanValue());
+    }
+  }
+
+  @Test
   public void testPreparedByte() throws SQLException {
     PreparedStatement pstmt = _conn.prepareStatement("SELECT ?,?");
     pstmt.setByte(1, (byte) 1);

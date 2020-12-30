@@ -14,15 +14,17 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.HashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
+
+
 
 /**
  * Representation of a particular character encoding.
  */
 public class Encoding {
 
-  private static final Logger LOGGER = Logger.getLogger(Encoding.class.getName());
+  private static Log LOGGER = Logger.getLogger(Encoding.class.getName());
 
   private static final Encoding DEFAULT_ENCODING = new Encoding();
   private static final Encoding UTF8_ENCODING = new Encoding("UTF-8");
@@ -97,10 +99,6 @@ public class Encoding {
     }
     this.encoding = encoding;
     fastASCIINumbers = testAsciiNumbers();
-    if (LOGGER.isLoggable(Level.FINEST)) {
-      LOGGER.log(Level.FINEST, "Creating new Encoding {0} with fastASCIINumbers {1}",
-          new Object[]{encoding, fastASCIINumbers});
-    }
   }
 
   /**
@@ -148,7 +146,7 @@ public class Encoding {
     String[] candidates = encodings.get(databaseEncoding);
     if (candidates != null) {
       for (String candidate : candidates) {
-        LOGGER.log(Level.FINEST, "Search encoding candidate {0}", candidate);
+        LOGGER.trace("Search encoding candidate " + candidate);
         if (Charset.isSupported(candidate)) {
           return new Encoding(candidate);
         }
@@ -162,7 +160,7 @@ public class Encoding {
     }
 
     // Fall back to default JVM encoding.
-    LOGGER.log(Level.FINEST, "{0} encoding not found, returning default encoding", databaseEncoding);
+    LOGGER.trace(databaseEncoding + " encoding not found, returning default encoding");
     return DEFAULT_ENCODING;
   }
 

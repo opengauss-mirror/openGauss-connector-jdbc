@@ -53,6 +53,32 @@ public class PGTimestampTest {
   }
 
   /**
+   * Tests {@link PGTimestamp} with {@link PGInterval}.
+   *
+   * @throws SQLException if a JDBC or database problem occurs.
+   */
+  @Test
+  public void testTimestampWithInterval() throws SQLException {
+    assumeTrue(TestUtil.haveIntegerDateTimes(con));
+    PGTimestamp timestamp = new PGTimestamp(System.currentTimeMillis());
+    PGInterval interval = new PGInterval(0, 0, 0, 1, 2, 3.14);
+    verifyTimestampWithInterval(timestamp, interval, true);
+    verifyTimestampWithInterval(timestamp, interval, false);
+
+    timestamp = new PGTimestamp(System.currentTimeMillis(),
+        Calendar.getInstance(TimeZone.getTimeZone("GMT")));
+    interval = new PGInterval(0, 0, 0, 1, 2, 3.14);
+    verifyTimestampWithInterval(timestamp, interval, true);
+    verifyTimestampWithInterval(timestamp, interval, false);
+
+    timestamp = new PGTimestamp(System.currentTimeMillis(),
+        Calendar.getInstance(TimeZone.getTimeZone("GMT+01:00")));
+    interval = new PGInterval(-3, -2, -1, 1, 2, 3.14);
+    verifyTimestampWithInterval(timestamp, interval, true);
+    verifyTimestampWithInterval(timestamp, interval, false);
+  }
+
+  /**
    * Executes a test with the given timestamp and interval.
    *
    * @param timestamp the timestamp under test.

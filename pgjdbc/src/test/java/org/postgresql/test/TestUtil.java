@@ -409,6 +409,11 @@ public class TestUtil {
 
       // Now create the table
       String sql = "CREATE TABLE " + table + " (" + columns + ")";
+
+      if (withOids) {
+        sql += " WITH OIDS";
+      }
+
       st.executeUpdate(sql);
     } finally {
       closeQuietly(st);

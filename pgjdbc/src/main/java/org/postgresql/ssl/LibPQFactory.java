@@ -12,6 +12,9 @@ import org.postgresql.util.GT;
 import org.postgresql.util.ObjectFactory;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
+
 
 import java.io.Console;
 import java.io.FileInputStream;
@@ -33,8 +36,6 @@ import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Provide an SSLSocketFactory that is compatible with the libpq behaviour.
@@ -42,7 +43,7 @@ import java.util.logging.Logger;
 public class LibPQFactory extends WrappedFactory {
 
   LazyKeyManager km;
-  private static final Logger LOGGER = Logger.getLogger(LibPQFactory.class.getName());
+  private static Log LOGGER = Logger.getLogger(LibPQFactory.class.getName());
 
   /**
    * @param info the connection parameters The following parameters are used:
@@ -93,7 +94,7 @@ public class LibPQFactory extends WrappedFactory {
 
       // If the properties are empty, give null to prevent client key selection
       km = new LazyKeyManager(("".equals(sslcertfile) ? null : sslcertfile),
-          ("".equals(sslkeyfile) ? null : sslkeyfile), cbh, defaultfile);
+          ("".equals(sslkeyfile) ? null : sslkeyfile), cbh, defaultfile, PGProperty.SSL_PRIVATEKEY_FACTORY.get(info));
 
       TrustManager[] tm;
       SslMode sslMode = SslMode.of(info);
@@ -146,7 +147,7 @@ public class LibPQFactory extends WrappedFactory {
             fis.close();
           } catch (IOException e) {
               /* ignore */
-              LOGGER.log(Level.FINEST, "Catch IOException on close:", e);
+              LOGGER.trace("Catch IOException on close:", e);
           }
         }
         tm = tmf.getTrustManagers();

@@ -7,7 +7,11 @@ package org.postgresql.hostchooser;
 
 import static java.util.Collections.shuffle;
 
+import org.postgresql.Driver;
 import org.postgresql.PGProperty;
+import org.postgresql.log.Log;
+import org.postgresql.log.Logger;
+import org.postgresql.QueryCNListUtils;
 import org.postgresql.util.HostSpec;
 import org.postgresql.util.PSQLException;
 
@@ -19,25 +23,213 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 
+import java.util.*;
+
+
 /**
  * HostChooser that keeps track of known host statuses.
  */
-class MultiHostChooser implements HostChooser {
+public class MultiHostChooser implements HostChooser {
   private HostSpec[] hostSpecs;
   private final HostRequirement targetServerType;
   private int hostRecheckTime;
   private boolean loadBalance;
+  private LoadBalanceType loadBalanceType;
+  private String URLIdentifier;
+  private Properties info;
+  private static Log LOGGER = Logger.getLogger(MultiHostChooser.class.getName());
+
+  private static final int MAX_CONNECT_NUM = 1 << 30;
+
+  private enum LoadBalanceType {
+    Shuffle, RoundRobin, PriorityRoundRobin, LeastConn, NONE
+  }
+
+  private static Map<String, Integer> roundRobinCounter = new HashMap<>();
+
 
   MultiHostChooser(HostSpec[] hostSpecs, HostRequirement targetServerType,
       Properties info) {
     this.hostSpecs = hostSpecs;
     this.targetServerType = targetServerType;
+    this.loadBalanceType = initLoadBalanceType(info);
+    this.URLIdentifier = QueryCNListUtils.keyFromURL(info);
+    this.info = info;
     try {
       hostRecheckTime = PGProperty.HOST_RECHECK_SECONDS.getInt(info) * 1000;
-      loadBalance = PGProperty.LOAD_BALANCE_HOSTS.getBoolean(info);
     } catch (PSQLException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  // Select a load balancing algorithm based on the value of autoBalance.
+  // In addition, the original loadbalancehosts = true is compatible.
+  private LoadBalanceType initLoadBalanceType(Properties info) {
+    String autoBalance = info.getProperty("autoBalance", "false");
+    if (autoBalance.equals("roundrobin") || autoBalance.equals("true") || autoBalance.equals("balance"))
+      return LoadBalanceType.RoundRobin;
+    if (autoBalance.contains("priority"))
+      return LoadBalanceType.PriorityRoundRobin;
+    if (autoBalance.equals("leastconn"))
+      return LoadBalanceType.LeastConn;
+    if (PGProperty.LOAD_BALANCE_HOSTS.getBoolean(info) || autoBalance.equals("shuffle"))
+      return LoadBalanceType.Shuffle;
+    return LoadBalanceType.NONE;
+  }
+
+  // Load balancing algorithms are executed based on the value of loadBalanceType.
+  private List<HostSpec> loadBalance(List<HostSpec> allHosts) {
+    Boolean isOutPutLog = true;
+    if (allHosts.size() <= 1) {
+      return allHosts;
+    }
+    switch (loadBalanceType) {
+      case Shuffle:
+        allHosts = new ArrayList<HostSpec>(allHosts);
+        shuffle(allHosts);
+        break;
+      case RoundRobin:
+        allHosts = roundRobin(allHosts);
+        break;
+      case PriorityRoundRobin:
+        allHosts = priorityRoundRobin(allHosts);
+        break;
+      case LeastConn:
+        break;
+      default:
+        isOutPutLog = false;
+        break;
+    }
+    if(isOutPutLog){
+      LOGGER.info("[AUTOBALANCE] The load balancing result of the cluster is:" +
+              " | Cluster: " + URLIdentifier  +
+              " | LoadBalanceResult: " + allHosts
+      );
+    }
+    return allHosts;
+  }
+  // Returns a counter and increments it by one.
+  // Because it is possible to use it in multiple instances,  use synchronized (MultiHostChooser.class).
+  private int getRRIndex() {
+    synchronized (roundRobinCounter) {
+      int value = roundRobinCounter.getOrDefault(URLIdentifier, 0);
+      value = (value + 1) % MAX_CONNECT_NUM;
+      roundRobinCounter.put(URLIdentifier, value);
+      return value;
+    }
+  }
+
+  /*
+   * Use for RR algorithm. In case of first CN is not been connected, jdbc will
+   * try to connect the second one. So shuffering all CN except of the first one
+   * will keep balance.
+   */
+  private List<HostSpec> roundRobin(List<HostSpec> hostSpecs) {
+    if (hostSpecs.size() <= 1) {
+      return hostSpecs;
+    }
+    int index = getRRIndex() % hostSpecs.size();
+    List<HostSpec> result = new ArrayList<HostSpec>(hostSpecs.size());
+    for (int i = 0; i < hostSpecs.size(); i++) {
+      int primitiveIndex = (index + i) % hostSpecs.size();
+      result.add(hostSpecs.get(primitiveIndex));
+    }
+    Collections.shuffle(result.subList(1, result.size()));
+    return result;
+  }
+
+  /*
+   * Use for RR algorithm. In case of first CN is not been connected, jdbc will
+   * try to connect the second one. So shuffering all CN except of the first one
+   * will keep balance.
+   * CN configured on url has higher priority to be connected.
+   */
+  private List<HostSpec> priorityRoundRobin(List<HostSpec> hostSpecs) {
+    // Obtains the URL CN Host List.
+    List<HostSpec> urlHostSpecs = Arrays.asList(Driver.getURLHostSpecs(info));
+    int priorityCNNumber = Integer.parseInt(info.getProperty("autoBalance").substring("priority".length()));
+    // Obtain the currently active CN node that is in the priority state.
+    List<HostSpec> priorityURLHostSpecs = getSurvivalPriorityURLHostSpecs(hostSpecs, urlHostSpecs, priorityCNNumber);
+    List<HostSpec> nonPriorityHostSpecs = getNonPriorityHostSpecs(hostSpecs, priorityURLHostSpecs);
+    if (priorityURLHostSpecs.size() > 0) {
+      List<HostSpec> resultHostSpecs = roundRobin(priorityURLHostSpecs);
+      shuffle(nonPriorityHostSpecs);
+      resultHostSpecs.addAll(nonPriorityHostSpecs);
+      return resultHostSpecs;
+    } else {
+      return roundRobin(hostSpecs);
+    }
+  }
+
+  // Returns the alive PriorityURL.
+  private List<HostSpec> getSurvivalPriorityURLHostSpecs(List<HostSpec> hostSpecs, List<HostSpec> urlHostSpecs, int priorityCNNumber) {
+    List<HostSpec> priorityURLHostSpecs = new ArrayList<>();
+    for (int i = 0; i < priorityCNNumber; i++) {
+      HostSpec urlHostSpec = urlHostSpecs.get(i);
+      for (HostSpec hostSpec : hostSpecs) {
+        if (urlHostSpec.equals(hostSpec)) {
+          priorityURLHostSpecs.add(urlHostSpec);
+          break;
+        }
+      }
+    }
+    return priorityURLHostSpecs;
+  }
+
+  // Returns hostSpecs except alive PriorityURL.
+  private List<HostSpec> getNonPriorityHostSpecs(List<HostSpec> hostSpecs, List<HostSpec> priorityURLHostSpecs) {
+    List<HostSpec> nonPriorityHostSpecs = new ArrayList<>();
+    for (HostSpec hostSpec : hostSpecs) {
+      if (!priorityURLHostSpecs.contains(hostSpec)) {
+        nonPriorityHostSpecs.add(hostSpec);
+      }
+    }
+    return nonPriorityHostSpecs;
+  }
+
+
+  /**
+   * Determine whether configuring the priority load balancing is valid;
+   * if using priority load balancing, "autoBalance" should be start with priority and end with number
+   * and the number of CNs with priority should be less than the number of CNs on the URL ;
+   * otherwise, return false.
+   *
+   * testIsVaildPriorityLoadBalance Overwrite the function test.
+   *
+   * @param props : Connection properties
+   */
+  public static boolean isVaildPriorityLoadBalance(Properties props) {
+    String autoBalance = props.getProperty("autoBalance", "false");
+    if (!autoBalance.contains("priority")) {
+      return true;
+    }
+    String priorityLoadBalance = "priority\\d+";
+    if (!autoBalance.matches(priorityLoadBalance)) {
+      LOGGER.warn("\"autoBalance\" is invaild. When configuring priority load balancing, \"autoBalance\" should be start with priority and end with number.");
+      return false;
+    }
+    String urlPriorityCNNumber = autoBalance.substring("priority".length());
+    try {
+      int priorityCNNumber = Integer.parseInt(urlPriorityCNNumber);
+      int lengthPGPORTURL = props.getProperty("PGPORTURL").split(",").length;
+      if (lengthPGPORTURL <= priorityCNNumber) {
+        LOGGER.warn("When configuring priority load balancing, the number of CNs with priority should be less than the number of CNs on the URL.");
+        return false;
+      }
+    } catch (NumberFormatException e) {
+      LOGGER.warn("When configuring priority load balancing, \"autoBalance\" should be end with number.");
+      return false;
+    }
+    return true;
+  }
+
+  public static boolean isUsingAutoLoadBalance(Properties props) {
+    String autoBalance = props.getProperty("autoBalance", "false");
+    if (autoBalance.equals("shuffle") || autoBalance.equals("roundrobin") || autoBalance.contains("priority") ||
+            autoBalance.equals("leastconn") || autoBalance.equals("true") || autoBalance.equals("balance")) {
+      return true;
+    }
+    return false;
   }
 
   @Override
@@ -46,10 +238,7 @@ class MultiHostChooser implements HostChooser {
     if (!res.hasNext()) {
       // In case all the candidate hosts are unavailable or do not match, try all the hosts just in case
       List<HostSpec> allHosts = Arrays.asList(hostSpecs);
-      if (loadBalance) {
-        allHosts = new ArrayList<HostSpec>(allHosts);
-        Collections.shuffle(allHosts);
-      }
+      allHosts = loadBalance(allHosts);
       res = withReqStatus(targetServerType, allHosts).iterator();
     }
     return res;
@@ -87,9 +276,7 @@ class MultiHostChooser implements HostChooser {
   private List<CandidateHost> getCandidateHosts(HostRequirement hostRequirement) {
     List<HostSpec> candidates =
         GlobalHostStatusTracker.getCandidateHosts(hostSpecs, hostRequirement, hostRecheckTime);
-    if (loadBalance) {
-      shuffle(candidates);
-    }
+    candidates = loadBalance(candidates);
     return withReqStatus(hostRequirement, candidates);
   }
 

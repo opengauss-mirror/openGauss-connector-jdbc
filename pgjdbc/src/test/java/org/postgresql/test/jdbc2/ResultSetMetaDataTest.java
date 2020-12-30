@@ -107,6 +107,25 @@ public class ResultSetMetaDataTest extends BaseTest4 {
     super.tearDown();
   }
 
+  @Test
+  public void testStandardResultSet() throws SQLException {
+    Statement stmt = conn.createStatement();
+    ResultSet rs = stmt.executeQuery("SELECT a,b,c,a+c as total,oid,b as d FROM rsmd1");
+    runStandardTests(rs.getMetaData());
+    rs.close();
+    stmt.close();
+  }
+
+  @Test
+  public void testPreparedResultSet() throws SQLException {
+    assumePreparedStatementMetadataSupported();
+
+    PreparedStatement pstmt =
+        conn.prepareStatement("SELECT a,b,c,a+c as total,oid,b as d FROM rsmd1 WHERE b = ?");
+    runStandardTests(pstmt.getMetaData());
+    pstmt.close();
+  }
+
   private void runStandardTests(ResultSetMetaData rsmd) throws SQLException {
     PGResultSetMetaData pgrsmd = (PGResultSetMetaData) rsmd;
 

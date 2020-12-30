@@ -15,19 +15,17 @@ import org.postgresql.core.SetupQueryRunner;
 import org.postgresql.core.SocketFactoryFactory;
 import org.postgresql.core.Utils;
 import org.postgresql.core.Version;
-import org.postgresql.hostchooser.CandidateHost;
-import org.postgresql.hostchooser.GlobalHostStatusTracker;
-import org.postgresql.hostchooser.HostChooser;
-import org.postgresql.hostchooser.HostChooserFactory;
-import org.postgresql.hostchooser.HostRequirement;
-import org.postgresql.hostchooser.HostStatus;
+import org.postgresql.hostchooser.*;
 import org.postgresql.jdbc.SslMode;
+import org.postgresql.QueryCNListUtils;
 import org.postgresql.util.GT;
 import org.postgresql.util.HostSpec;
 import org.postgresql.util.MD5Digest;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.util.ServerErrorMessage;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -40,9 +38,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TimeZone;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
+import java.util.UUID;
+
 import javax.net.SocketFactory;
 
 /**
@@ -52,7 +49,7 @@ import javax.net.SocketFactory;
  */
 public class ConnectionFactoryImpl extends ConnectionFactory {
 
-  private static final Logger LOGGER = Logger.getLogger(ConnectionFactoryImpl.class.getName());
+  private static Log LOGGER = Logger.getLogger(ConnectionFactoryImpl.class.getName());
   private static final int AUTH_REQ_OK = 0;
   private static final int AUTH_REQ_KRB4 = 1;
   private static final int AUTH_REQ_KRB5 = 2;
@@ -75,7 +72,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   private static final int PROTOCOL_VERSION_351 = 351;
   private static final int PROTOCOL_VERSION_350 = 350;
   private int protocolVerion = PROTOCOL_VERSION_351;
-
+  private String connectInfo = "";
   public static void setStaticClientEncoding(String client) {
       ConnectionFactoryImpl.CLIENT_ENCODING = client;
   }
@@ -97,8 +94,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     int connectTimeout = Integer.parseInt(PGProperty.CONNECT_TIMEOUT.getDefaultValue());
     if (PGProperty.CONNECT_TIMEOUT.getInt(info) <= Integer.MAX_VALUE / 1000) {
         connectTimeout = PGProperty.CONNECT_TIMEOUT.getInt(info) * 1000;
-    } else {
-        LOGGER.log(Level.FINE, "integer connectTimeout is too large, it will occur error after multiply by 1000.");
+    } else {  
+        LOGGER.debug("integer connectTimeout is too large, it will occur error after multiply by 1000.");
     }
 
     PGStream newStream = new PGStream(socketFactory, hostSpec, connectTimeout);
@@ -111,7 +108,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     if (PGProperty.SOCKET_TIMEOUT.getInt(info) <= Integer.MAX_VALUE / 1000) {
         socketTimeout = PGProperty.SOCKET_TIMEOUT.getInt(info);
     } else {
-        LOGGER.log(Level.FINE, "integer socketTimeout is too large, it will occur error after multiply by 1000.");
+        LOGGER.debug("integer socketTimeout is too large, it will occur error after multiply by 1000.");
     }
     if (socketTimeout > 0) {
       newStream.getSocket().setSoTimeout(socketTimeout * 1000);
@@ -133,7 +130,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       if (receiveBufferSize > 0) {
         newStream.getSocket().setReceiveBufferSize(receiveBufferSize);
       } else {
-        LOGGER.log(Level.WARNING, "Ignore invalid value for receiveBufferSize: {0}", receiveBufferSize);
+        LOGGER.warn("Ignore invalid value for receiveBufferSize: " + receiveBufferSize);
       }
     }
 
@@ -143,13 +140,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       if (sendBufferSize > 0) {
         newStream.getSocket().setSendBufferSize(sendBufferSize);
       } else {
-        LOGGER.log(Level.WARNING, "Ignore invalid value for sendBufferSize: {0}", sendBufferSize);
+        LOGGER.warn("Ignore invalid value for sendBufferSize: " + sendBufferSize);
       }
-    }
-
-    if (LOGGER.isLoggable(Level.FINE)) {
-      LOGGER.log(Level.FINE, "Receive Buffer Size is {0}", newStream.getSocket().getReceiveBufferSize());
-      LOGGER.log(Level.FINE, "Send Buffer Size is {0}", newStream.getSocket().getSendBufferSize());
     }
 
     List<String[]> paramList = getParametersForStartup(user, database, info);
@@ -201,7 +193,6 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     while (hostIter.hasNext()) {
       CandidateHost candidateHost = hostIter.next();
       HostSpec hostSpec = candidateHost.hostSpec;
-      LOGGER.log(Level.FINE, "Trying to establish a protocol version 3 connection to {0}", hostSpec);
 
       // Note: per-connect-attempt status map is used here instead of GlobalHostStatusTracker
       // for the case when "no good hosts" match (e.g. all the hosts are known as "connectfail")
@@ -209,9 +200,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       // GlobalHostStatusTracker
       HostStatus knownStatus = knownStates.get(hostSpec);
       if (knownStatus != null && !candidateHost.targetServerType.allowConnectingTo(knownStatus)) {
-        if (LOGGER.isLoggable(Level.FINER)) {
-          LOGGER.log(Level.FINER, "Known status of host {0} is {1}, and required status was {2}. Will try next host",
-                     new Object[]{hostSpec, knownStatus, candidateHost.targetServerType});
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Known status of host " + hostSpec + " is " + knownStatus + ", and required status was " + candidateHost.targetServerType + ". Will try next host");
         }
         continue;
       }
@@ -219,7 +209,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       //
       // Establish a connection.
       //
-
+      connectInfo = UUID.randomUUID().toString(); // this is used to trace the time taken to establish the connection.
+      LOGGER.info("[" + connectInfo + "] " + "Try to connect." + " IP: " + hostSpec.toString());
       PGStream newStream = null;
       try {
         try {
@@ -233,19 +224,15 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
             try {
               newStream =
                   tryConnect(user, database, info, socketFactory, hostSpec, SslMode.DISABLE);
-              LOGGER.log(Level.FINE, "Downgraded to non-encrypted connection for host {0}",
-                  hostSpec);
+              LOGGER.debug("Downgraded to non-encrypted connection for host " + hostSpec);    
             } catch (SQLException ee) {
               ex = ee;
             } catch (IOException ee) {
               ex = ee; // Can't use multi-catch in Java 6 :(
             }
             if (ex != null) {
-              log(Level.FINE, "sslMode==PREFER, however non-SSL connection failed as well", ex);
+              LOGGER.debug("sslMode==PREFER, however non-SSL connection failed as well", ex);
               // non-SSL failed as well, so re-throw original exception
-//              //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.1"
-//              // Add non-SSL exception as suppressed
-//              //#endif
               throw e;
             }
           } else if (sslMode == SslMode.ALLOW
@@ -255,7 +242,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
             try {
               newStream =
                   tryConnect(user, database, info, socketFactory, hostSpec, SslMode.REQUIRE);
-              LOGGER.log(Level.FINE, "Upgraded to encrypted connection for host {0}",
+              LOGGER.debug("Upgraded to encrypted connection for host " + 
                   hostSpec);
             } catch (SQLException ee) {
               ex = ee;
@@ -263,11 +250,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
               ex = ee; // Can't use multi-catch in Java 6 :(
             }
             if (ex != null) {
-              log(Level.FINE, "sslMode==ALLOW, however SSL connection failed as well", ex);
+              LOGGER.debug("sslMode==ALLOW, however SSL connection failed as well", ex);
               // non-SSL failed as well, so re-throw original exception
-//              //#if mvn.project.property.postgresql.jdbc.spec >= "JDBC4.1"
-//              // Add SSL exception as suppressed
-//              //#endif
               throw e;
             }
 
@@ -280,8 +264,10 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         if (PGProperty.CANCEL_SIGNAL_TIMEOUT.getInt(info) <= Integer.MAX_VALUE / 1000) {
             cancelSignalTimeout = PGProperty.CANCEL_SIGNAL_TIMEOUT.getInt(info) * 1000;
         } else {
-            LOGGER.log(Level.FINE, "integer cancelSignalTimeout is too large, it will occur error after multiply by 1000.");
+            LOGGER.debug("integer cancelSignalTimeout is too large, it will occur error after multiply by 1000.");
         }
+        String socketAddress = newStream.getConnectInfo();
+        LOGGER.info("[" + socketAddress + "] " + "Connection is established. ID: " + connectInfo);
         // Do final startup.
         QueryExecutor queryExecutor = new QueryExecutorImpl(newStream, user, database,
             cancelSignalTimeout, info);
@@ -299,7 +285,12 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         }
 
         runInitialQueries(queryExecutor, info);
+        if(MultiHostChooser.isUsingAutoLoadBalance(info)){
+          QueryCNListUtils.runRereshCNListQueryies(queryExecutor,info);
+        }
+        queryExecutor.setGaussdbVersion(queryGaussdbVersion(queryExecutor));
 
+        LOGGER.info("Connect complete. ID: " + connectInfo);
         // And we're done.
         return queryExecutor;
       } catch (ConnectException cex) {
@@ -309,7 +300,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail);
         knownStates.put(hostSpec, HostStatus.ConnectFail);
         if (hostIter.hasNext()) {
-          log(Level.FINE, "ConnectException occured while connecting to {0}", cex, hostSpec);
+          LOGGER.debug("ConnectException occured while connecting to {0}" + hostSpec, cex);
           // still more addresses to try
           continue;
         }
@@ -321,7 +312,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail);
         knownStates.put(hostSpec, HostStatus.ConnectFail);
         if (hostIter.hasNext()) {
-          log(Level.FINE, "IOException occured while connecting to {0}", ioe, hostSpec);
+          LOGGER.debug("IOException occured while connecting to " + hostSpec, ioe);
           // still more addresses to try
           continue;
         }
@@ -332,13 +323,14 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail);
         knownStates.put(hostSpec, HostStatus.ConnectFail);
         if (hostIter.hasNext()) {
-          log(Level.FINE, "SQLException occured while connecting to {0}", se, hostSpec);
+          LOGGER.debug("SQLException occured while connecting to " + hostSpec, se);
           // still more addresses to try
           continue;
         }
         throw se;
       }
     }
+    LOGGER.info("Could not find a server with specified targetServerType: " + targetServerType + ". The current server known status is: " + knownStates.entrySet().toString());
     throw new PSQLException(GT
         .tr("Could not find a server with specified targetServerType: {0}", targetServerType),
         PSQLState.CONNECTION_UNABLE_TO_CONNECT);
@@ -376,18 +368,6 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       paramList.add(new String[]{"search_path", currentSchema});
     }
     return paramList;
-  }
-
-  private static void log(Level level, String msg, Throwable thrown, Object... params) {
-    if (!LOGGER.isLoggable(level)) {
-      return;
-    }
-    LogRecord rec = new LogRecord(level, msg);
-    // Set the loggerName of the LogRecord with the current logger
-    rec.setLoggerName(LOGGER.getName());
-    rec.setParameters(params);
-    rec.setThrown(thrown);
-    LOGGER.log(rec);
   }
 
   /**
@@ -429,7 +409,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       return pgStream;
     }
 
-    LOGGER.log(Level.FINEST, " FE=> SSLRequest");
+    LOGGER.trace(" FE=> SSLRequest");
 
     // Send SSL request packet
     pgStream.sendInteger4(8);
@@ -441,7 +421,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     int beresp = pgStream.receiveChar();
     switch (beresp) {
       case 'E':
-        LOGGER.log(Level.FINEST, " <=BE SSLError");
+        LOGGER.trace(" <=BE SSLError");
 
         // Server doesn't even know about the SSL handshake protocol
         if (sslMode.requireEncryption()) {
@@ -454,7 +434,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         return new PGStream(pgStream.getSocketFactory(), pgStream.getHostSpec(), connectTimeout);
 
       case 'N':
-        LOGGER.log(Level.FINEST, " <=BE SSLRefused");
+        LOGGER.trace(" <=BE SSLRefused");
 
         // Server does not support ssl
         if (sslMode.requireEncryption()) {
@@ -465,7 +445,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         return pgStream;
 
       case 'S':
-        LOGGER.log(Level.FINEST, " <=BE SSLOk");
+        LOGGER.trace(" <=BE SSLOk");
 
         // Server supports ssl
         org.postgresql.ssl.MakeSSL.convert(pgStream, info);
@@ -479,7 +459,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
 
   private void sendStartupPacket(PGStream pgStream, List<String[]> params)
       throws IOException {
-    if (LOGGER.isLoggable(Level.FINEST)) {
+    if (LOGGER.isDebugEnabled()) {
       StringBuilder details = new StringBuilder();
       for (int i = 0; i < params.size(); ++i) {
         if (i != 0) {
@@ -489,7 +469,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         details.append("=");
         details.append(params.get(i)[1]);
       }
-      LOGGER.log(Level.FINEST, " FE=> StartupPacket({0})", details);
+      LOGGER.debug("[" + connectInfo + "] " + " FE=> StartupPacket(" + details + ")");
     }
 
     // Precalculate message length and encode params.
@@ -528,6 +508,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     String password = PGProperty.PASSWORD.get(info);
 
     /* SCRAM authentication state, if used */
+    //#endif
       authloop: while (true) {
         int beresp = pgStream.receiveChar();
 
@@ -542,8 +523,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
             int l_elen = pgStream.receiveInteger4();
 
             ServerErrorMessage errorMsg =
-                new ServerErrorMessage(pgStream.receiveErrorString(l_elen - 4));
-            LOGGER.log(Level.FINEST, " <=BE ErrorMessage({0})", errorMsg);
+                new ServerErrorMessage(pgStream.receiveErrorString(l_elen - 4), pgStream.getConnectInfo());
+            LOGGER.trace("[" + connectInfo + "] " + " <=BE ErrorMessage(" + errorMsg + ")");
             throw new PSQLException(errorMsg);
 
           case 'R':
@@ -558,8 +539,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
             switch (areq) {
               case AUTH_REQ_MD5: {
                 byte[] md5Salt = pgStream.receive(4);
-                if (LOGGER.isLoggable(Level.FINEST)) {
-                  LOGGER.log(Level.FINEST, " <=BE AuthenticationReqMD5(salt={0})", Utils.toHexString(md5Salt));
+                if (LOGGER.isDebugEnabled()) {
+                  LOGGER.debug("[" + connectInfo + "] " + " <=BE AuthenticationReqMD5(salt=" + Utils.toHexString(md5Salt) + ")");
                 }
 
                 if (password == null) {
@@ -572,10 +553,6 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                 byte[] digest =
                     MD5Digest.encode(user.getBytes("UTF-8"), password.getBytes("UTF-8"), md5Salt);
 
-                if (LOGGER.isLoggable(Level.FINEST)) {
-                  LOGGER.log(Level.FINEST, " FE=> Password(md5digest={0})", new String(digest, "US-ASCII"));
-                }
-
                 pgStream.sendChar('p');
                 pgStream.sendInteger4(4 + digest.length + 1);
                 pgStream.send(digest);
@@ -585,6 +562,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                 break;
               }
               case AUTH_REQ_MD5_SHA256: {
+                  LOGGER.trace("AUTH_REQ_MD5_SHA256" + " ID: " + connectInfo);
                   byte[] digest;
                   String random64code = pgStream.receiveString(64);
                   byte[] md5Salt = pgStream.receive(4);
@@ -598,6 +576,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                   break;
               }
               case AUTH_REQ_SHA256: {
+                  LOGGER.trace("[" + connectInfo + "] " + "AUTH_REQ_SHA256");
                   byte[] digest;
                   int passwordStoredMethod = pgStream.receiveInteger4();
                   if (password == null)
@@ -659,8 +638,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
 
 
               case AUTH_REQ_PASSWORD: {
-                LOGGER.log(Level.FINEST, "<=BE AuthenticationReqPassword");
-                LOGGER.log(Level.FINEST, " FE=> Password(password=<not shown>)");
+                LOGGER.debug("[" + connectInfo + "] " + "<=BE AuthenticationReqPassword" + " ID: " + connectInfo);
 
                 if (password == null) {
                   throw new PSQLException(
@@ -692,16 +670,22 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                           PGProperty.JAAS_APPLICATION_NAME.get(info),
                           PGProperty.KERBEROS_SERVER_NAME.get(info), PGProperty.USE_SPNEGO.getBoolean(info),
                           PGProperty.JAAS_LOGIN.getBoolean(info));
-
+                  if (LOGGER.isDebugEnabled()) {
+                    if (areq == AUTH_REQ_GSS) {
+                        LOGGER.debug("[" + connectInfo + "] " + "AUTH_REQ_GSS");
+                    } else {
+                        LOGGER.debug("[" + connectInfo + "] " + "AUTH_REQ_SSPI");
+                    }
+                  }
                   break;
 
               case AUTH_REQ_OK:
                 /* Cleanup after successful authentication */
-                LOGGER.log(Level.FINEST, " <=BE AuthenticationOk");
+                LOGGER.debug("[" + connectInfo + "] " + " <=BE AuthenticationOk");
                 break authloop; // We're done.
 
               default:
-                LOGGER.log(Level.FINEST, " <=BE AuthenticationReq (unsupported type {0})", areq);
+                LOGGER.trace("[" + connectInfo + "] " + " <=BE AuthenticationReq (unsupported type " + areq + ")");
                 throw new PSQLException(GT.tr(
                     "The authentication type {0} is not supported. Check that you have configured the pg_hba.conf file to include the client''s IP address or subnet, and that it is using an authentication scheme supported by the driver.",
                     areq), PSQLState.CONNECTION_REJECTED);
@@ -740,13 +724,38 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       Utils.escapeLiteral(sql, appName, queryExecutor.getStandardConformingStrings());
       sql.append("'");
       SetupQueryRunner.run(queryExecutor, sql.toString(), false);
+    } 
+    
+    String appType = PGProperty.APPLICATION_TYPE.get(info);
+    if (appType !=null && !appType.equals(queryExecutor.getApplicationType())) {
+      StringBuilder sql = new StringBuilder();
+      sql.append("SET application_type = '");
+      Utils.escapeLiteral(sql, appType, queryExecutor.getStandardConformingStrings());
+      sql.append("'");
+      SetupQueryRunner.run(queryExecutor, sql.toString(), false);
     }
-
   }
 
   private boolean isMaster(QueryExecutor queryExecutor) throws SQLException, IOException {
-    byte[][] results = SetupQueryRunner.run(queryExecutor, "show transaction_read_only", true);
-    String value = queryExecutor.getEncoding().decode(results[0]);
-    return value.equalsIgnoreCase("off");
+    String localRole = "";
+    String dbState = "";
+    List<byte[][]> results = SetupQueryRunner.runForList(queryExecutor, "select local_role, db_state from pg_stat_get_stream_replications();", true);
+    for (byte[][] result : results) {
+      localRole = queryExecutor.getEncoding().decode(result[0]);
+      dbState = queryExecutor.getEncoding().decode(result[1]);
+    }
+    return localRole.equalsIgnoreCase("Primary") && dbState.equalsIgnoreCase("Normal");
+  }
+
+  private String queryGaussdbVersion(QueryExecutor queryExecutor) throws SQLException, IOException {
+    byte[][] result = SetupQueryRunner.run(queryExecutor, "select version();", true);
+    String version = queryExecutor.getEncoding().decode(result[0]);
+    if (version != null && version.contains("GaussDB Kernel")) {
+      return "GaussDBKernel";
+    } else if (version != null && version.contains("openGauss")) {
+      return "openGauss";
+    } else {
+      return "";
+    }
   }
 }

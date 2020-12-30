@@ -277,6 +277,48 @@ public class Jdbc3CallableStatementTest extends BaseTest4 {
     }
   }
 
+  @Test
+  public void testInOut() throws Throwable {
+    try {
+      Statement stmt = con.createStatement();
+      stmt.execute(createBitTab);
+      stmt.execute(insertBitTab);
+      boolean ret = stmt.execute("create or replace function "
+          + "insert_bit( inout IMAX boolean, inout IMIN boolean, inout INUL boolean)  as "
+          + "'begin "
+          + "insert into bit_tab values( imax, imin, inul);"
+          + "select max_val into imax from bit_tab;"
+          + "select min_val into imin from bit_tab;"
+          + "select null_val into inul from bit_tab;"
+          + " end;' "
+          + "language plpgsql;");
+    } catch (Exception ex) {
+      fail(ex.getMessage());
+      throw ex;
+    }
+    try {
+      CallableStatement cstmt = con.prepareCall("{ call insert_bit(?,?,?) }");
+      cstmt.setObject(1, "true", Types.BIT);
+      cstmt.setObject(2, "false", Types.BIT);
+      cstmt.setNull(3, Types.BIT);
+      cstmt.registerOutParameter(1, Types.BIT);
+      cstmt.registerOutParameter(2, Types.BIT);
+      cstmt.registerOutParameter(3, Types.BIT);
+      cstmt.executeUpdate();
+
+      assertTrue(cstmt.getBoolean(1));
+      assertFalse(cstmt.getBoolean(2));
+      cstmt.getBoolean(3);
+      assertTrue(cstmt.wasNull());
+    } finally {
+      try {
+        Statement dstmt = con.createStatement();
+        dstmt.execute("drop function insert_bit(boolean, boolean, boolean)");
+      } catch (Exception ex) {
+      }
+    }
+  }
+
   private final String createBitTab =
       "create temp table bit_tab ( max_val boolean, min_val boolean, null_val boolean )";
   private final String insertBitTab = "insert into bit_tab values (true,false,null)";
@@ -885,6 +927,47 @@ public class Jdbc3CallableStatementTest extends BaseTest4 {
       try {
         Statement dstmt = con.createStatement();
         dstmt.execute("drop function bit_proc()");
+      } catch (Exception ex) {
+      }
+    }
+  }
+
+  @Test
+  public void testGetByte01() throws Throwable {
+    assumeCallableStatementsSupported();
+    try {
+      Statement stmt = con.createStatement();
+      stmt.execute("create temp table byte_tab ( max_val int2, min_val int2, null_val int2 )");
+      stmt.execute("insert into byte_tab values (127,-128,null)");
+      boolean ret = stmt.execute("create or replace function "
+          + "byte_proc( OUT IMAX int2, OUT IMIN int2, OUT INUL int2)  as "
+          + "'begin "
+          + "select max_val into imax from byte_tab;"
+          + "select min_val into imin from byte_tab;"
+          + "select null_val into inul from byte_tab;"
+
+          + " end;' "
+          + "language plpgsql;");
+    } catch (Exception ex) {
+      fail(ex.getMessage());
+      throw ex;
+    }
+    try {
+      CallableStatement cstmt = con.prepareCall("{ call byte_proc(?,?,?) }");
+      cstmt.registerOutParameter(1, java.sql.Types.TINYINT);
+      cstmt.registerOutParameter(2, java.sql.Types.TINYINT);
+      cstmt.registerOutParameter(3, java.sql.Types.TINYINT);
+      cstmt.executeUpdate();
+      assertEquals(127, cstmt.getByte(1));
+      assertEquals(-128, cstmt.getByte(2));
+      cstmt.getByte(3);
+      assertTrue(cstmt.wasNull());
+    } catch (Exception ex) {
+      fail(ex.getMessage());
+    } finally {
+      try {
+        Statement dstmt = con.createStatement();
+        dstmt.execute("drop function byte_proc()");
       } catch (Exception ex) {
       }
     }

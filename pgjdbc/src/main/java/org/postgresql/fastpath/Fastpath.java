@@ -12,12 +12,15 @@ import org.postgresql.util.ByteConverter;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.log.Logger;
+import org.postgresql.log.Log;
+
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
+
 
 /**
  * <p>This class implements the Fastpath api.</p>
@@ -120,7 +123,7 @@ public class Fastpath {
    */
   @Deprecated
   public Object fastpath(String name, boolean resulttype, FastpathArg[] args) throws SQLException {
-    connection.getLogger().log(Level.FINEST, "Fastpath: calling {0}", name);
+    connection.getLogger().trace("Fastpath: calling " + name);
     return fastpath(getID(name), resulttype, args);
   }
 
@@ -142,7 +145,7 @@ public class Fastpath {
    * @see org.postgresql.largeobject.LargeObject
    */
   public byte[] fastpath(String name, FastpathArg[] args) throws SQLException {
-    connection.getLogger().log(Level.FINEST, "Fastpath: calling {0}", name);
+    connection.getLogger().trace("Fastpath: calling " + name);
     return fastpath(getID(name), args);
   }
 
