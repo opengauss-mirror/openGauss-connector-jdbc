@@ -69,6 +69,18 @@ declare version_string="${mppdb_name_for_package}-${version_number}"
 declare package_pre_name="${version_string}-${dist_version}-${PLATFORM}bit"
 declare jdbc_package_name="${package_pre_name}-Jdbc.${install_package_format}.gz"
 
+coretype=$(uname -p)
+mvn_name="apache-maven-3.6.3-bin.tar.gz"
+jdk_name="OpenJDK8U-jdk_x64_linux_hotspot_8u222b10.tar.gz"
+
+if [ X"$coretype" == X"aarch64" ]; then
+    jdk_name="OpenJDK8U-jdk_aarch64_linux_hotspot_8u222b10.tar.gz"
+fi
+    
+tar -zxvf buildtools/$jdk_name -C buildtools/ > /dev/null
+mkdir -p buildtools/maven
+tar -zxvf buildtools/$mvn_name -C buildtools/maven/ > /dev/null
+
 die()
 {
     echo "ERROR: $@"
@@ -78,7 +90,7 @@ die()
 function prepare_java_env()
 {
     echo "Prepare the build enviroment."
-    export JAVA_HOME=$THIRD_DIR/$PLAT_FORM_STR/huaweijdk8/jdk1.8.0_272
+    export JAVA_HOME=$THIRD_DIR/jdk8u222-b10
     export JRE_HOME=$JAVA_HOME/jre
     export LD_LIBRARY_PATH=$JRE_HOME/lib/amd64/server:$LD_LIBRARY_PATH
     export PATH=$JAVA_HOME/bin:$JRE_HOME/bin:$PATH	
@@ -102,8 +114,6 @@ function prepare_maven_env()
 function install_jdbc()
 {
     export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF8"
-    export HUAWEI_JDBC_PACKAGE_NAME='com.huawei.gauss200.jdbc'
-    export HUAWEI_JDBC_PACKAGE_DIR=$(echo $HUAWEI_JDBC_PACKAGE_NAME | sed 's#\.#/#g')
     export COMMIT=$(git rev-parse --short HEAD)
     export GS_VERSION="compiled at $(date +%Y-%m-%d-%H:%M:%S) build ${COMMIT}"
     export OUTPUT_DIR="${JDBC_DIR}/output"
@@ -134,24 +144,9 @@ function install_jdbc()
     if [ ! -d "${OUTPUT_DIR}" ]; then
         mkdir ${OUTPUT_DIR}
     fi
-    mv ${JDBC_DIR}/jdbc/target/postgresql-42.2.5.jar ${OUTPUT_DIR}/gsjdbc4.jar
-    echo "Successfully make gsjdbc4.jar"
-    find . -name 'Driver.java' | xargs sed -i "s/@GSVERSION@/${GS_VERSION}/g" 
-    find -name '*.java' -type f | xargs sed -i "s#org\.postgresql#${HUAWEI_JDBC_PACKAGE_NAME}#g"
-    find . -name 'Driver.java' | xargs sed -i "s/jdbc:postgresql:/jdbc:gaussdb:/g"
-    if [ $? -ne 0 ]; then
-      die "failed to replace url name."
-    fi
-    find . -name 'BaseDataSource.java' | xargs sed -i "s/jdbc:postgresql:/jdbc:gaussdb:/g"
-    if [ $? -ne 0 ]; then
-      die "failed to replace url name."
-    fi
-    mvn clean install -Dmaven.test.skip=true >> "$LOG_FILE" 2>&1
-    if [ $? -ne 0 ]; then
-        die "mvn failed."
-    fi
-    mv ${JDBC_DIR}/jdbc/target/postgresql-42.2.5.jar ${OUTPUT_DIR}/gsjdbc200.jar
-    echo "Successfully make gsjdbc200.jar"
+    mv ${JDBC_DIR}/jdbc/target/postgresql-42.2.5.jar ${OUTPUT_DIR}/postgresql.jar
+    echo "Successfully make postgresql.jar"
+    
 }
 
 function clean()
@@ -194,7 +189,7 @@ function make_package()
     select_package_command
 
     echo "packaging jdbc..."
-    $package_command "${jdbc_package_name}" ./gsjdbc200.jar ./gsjdbc4.jar "${NOTICE_FILE}" >> "$LOG_FILE" 2>&1
+    $package_command "${jdbc_package_name}"  ./gsjdbc4.jar "${NOTICE_FILE}" >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
         die "$package_command ${jdbc_package_name} failed" 
     fi
@@ -220,19 +215,22 @@ function registerJars()
      cp *.jar $libs
      cd $third_part_lib/common/slf4j
      cp *.jar $libs
+     cd $third_part_lib/common/javasdkcore
+     cp *.jar $libs
 
      cd $libs
      prepare_env
      mvn install:install-file -Dfile=./commons-logging-1.2.jar -DgroupId=commons-logging -DartifactId=commons-logging -Dversion=1.2 -Dpackaging=jar
      mvn install:install-file -Dfile=./commons-codec-1.11.jar -DgroupId=commons-codec -DartifactId=commons-codec -Dversion=1.11 -Dpackaging=jar
-     mvn install:install-file -Dfile=./httpclient-4.5.12.jar  -DgroupId=org.apache.httpcomponents -DartifactId=httpclient -Dversion=4.5.12 -Dpackaging=jar
+     mvn install:install-file -Dfile=./httpclient-4.5.13.jar  -DgroupId=org.apache.httpcomponents -DartifactId=httpclient -Dversion=4.5.13 -Dpackaging=jar
      mvn install:install-file -Dfile=./httpcore-4.4.13.jar  -DgroupId=org.apache.httpcomponents -DartifactId=httpcore -Dversion=4.4.13 -Dpackaging=jar
      mvn install:install-file -Dfile=./fastjson-1.2.70.jar  -DgroupId=com.alibaba -DartifactId=fastjson -Dversion=1.2.70 -Dpackaging=jar
      mvn install:install-file -Dfile=./joda-time-2.10.6.jar -DgroupId=joda-time -DartifactId=joda-time -Dversion=2.10.6 -Dpackaging=jar
      mvn install:install-file -Dfile=./jackson-databind-2.11.2.jar -DgroupId=com.fasterxml.jackson.core -DartifactId=joda-time -Dversion=2.11.2 -Dpackaging=jar
      mvn install:install-file -Dfile=./jackson-core-2.11.2.jar -DgroupId=com.fasterxml.jackson.core -DartifactId=jackson-core -Dversion=2.11.2 -Dpackaging=jar
      mvn install:install-file -Dfile=./jackson-annotations-2.11.2.jar -DgroupId=com.fasterxml.jackson.core  -DartifactId=jackson-annotations -Dversion=2.11.2 -Dpackaging=jar
-     mvn install:install-file -Dfile=./slf4j-api-1.7.30.jar -DgroupId=org.slf4j  -DartifactId=slf4j-api -Dversion=1.7.30 -Dpackaging=jar     
+     mvn install:install-file -Dfile=./slf4j-api-1.7.30.jar -DgroupId=org.slf4j  -DartifactId=slf4j-api -Dversion=1.7.30 -Dpackaging=jar
+     mvn install:install-file -Dfile=./java-sdk-core-3.0.12.jar -DgroupId=com.huawei.apigateway  -DartifactId=hw-java-sdk-core -Dversion=3.0.12 -Dpackaging=jar     
 }
 prepare_env
 export third_part_lib=""
@@ -250,7 +248,6 @@ case $1 in
    *);;
 esac
 install_jdbc
-make_package
 clean
 echo "now, all packages has finished!"
 exit 0
