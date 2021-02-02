@@ -226,7 +226,7 @@ function registerJars()
      mvn install:install-file -Dfile=./httpcore-4.4.13.jar  -DgroupId=org.apache.httpcomponents -DartifactId=httpcore -Dversion=4.4.13 -Dpackaging=jar
      mvn install:install-file -Dfile=./fastjson-1.2.70.jar  -DgroupId=com.alibaba -DartifactId=fastjson -Dversion=1.2.70 -Dpackaging=jar
      mvn install:install-file -Dfile=./joda-time-2.10.6.jar -DgroupId=joda-time -DartifactId=joda-time -Dversion=2.10.6 -Dpackaging=jar
-     mvn install:install-file -Dfile=./jackson-databind-2.11.2.jar -DgroupId=com.fasterxml.jackson.core -DartifactId=joda-time -Dversion=2.11.2 -Dpackaging=jar
+     mvn install:install-file -Dfile=./jackson-databind-2.11.2.jar -DgroupId=com.fasterxml.jackson.core -DartifactId=jackson-databind -Dversion=2.11.2 -Dpackaging=jar
      mvn install:install-file -Dfile=./jackson-core-2.11.2.jar -DgroupId=com.fasterxml.jackson.core -DartifactId=jackson-core -Dversion=2.11.2 -Dpackaging=jar
      mvn install:install-file -Dfile=./jackson-annotations-2.11.2.jar -DgroupId=com.fasterxml.jackson.core  -DartifactId=jackson-annotations -Dversion=2.11.2 -Dpackaging=jar
      mvn install:install-file -Dfile=./slf4j-api-1.7.30.jar -DgroupId=org.slf4j  -DartifactId=slf4j-api -Dversion=1.7.30 -Dpackaging=jar
