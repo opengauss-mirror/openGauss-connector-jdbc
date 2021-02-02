@@ -40,6 +40,16 @@ public class TimestampUtils {
   private static final char[][] NUMBERS;
   private static final HashMap<String, TimeZone> GMT_ZONES = new HashMap<String, TimeZone>();
   private static final int MAX_NANOS_BEFORE_WRAP_ON_ROUND = 999999500;
+  private static final java.time.Duration ONE_MICROSECOND = java.time.Duration.ofNanos(1000);
+  // LocalTime.MAX is 23:59:59.999_999_999, and it wraps to 24:00:00 when nanos exceed 999_999_499
+  // since PostgreSQL has microsecond resolution only
+  private static final java.time.LocalTime MAX_TIME = java.time.LocalTime.MAX.minus(java.time.Duration.ofNanos(500));
+  private static final java.time.OffsetDateTime MAX_OFFSET_DATETIME = java.time.OffsetDateTime.MAX.minus(java.time.Duration.ofMillis(500));
+  private static final java.time.LocalDateTime MAX_LOCAL_DATETIME = java.time.LocalDateTime.MAX.minus(java.time.Duration.ofMillis(500));
+  // low value for dates is   4713 BC
+  private static final java.time.LocalDate MIN_LOCAL_DATE = java.time.LocalDate.of(4713, 1, 1).with(java.time.temporal.ChronoField.ERA, java.time.chrono.IsoEra.BCE.getValue());
+  private static final java.time.LocalDateTime MIN_LOCAL_DATETIME = MIN_LOCAL_DATE.atStartOfDay();
+  private static final java.time.OffsetDateTime MIN_OFFSET_DATETIME = MIN_LOCAL_DATETIME.atOffset(java.time.ZoneOffset.UTC);
   private static final Field DEFAULT_TIME_ZONE_FIELD;
   private static Log LOGGER = Logger.getLogger(TimestampUtils.class.getName());
 
@@ -112,7 +122,7 @@ public class TimestampUtils {
   private final boolean usesDouble;
   private final Provider<TimeZone> timeZoneProvider;
 
-  TimestampUtils(boolean usesDouble, Provider<TimeZone> timeZoneProvider) {
+  public TimestampUtils(boolean usesDouble, Provider<TimeZone> timeZoneProvider) {
     this.usesDouble = usesDouble;
     this.timeZoneProvider = timeZoneProvider;
   }
@@ -391,6 +401,143 @@ public class TimestampUtils {
     return result;
   }
 
+  /**
+   * Parse a string and return a LocalTime representing its value.
+   *
+   * @param s The ISO formated time string to parse.
+   * @return null if s is null or a LocalTime of the parsed string s.
+   * @throws SQLException if there is a problem parsing s.
+   */
+  public java.time.LocalTime toLocalTime(String s) throws SQLException {
+    if (s == null) {
+      return null;
+    }
+
+    if (s.equals("24:00:00")) {
+      return java.time.LocalTime.MAX;
+    }
+
+    try {
+      return java.time.LocalTime.parse(s);
+    } catch (java.time.format.DateTimeParseException nfe) {
+      throw new PSQLException(
+              GT.tr("Bad value for type timestamp/date/time: {1}", s),
+              PSQLState.BAD_DATETIME_FORMAT, nfe);
+    }
+
+  }
+
+  /**
+   * Parse a string and return a LocalDateTime representing its value.
+   *
+   * @param s The ISO formated date string to parse.
+   * @return null if s is null or a LocalDateTime of the parsed string s.
+   * @throws SQLException if there is a problem parsing s.
+   */
+  public java.time.LocalDateTime toLocalDateTime(String s) throws SQLException {
+    if (s == null) {
+      return null;
+    }
+
+    int slen = s.length();
+
+    // convert postgres's infinity values to internal infinity magic value
+    if (slen == 8 && s.equals("infinity")) {
+      return java.time.LocalDateTime.MAX;
+    }
+
+    if (slen == 9 && s.equals("-infinity")) {
+      return java.time.LocalDateTime.MIN;
+    }
+
+    ParsedTimestamp ts = parseBackendTimestamp(s);
+
+    // intentionally ignore time zone
+    // 2004-10-19 10:23:54+03:00 is 2004-10-19 10:23:54 locally
+    java.time.LocalDateTime result = java.time.LocalDateTime.of(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second, ts.nanos);
+    if (ts.era == GregorianCalendar.BC) {
+      return result.with(java.time.temporal.ChronoField.ERA, java.time.chrono.IsoEra.BCE.getValue());
+    } else {
+      return result;
+    }
+  }
+
+  /**
+   * Parse a string and return a LocalDateTime representing its value.
+   *
+   * @param s The ISO formated date string to parse.
+   * @return null if s is null or a LocalDateTime of the parsed string s.
+   * @throws SQLException if there is a problem parsing s.
+   */
+  public java.time.OffsetDateTime toOffsetDateTime(
+          String s) throws SQLException {
+    if (s == null) {
+      return null;
+    }
+
+    int slen = s.length();
+
+    // convert postgres's infinity values to internal infinity magic value
+    if (slen == 8 && s.equals("infinity")) {
+      return java.time.OffsetDateTime.MAX;
+    }
+
+    if (slen == 9 && s.equals("-infinity")) {
+      return java.time.OffsetDateTime.MIN;
+    }
+
+    ParsedTimestamp ts = parseBackendTimestamp(s);
+
+    Calendar tz = ts.tz;
+    int offsetSeconds;
+    if (tz == null) {
+      offsetSeconds = 0;
+    } else {
+      offsetSeconds = tz.get(Calendar.ZONE_OFFSET) / 1000;
+    }
+    java.time.ZoneOffset zoneOffset = java.time.ZoneOffset.ofTotalSeconds(offsetSeconds);
+    // Postgres is always UTC
+    java.time.OffsetDateTime result = java.time.OffsetDateTime.of(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second, ts.nanos, zoneOffset)
+            .withOffsetSameInstant(java.time.ZoneOffset.UTC);
+    if (ts.era == GregorianCalendar.BC) {
+      return result.with(java.time.temporal.ChronoField.ERA, java.time.chrono.IsoEra.BCE.getValue());
+    } else {
+      return result;
+    }
+  }
+
+  /**
+   * Returns the offset date time object matching the given bytes with Oid#TIMETZ.
+   *
+   * @param t the time value
+   * @return the matching offset date time
+   */
+  public java.time.OffsetDateTime toOffsetDateTime(Time t) {
+    // hardcode utc because the backend does not provide us the timezone
+    // hardcode UNIX epoch, JDBC requires OffsetDateTime but doesn't describe what date should be used
+    return t.toLocalTime().atDate(java.time.LocalDate.of(1970, 1, 1)).atOffset(java.time.ZoneOffset.UTC);
+  }
+
+  /**
+   * Returns the offset date time object matching the given bytes with Oid#TIMESTAMPTZ.
+   *
+   * @param bytes The binary encoded local date time value.
+   * @return The parsed local date time object.
+   * @throws PSQLException If binary format could not be parsed.
+   */
+  public java.time.OffsetDateTime toOffsetDateTimeBin(byte[] bytes) throws PSQLException {
+    ParsedBinaryTimestamp parsedTimestamp = this.toProlepticParsedTimestampBin(bytes);
+    if (parsedTimestamp.infinity == Infinity.POSITIVE) {
+      return java.time.OffsetDateTime.MAX;
+    } else if (parsedTimestamp.infinity == Infinity.NEGATIVE) {
+      return java.time.OffsetDateTime.MIN;
+    }
+
+    // hardcode utc because the backend does not provide us the timezone
+    // Postgres is always UTC
+    java.time.Instant instant = java.time.Instant.ofEpochSecond(parsedTimestamp.millis / 1000L, parsedTimestamp.nanos);
+    return java.time.OffsetDateTime.ofInstant(instant, java.time.ZoneOffset.UTC);
+  }
 
   public synchronized Time toTime(Calendar cal, String s) throws SQLException {
     // 1) Parse backend string
@@ -675,6 +822,111 @@ public class TimestampUtils {
     }
   }
 
+  public synchronized String toString(java.time.LocalDate localDate) {
+    if (java.time.LocalDate.MAX.equals(localDate)) {
+      return "infinity";
+    } else if (localDate.isBefore(MIN_LOCAL_DATE)) {
+      return "-infinity";
+    }
+
+    sbuf.setLength(0);
+
+    appendDate(sbuf, localDate);
+    appendEra(sbuf, localDate);
+
+    return sbuf.toString();
+  }
+
+  public synchronized String toString(java.time.LocalTime localTime) {
+
+    sbuf.setLength(0);
+
+    if (localTime.isAfter(MAX_TIME)) {
+      return "24:00:00";
+    }
+
+    int nano = localTime.getNano();
+    if (nanosExceed499(nano)) {
+      // Technically speaking this is not a proper rounding, however
+      // it relies on the fact that appendTime just truncates 000..999 nanosecond part
+      localTime = localTime.plus(ONE_MICROSECOND);
+    }
+    appendTime(sbuf, localTime);
+
+    return sbuf.toString();
+  }
+
+  public synchronized String toString(java.time.OffsetDateTime offsetDateTime) {
+    if (offsetDateTime.isAfter(MAX_OFFSET_DATETIME)) {
+      return "infinity";
+    } else if (offsetDateTime.isBefore(MIN_OFFSET_DATETIME)) {
+      return "-infinity";
+    }
+
+    sbuf.setLength(0);
+
+    int nano = offsetDateTime.getNano();
+    if (nanosExceed499(nano)) {
+      // Technically speaking this is not a proper rounding, however
+      // it relies on the fact that appendTime just truncates 000..999 nanosecond part
+      offsetDateTime = offsetDateTime.plus(ONE_MICROSECOND);
+    }
+    java.time.LocalDateTime localDateTime = offsetDateTime.toLocalDateTime();
+    java.time.LocalDate localDate = localDateTime.toLocalDate();
+    appendDate(sbuf, localDate);
+    sbuf.append(' ');
+    appendTime(sbuf, localDateTime.toLocalTime());
+    appendTimeZone(sbuf, offsetDateTime.getOffset());
+    appendEra(sbuf, localDate);
+
+    return sbuf.toString();
+  }
+
+  /**
+   * Formats {@link java.time.LocalDateTime} to be sent to the backend, thus it adds time zone.
+   * Do not use this method in {@link java.sql.ResultSet#getString(int)}
+   * @param localDateTime The local date to format as a String
+   * @return The formatted local date
+   */
+  public synchronized String toString(java.time.LocalDateTime localDateTime) {
+    if (localDateTime.isAfter(MAX_LOCAL_DATETIME)) {
+      return "infinity";
+    } else if (localDateTime.isBefore(MIN_LOCAL_DATETIME)) {
+      return "-infinity";
+    }
+
+    // LocalDateTime is always passed with time zone so backend can decide between timestamp and timestamptz
+    java.time.ZonedDateTime zonedDateTime = localDateTime.atZone(getDefaultTz().toZoneId());
+    return toString(zonedDateTime.toOffsetDateTime());
+  }
+
+  private static void appendDate(StringBuilder sb, java.time.LocalDate localDate) {
+    int year = localDate.get(java.time.temporal.ChronoField.YEAR_OF_ERA);
+    int month = localDate.getMonthValue();
+    int day = localDate.getDayOfMonth();
+    appendDate(sb, year, month, day);
+  }
+
+  private static void appendTime(StringBuilder sb, java.time.LocalTime localTime) {
+    int hours = localTime.getHour();
+    int minutes = localTime.getMinute();
+    int seconds = localTime.getSecond();
+    int nanos = localTime.getNano();
+    appendTime(sb, hours, minutes, seconds, nanos);
+  }
+
+  private void appendTimeZone(StringBuilder sb, java.time.ZoneOffset offset) {
+    int offsetSeconds = offset.getTotalSeconds();
+
+    appendTimeZone(sb, offsetSeconds);
+  }
+
+  private static void appendEra(StringBuilder sb, java.time.LocalDate localDate) {
+    if (localDate.get(java.time.temporal.ChronoField.ERA) == java.time.chrono.IsoEra.BCE.getValue()) {
+      sb.append(" BC");
+    }
+  }
+
   private static int skipWhitespace(char[] s, int start) {
     int slen = s.length;
     for (int i = start; i < slen; i++) {
@@ -814,6 +1066,32 @@ public class TimestampUtils {
     millis = guessTimestamp(millis, tz);
 
     return convertToTime(millis, tz); // Ensure date part is 1970-01-01
+  }
+
+  /**
+   * Returns the SQL Time object matching the given bytes with {@link Oid#TIME}.
+   *
+   * @param bytes The binary encoded time value.
+   * @return The parsed time object.
+   * @throws PSQLException If binary format could not be parsed.
+   */
+  public java.time.LocalTime toLocalTimeBin(byte[] bytes) throws PSQLException {
+    if (bytes.length != 8) {
+      throw new PSQLException(GT.tr("Unsupported binary encoding of {0}.", "time"),
+              PSQLState.BAD_DATETIME_FORMAT);
+    }
+
+    long micros;
+
+    if (usesDouble) {
+      double seconds = ByteConverter.float8(bytes, 0);
+
+      micros = (long) (seconds * 1000000d);
+    } else {
+      micros = ByteConverter.int8(bytes, 0);
+    }
+
+    return java.time.LocalTime.ofNanoOfDay(micros * 1000);
   }
 
   /**
@@ -1173,5 +1451,103 @@ public class TimestampUtils {
       }
     }
     return TimeZone.getTimeZone(timeZone);
+  }
+
+  private ParsedBinaryTimestamp toParsedTimestampBinPlain(byte[] bytes)
+          throws PSQLException {
+
+    if (bytes.length != 8) {
+      throw new PSQLException(GT.tr("Unsupported binary encoding of {0}.", "timestamp"),
+              PSQLState.BAD_DATETIME_FORMAT);
+    }
+
+    long secs;
+    int nanos;
+
+    if (usesDouble) {
+      double time = ByteConverter.float8(bytes, 0);
+      if (time == Double.POSITIVE_INFINITY) {
+        ParsedBinaryTimestamp ts = new ParsedBinaryTimestamp();
+        ts.infinity = Infinity.POSITIVE;
+        return ts;
+      } else if (time == Double.NEGATIVE_INFINITY) {
+        ParsedBinaryTimestamp ts = new ParsedBinaryTimestamp();
+        ts.infinity = Infinity.NEGATIVE;
+        return ts;
+      }
+
+      secs = (long) time;
+      nanos = (int) ((time - secs) * 1000000);
+    } else {
+      long time = ByteConverter.int8(bytes, 0);
+
+      // compatibility with text based receiving, not strictly necessary
+      // and can actually be confusing because there are timestamps
+      // that are larger than infinite
+      if (time == Long.MAX_VALUE) {
+        ParsedBinaryTimestamp ts = new ParsedBinaryTimestamp();
+        ts.infinity = Infinity.POSITIVE;
+        return ts;
+      } else if (time == Long.MIN_VALUE) {
+        ParsedBinaryTimestamp ts = new ParsedBinaryTimestamp();
+        ts.infinity = Infinity.NEGATIVE;
+        return ts;
+      }
+
+      secs = time / 1000000;
+      nanos = (int) (time - secs * 1000000);
+    }
+    if (nanos < 0) {
+      secs--;
+      nanos += 1000000;
+    }
+    nanos *= 1000;
+
+    long millis = secs * 1000L;
+
+    ParsedBinaryTimestamp ts = new ParsedBinaryTimestamp();
+    ts.millis = millis;
+    ts.nanos = nanos;
+    return ts;
+  }
+
+  private ParsedBinaryTimestamp toProlepticParsedTimestampBin(byte[] bytes)
+          throws PSQLException {
+
+    ParsedBinaryTimestamp ts = toParsedTimestampBinPlain(bytes);
+    if (ts.infinity != null) {
+      return ts;
+    }
+
+    long secs = ts.millis / 1000L;
+
+    // postgres epoc to java epoc
+    secs += 946684800L;
+    long millis = secs * 1000L;
+
+    ts.millis = millis;
+    return ts;
+  }
+
+  /**
+   * Returns the local date time object matching the given bytes with {@link Oid#TIMESTAMP} or
+   * {@link Oid#TIMESTAMPTZ}.
+   * @param bytes The binary encoded local date time value.
+   *
+   * @return The parsed local date time object.
+   * @throws PSQLException If binary format could not be parsed.
+   */
+  public java.time.LocalDateTime toLocalDateTimeBin(byte[] bytes) throws PSQLException {
+
+    ParsedBinaryTimestamp parsedTimestamp = this.toProlepticParsedTimestampBin(bytes);
+    if (parsedTimestamp.infinity == Infinity.POSITIVE) {
+      return java.time.LocalDateTime.MAX;
+    } else if (parsedTimestamp.infinity == Infinity.NEGATIVE) {
+      return java.time.LocalDateTime.MIN;
+    }
+
+    // hardcode utc because the backend does not provide us the timezone
+    // Postgres is always UTC
+    return java.time.LocalDateTime.ofEpochSecond(parsedTimestamp.millis / 1000L, parsedTimestamp.nanos, java.time.ZoneOffset.UTC);
   }
 }

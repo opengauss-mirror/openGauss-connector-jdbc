@@ -40,6 +40,7 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -182,6 +183,8 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       sqlTypeToOid.put(Types.DATE, Oid.DATE);
       sqlTypeToOid.put(Types.TIME, Oid.UNSPECIFIED);
       sqlTypeToOid.put(Types.TIMESTAMP, Oid.UNSPECIFIED);
+      sqlTypeToOid.put(Types.TIME_WITH_TIMEZONE, Oid.UNSPECIFIED);
+      sqlTypeToOid.put(Types.TIMESTAMP_WITH_TIMEZONE, Oid.UNSPECIFIED);
       sqlTypeToOid.put(Types.BOOLEAN, Oid.BOOL);
       sqlTypeToOid.put(Types.BIT, Oid.BOOL);
       sqlTypeToOid.put(Types.BINARY, Oid.BYTEA);
@@ -555,6 +558,9 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
           java.sql.Date tmpd;
           if (in instanceof java.util.Date) {
             tmpd = new java.sql.Date(((java.util.Date) in).getTime());
+          } else if (in instanceof java.time.LocalDate) {
+            setDate(parameterIndex, (java.time.LocalDate) in);
+            break;
           } else {
             tmpd = connection.getTimestampUtils().toDate(getDefaultCalendar(), in.toString());
           }
@@ -568,6 +574,9 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
           java.sql.Time tmpt;
           if (in instanceof java.util.Date) {
             tmpt = new java.sql.Time(((java.util.Date) in).getTime());
+          } else if (in instanceof java.time.LocalTime) {
+            setTime(parameterIndex, (java.time.LocalTime) in);
+            break;
           } else {
             tmpt = connection.getTimestampUtils().toTime(getDefaultCalendar(), in.toString());
           }
@@ -583,10 +592,25 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
           java.sql.Timestamp tmpts;
           if (in instanceof java.util.Date) {
             tmpts = new java.sql.Timestamp(((java.util.Date) in).getTime());
+          } else if (in instanceof java.time.LocalDateTime) {
+            setTimestamp(parameterIndex, (java.time.LocalDateTime) in);
+            break;
           } else {
             tmpts = connection.getTimestampUtils().toTimestamp(getDefaultCalendar(), in.toString());
           }
           setTimestamp(parameterIndex, tmpts);
+        }
+        break;
+      case Types.TIMESTAMP_WITH_TIMEZONE:
+        if (in instanceof java.time.OffsetDateTime) {
+          setTimestamp(parameterIndex, (java.time.OffsetDateTime) in);
+        } else if (in instanceof PGTimestamp) {
+          setObject(parameterIndex, in);
+        } else {
+          throw new PSQLException(
+                  GT.tr("Cannot cast an instance of {0} to type {1}",
+                          in.getClass().getName(), "Types.TIMESTAMP_WITH_TIMEZONE"),
+                  PSQLState.INVALID_PARAMETER_TYPE);
         }
         break;
       case Types.BOOLEAN:
@@ -923,6 +947,14 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
         setObjectOfByte(parameterIndex, x);
     } else if (x instanceof java.sql.Date || x instanceof Time || x instanceof Timestamp) {
         setObjectOfDate(parameterIndex, x);
+    } else if (x instanceof java.time.LocalDate) {
+      setDate(parameterIndex, (java.time.LocalDate) x);
+    } else if (x instanceof java.time.LocalTime) {
+      setTime(parameterIndex, (java.time.LocalTime) x);
+    } else if (x instanceof java.time.LocalDateTime) {
+      setTimestamp(parameterIndex, (java.time.LocalDateTime) x);
+    } else if (x instanceof java.time.OffsetDateTime) {
+      setTimestamp(parameterIndex, (java.time.OffsetDateTime) x);
     } else if (x instanceof Boolean) {
       setBoolean(parameterIndex, (Boolean) x);
     } else if (x instanceof Blob) {
@@ -1317,6 +1349,28 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
    }
    bindString(i, connection.getTimestampUtils().toString(cal, t), oid);
  }
+
+  private void setDate(int i, java.time.LocalDate localDate) throws SQLException {
+    int oid = Oid.DATE;
+    bindString(i, connection.getTimestampUtils().toString(localDate), oid);
+  }
+
+  private void setTime(int i, java.time.LocalTime localTime) throws SQLException {
+    int oid = Oid.TIME;
+    bindString(i, connection.getTimestampUtils().toString(localTime), oid);
+  }
+
+  private void setTimestamp(int i, java.time.LocalDateTime localDateTime)
+          throws SQLException {
+    int oid = Oid.TIMESTAMP;
+    bindString(i, connection.getTimestampUtils().toString(localDateTime), oid);
+  }
+
+  private void setTimestamp(int i, java.time.OffsetDateTime offsetDateTime)
+          throws SQLException {
+    int oid = Oid.TIMESTAMPTZ;
+    bindString(i, connection.getTimestampUtils().toString(offsetDateTime), oid);
+  }
 
  public ParameterMetaData createParameterMetaData(BaseConnection conn, int[] oids)
      throws SQLException {
