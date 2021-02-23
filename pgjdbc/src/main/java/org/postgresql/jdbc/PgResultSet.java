@@ -562,6 +562,29 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     return connection.getTimestampUtils().toTime(cal, string);
   }
 
+  private java.time.LocalTime getLocalTime(int i) throws SQLException {
+    byte[] value = getRawValue(i);
+    if (value == null) {
+      return null;
+    }
+
+    if (isBinary(i)) {
+      int col = i - 1;
+      int oid = fields[col].getOID();
+      if (oid == Oid.TIME) {
+        return connection.getTimestampUtils().toLocalTimeBin(value);
+      } else {
+        throw new PSQLException(
+                GT.tr("Cannot convert the column of type {0} to requested type {1}.",
+                        Oid.toString(oid), "time"),
+                PSQLState.DATA_TYPE_MISMATCH);
+      }
+    }
+
+    String string = getString(i);
+    return connection.getTimestampUtils().toLocalTime(string);
+  }
+
   @Override
   public Timestamp getTimestamp(int i, java.util.Calendar cal) throws SQLException {
     checkResultSet(i);
@@ -605,6 +628,69 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       return new Timestamp(connection.getTimestampUtils().toTime(cal, string).getTime());
     }
     return connection.getTimestampUtils().toTimestamp(cal, string);
+  }
+
+  private java.time.OffsetDateTime getOffsetDateTime(int i) throws SQLException {
+    byte[] value = getRawValue(i);
+    if (value == null) {
+      return null;
+    }
+
+    int col = i - 1;
+    int oid = fields[col].getOID();
+
+    if (isBinary(i)) {
+      if (oid == Oid.TIMESTAMPTZ || oid == Oid.TIMESTAMP) {
+        return connection.getTimestampUtils().toOffsetDateTimeBin(value);
+      } else if (oid == Oid.TIMETZ) {
+        // JDBC spec says timetz must be supported
+        Time time = getTime(i);
+        if (time == null) {
+          return null;
+        }
+        return connection.getTimestampUtils().toOffsetDateTime(time);
+      } else {
+        throw new PSQLException(
+                GT.tr("Cannot convert the column of type {0} to requested type {1}.",
+                        Oid.toString(oid), "timestamptz"),
+                PSQLState.DATA_TYPE_MISMATCH);
+      }
+    }
+
+    // If this is actually a timestamptz, the server-provided timezone will override
+    // the one we pass in, which is the desired behaviour. Otherwise, we'll
+    // interpret the timezone-less value in the provided timezone.
+    String string = getString(i);
+    if (oid == Oid.TIMETZ) {
+      // JDBC spec says timetz must be supported
+      // If server sends us a TIMETZ, we ensure java counterpart has date of 1970-01-01
+      Calendar cal = getDefaultCalendar();
+      Time time = connection.getTimestampUtils().toTime(cal, string);
+      return connection.getTimestampUtils().toOffsetDateTime(time);
+    }
+    return connection.getTimestampUtils().toOffsetDateTime(string);
+  }
+
+  private java.time.LocalDateTime getLocalDateTime(int i) throws SQLException {
+    byte[] value = getRawValue(i);
+    if (value == null) {
+      return null;
+    }
+
+    int col = i - 1;
+    int oid = fields[col].getOID();
+    if (oid != Oid.TIMESTAMP) {
+      throw new PSQLException(
+              GT.tr("Cannot convert the column of type {0} to requested type {1}.",
+                      Oid.toString(oid), "timestamp"),
+              PSQLState.DATA_TYPE_MISMATCH);
+    }
+    if (isBinary(i)) {
+      return connection.getTimestampUtils().toLocalDateTimeBin(value);
+    }
+
+    String string = getString(i);
+    return connection.getTimestampUtils().toLocalDateTime(string);
   }
 
   public java.sql.Date getDate(String c, java.util.Calendar cal) throws SQLException {
@@ -2727,6 +2813,27 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
    * column number is valid. Also updates the {@link #wasNullFlag} to correct value.
    *
    * @param column The column number to check. Range starts from 1.
+   * @return byte[] value or null
+   * @throws SQLException If state or column is invalid.
+   */
+  protected byte[] getRawValue(int column) throws SQLException {
+    checkClosed();
+    if (this_row == null) {
+      throw new PSQLException(
+              GT.tr("ResultSet not positioned properly, perhaps you need to call next."),
+              PSQLState.INVALID_CURSOR_STATE);
+    }
+    checkColumnIndex(column);
+    byte[] bytes = this_row[column - 1];
+    wasNullFlag = bytes == null;
+    return bytes;
+  }
+
+  /**
+   * Checks that the result set is not closed, it's positioned on a valid row and that the given
+   * column number is valid. Also updates the {@link #wasNullFlag} to correct value.
+   *
+   * @param column The column number to check. Range starts from 1.
    * @throws SQLException If state or column is invalid.
    */
   protected void checkResultSet(int column) throws SQLException {
@@ -3246,14 +3353,16 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
                 PSQLState.INVALID_PARAMETER_VALUE);
       }
     } else if (type == Timestamp.class) {
-      if (sqlType == Types.TIMESTAMP) {
+      if (sqlType == Types.TIMESTAMP
+              || sqlType == Types.TIME_WITH_TIMEZONE) {
         return type.cast(getTimestamp(columnIndex));
       } else {
         throw new PSQLException(GT.tr("conversion to {0} from {1} not supported", type, sqlType),
                 PSQLState.INVALID_PARAMETER_VALUE);
       }
     } else if (type == Calendar.class) {
-      if (sqlType == Types.TIMESTAMP) {
+      if (sqlType == Types.TIMESTAMP
+              || sqlType == Types.TIME_WITH_TIMEZONE) {
         Timestamp timestampValue = getTimestamp(columnIndex);
         if (wasNull()) {
           return null;
@@ -3315,6 +3424,53 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
         return type.cast(InetAddress.getByName(((PGobject) addressString).getValue()));
       } catch (UnknownHostException e) {
         throw new SQLException("could not create inet address from string '" + addressString + "'");
+      }
+      // JSR-310 support
+    } else if (type == java.time.LocalDate.class) {
+      if (sqlType == Types.DATE) {
+        Date dateValue = getDate(columnIndex);
+        if (dateValue == null) {
+          return null;
+        }
+        long time = dateValue.getTime();
+        if (time == PGStatement.DATE_POSITIVE_INFINITY) {
+          return type.cast(java.time.LocalDate.MAX);
+        }
+        if (time == PGStatement.DATE_NEGATIVE_INFINITY) {
+          return type.cast(java.time.LocalDate.MIN);
+        }
+        return type.cast(dateValue.toLocalDate());
+      } else if (sqlType == Types.TIMESTAMP) {
+        java.time.LocalDateTime localDateTimeValue = getLocalDateTime(columnIndex);
+        if (localDateTimeValue == null) {
+          return null;
+        }
+        return type.cast(localDateTimeValue.toLocalDate());
+      } else {
+        throw new PSQLException(GT.tr("conversion to {0} from {1} not supported", type, getPGType(columnIndex)),
+                PSQLState.INVALID_PARAMETER_VALUE);
+      }
+    } else if (type == java.time.LocalTime.class) {
+      if (sqlType == Types.TIME) {
+        return type.cast(getLocalTime(columnIndex));
+      } else {
+        throw new PSQLException(GT.tr("conversion to {0} from {1} not supported", type, getPGType(columnIndex)),
+                PSQLState.INVALID_PARAMETER_VALUE);
+      }
+    } else if (type == java.time.LocalDateTime.class) {
+      if (sqlType == Types.TIMESTAMP) {
+        return type.cast(getLocalDateTime(columnIndex));
+      } else {
+        throw new PSQLException(GT.tr("conversion to {0} from {1} not supported", type, getPGType(columnIndex)),
+                PSQLState.INVALID_PARAMETER_VALUE);
+      }
+    } else if (type == java.time.OffsetDateTime.class) {
+      if (sqlType == Types.TIMESTAMP_WITH_TIMEZONE || sqlType == Types.TIMESTAMP) {
+        java.time.OffsetDateTime offsetDateTime = getOffsetDateTime(columnIndex);
+        return type.cast(offsetDateTime);
+      } else {
+        throw new PSQLException(GT.tr("conversion to {0} from {1} not supported", type, getPGType(columnIndex)),
+                PSQLState.INVALID_PARAMETER_VALUE);
       }
     } else if (PGobject.class.isAssignableFrom(type)) {
       Object object;
