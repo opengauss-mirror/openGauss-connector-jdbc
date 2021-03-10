@@ -144,9 +144,15 @@ function install_jdbc()
     if [ ! -d "${OUTPUT_DIR}" ]; then
         mkdir ${OUTPUT_DIR}
     fi
-    mv ${JDBC_DIR}/jdbc/target/postgresql-42.2.5.jar ${OUTPUT_DIR}/postgresql.jar
+    cd ${OUTPUT_DIR}
+    rm -rf *.jar
+    version=`awk '/<version>[^<]+<\/version>/{gsub(/<version>|<\/version>/,"",$1);print $1;exit;}' ${JDBC_DIR}/jdbc/pom.xml`
+    cp ${JDBC_DIR}/jdbc/target/opengauss-jdbc-${version}.jar .
+    mv ${JDBC_DIR}/jdbc/target/opengauss-jdbc-${version}.jar ./postgresql.jar
     echo "Successfully make postgresql.jar"
-    
+    cd ${OUTPUT_DIR}/
+    tar -zcvf ${JDBC_DIR}/openGauss-${version}-JDBC.tar.gz *.jar
+    echo "Successfully make jdbc jar package"
 }
 
 function clean()
@@ -199,25 +205,11 @@ function make_package()
 }
 function registerJars()
 {
-     cd $third_part_lib/common/commons-logging
-     cp *.jar $libs
-     cd $third_part_lib/common/commons-codec
-     cp *.jar $libs
-     cd $third_part_lib/common/httpclient
-     cp *.jar $libs
-     cd $third_part_lib/common/httpcore
-     cp *.jar $libs
-     cd $third_part_lib/common/fastjson
-     cp *.jar $libs
-     cd $third_part_lib/common/joda-time
-     cp *.jar $libs
-     cd $third_part_lib/common/jackson
-     cp *.jar $libs
-     cd $third_part_lib/common/slf4j
-     cp *.jar $libs
-     cd $third_part_lib/common/javasdkcore
-     cp *.jar $libs
-
+     for src in `find $third_part_lib -name '*.jar'`
+     do
+        cp $src $libs/
+     done
+     echo "copy finished"
      cd $libs
      prepare_env
      mvn install:install-file -Dfile=./commons-logging-1.2.jar -DgroupId=commons-logging -DartifactId=commons-logging -Dversion=1.2 -Dpackaging=jar
