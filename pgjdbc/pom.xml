@@ -1,11 +1,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>test</groupId>
-  <artifactId>postgresql</artifactId>
-  <name>PostgreSQL JDBC Driver - JDBC 4.2</name>
-  <version>42.2.5</version>
-  <description>Java JDBC 4.2 (JRE 8+) driver for PostgreSQL database</description>
-  <url>https://github.com/pgjdbc/pgjdbc</url>
+  <groupId>org.opengauss</groupId>
+  <artifactId>opengauss-jdbc</artifactId>
+  <name>openGauss JDBC Driver</name>
+  <version>2.0.0</version>
+  <description>Java JDBC driver for openGauss</description>
+  <url>https://gitee.com/opengauss/openGauss-connector-jdbc</url>
 
   <licenses>
     <license>
@@ -15,8 +15,8 @@
   </licenses>
 
   <organization>
-    <name>PostgreSQL Global Development Group</name>
-    <url>https://jdbc.postgresql.org/</url>
+    <name>openGauss</name>
+    <url>https://opengauss.org/</url>
   </organization>
 
   <properties>
