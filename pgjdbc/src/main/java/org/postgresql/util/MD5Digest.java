@@ -9,7 +9,10 @@ import org.postgresql.log.Log;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.Security;
 import java.io.UnsupportedEncodingException;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.Locale;
@@ -19,6 +22,8 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec; 
 import javax.crypto.spec.PBEKeySpec;
 
+import com.huawei.shade.org.bouncycastle.jce.provider.BouncyCastleProvider;
+import static com.huawei.shade.org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME;
 
 /**
  * MD5-based utility function to obfuscate passwords before network transmission.
@@ -26,6 +31,18 @@ import javax.crypto.spec.PBEKeySpec;
  * @author Jeremy Wohl
  */
 public class MD5Digest {
+	private static final Provider provider = new BouncyCastleProvider();
+	
+	private static boolean isSha256 = true;
+	
+	public static boolean getIsSha256 () {
+		return isSha256;
+	}
+	
+	public static void setIsSha256 (boolean val) {
+		isSha256 = val;
+	}
+	
     private static Log LOGGER = Logger.getLogger(MD5Digest.class.getName());
 
   private MD5Digest() {
@@ -131,6 +148,20 @@ public class MD5Digest {
 
         md.update(str);
         return md.digest();
+    }
+
+    private static byte[] sm3(byte[] str) {
+    	Security.addProvider(provider);
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SM3", PROVIDER_NAME);
+        } catch (GeneralSecurityException e) {
+            LOGGER.info("Sm3 encode failed.", e);
+        }
+        if (md == null) {
+            return new byte[0];
+        }
+        return md.digest(str);
     }
 
     private static String bytesToHexString(byte[] src) {
@@ -267,7 +298,12 @@ public class MD5Digest {
             byte[] K = generateKFromPBKDF2(password, random64code, server_iteration);
             byte[] server_key = getKeyFromHmac(K, "Sever Key".getBytes("UTF-8"));
             byte[] client_key = getKeyFromHmac(K, "Client Key".getBytes("UTF-8"));
-            byte[] stored_key = sha256(client_key);
+            byte[] stored_key = null;
+            if (getIsSha256()) {
+            	stored_key = sha256(client_key);           	
+            } else {
+            	stored_key = sm3(client_key);
+            }
             byte[] tokenbyte = hexStringToBytes(token);
             byte[] client_signature = getKeyFromHmac(server_key, tokenbyte);
             if (server_signature != null && !server_signature.equals(bytesToHexString(client_signature))) return new byte[0];
