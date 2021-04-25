@@ -224,7 +224,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
             try {
               newStream =
                   tryConnect(user, database, info, socketFactory, hostSpec, SslMode.DISABLE);
-              LOGGER.debug("Downgraded to non-encrypted connection for host " + hostSpec);    
+              LOGGER.debug("Downgraded to non-encrypted connection for host " + hostSpec);
             } catch (SQLException ee) {
               ex = ee;
             } catch (IOException ee) {
@@ -300,7 +300,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail);
         knownStates.put(hostSpec, HostStatus.ConnectFail);
         if (hostIter.hasNext()) {
-          LOGGER.debug("ConnectException occured while connecting to {0}" + hostSpec, cex);
+          LOGGER.info("ConnectException occured while connecting to {0}" + hostSpec, cex);
           // still more addresses to try
           continue;
         }
@@ -312,7 +312,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail);
         knownStates.put(hostSpec, HostStatus.ConnectFail);
         if (hostIter.hasNext()) {
-          LOGGER.debug("IOException occured while connecting to " + hostSpec, ioe);
+          LOGGER.info("IOException occured while connecting to " + hostSpec, ioe);
           // still more addresses to try
           continue;
         }
@@ -323,7 +323,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail);
         knownStates.put(hostSpec, HostStatus.ConnectFail);
         if (hostIter.hasNext()) {
-          LOGGER.debug("SQLException occured while connecting to " + hostSpec, se);
+          LOGGER.info("SQLException occured while connecting to " + hostSpec, se);
           // still more addresses to try
           continue;
         }
