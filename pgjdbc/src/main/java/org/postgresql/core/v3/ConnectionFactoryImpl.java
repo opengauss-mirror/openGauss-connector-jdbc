@@ -65,9 +65,11 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   public static String USE_BOOLEAN = "false";
   private static final int AUTH_REQ_SHA256 = 10;
   private static final int AUTH_REQ_MD5_SHA256 = 11;
+  private static final int AUTH_REQ_SM3 = 13;
   private static final int PLAIN_PASSWORD = 0;
   private static final int MD5_PASSWORD  = 1;
   private static final int SHA256_PASSWORD =  2;
+  private static final int SM3_PASSWORD = 6;
   private static final int ERROR_PASSWORD = 3;
   private static final int PROTOCOL_VERSION_351 = 351;
   private static final int PROTOCOL_VERSION_350 = 350;
@@ -574,6 +576,40 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                   pgStream.flush();
 
                   break;
+              }
+              case AUTH_REQ_SM3: {
+            	  LOGGER.trace("[" + connectInfo + "] " + "AUTH_REQ_SM3");
+            	  int passwordStoredMethod = pgStream.receiveInteger4();
+            	  if (password == null)
+                      throw new PSQLException(
+                              GT.tr(
+                                      "The server requested password-based authentication, but no password"
+                                          + " was provided."),
+                              PSQLState.CONNECTION_REJECTED);
+            	  if (passwordStoredMethod == SM3_PASSWORD) {
+                      String random64code = pgStream.receiveString(64);
+                      String token = pgStream.receiveString(8);
+                      int server_iteration = pgStream.receiveInteger4();
+                      byte[] result = null;
+                      MD5Digest.setIsSha256(false);
+                      result = MD5Digest.RFC5802Algorithm(password, random64code, token, server_iteration);
+                      if (result == null)
+                          throw new PSQLException(
+                                  GT.tr("Invalid username/password,login denied."),
+                                  PSQLState.CONNECTION_REJECTED);
+                      pgStream.sendChar('p');
+                      pgStream.sendInteger4(4 + result.length + 1);
+                      pgStream.send(result);
+                      pgStream.sendChar(0);
+                      pgStream.flush();
+                      break;
+            	  } else {
+            		  throw new PSQLException(
+                              GT.tr(
+                                      "The password-stored method is not supported, must be plain, md5, "
+                                          + "sha256 or sm3."),
+                              PSQLState.CONNECTION_REJECTED);
+            	  }
               }
               case AUTH_REQ_SHA256: {
                   LOGGER.trace("[" + connectInfo + "] " + "AUTH_REQ_SHA256");
