@@ -16,7 +16,6 @@ import org.junit.runners.Suite;
         SchemaTest.class,
         AbortTest.class,
         CloseOnCompletionTest.class,
-        SharedTimerClassLoaderLeakTest.class,
         NetworkTimeoutTest.class,
         GetObjectTest.class}
     )

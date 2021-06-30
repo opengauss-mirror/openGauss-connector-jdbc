@@ -129,7 +129,6 @@ import org.junit.runners.Suite;
 
         CopyTest.class,
         CopyLargeFileTest.class,
-        ServerErrorTest.class,
         UpsertTest.class,
         OuterJoinSyntaxTest.class
 })

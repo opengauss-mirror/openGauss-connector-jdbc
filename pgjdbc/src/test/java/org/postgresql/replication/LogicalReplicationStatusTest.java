@@ -13,6 +13,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.PGProperty;
 import org.postgresql.core.BaseConnection;
 import org.postgresql.core.ServerVersion;
+import org.postgresql.jdbc.PgConnection;
 import org.postgresql.test.TestUtil;
 import org.postgresql.test.util.rules.ServerVersionRule;
 import org.postgresql.test.util.rules.annotation.HaveMinimalServerVersion;
@@ -471,7 +472,7 @@ public class LogicalReplicationStatusTest {
   }
 
   private LogSequenceNumber getLSNFromView(String columnName) throws Exception {
-    int pid = ((PGConnection) replicationConnection).getBackendPID();
+    int pid = ((PgConnection) replicationConnection).getQueryExecutor().getBackendPID();
 
     int repeatCount = 0;
     while (true) {

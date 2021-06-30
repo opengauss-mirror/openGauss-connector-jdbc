@@ -10,6 +10,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 
 import org.postgresql.PGConnection;
 import org.postgresql.PGProperty;
+import org.postgresql.jdbc.PgConnection;
 import org.postgresql.test.TestUtil;
 import org.postgresql.test.util.rules.annotation.HaveMinimalServerVersion;
 
@@ -43,8 +44,8 @@ public class ReplicationConnectionTest {
   public void testIsValid() throws Exception {
     boolean result = replConnection.isValid(3);
 
-    PGConnection connection = (PGConnection) replConnection;
-    connection.getBackendPID();
+    PgConnection connection = (PgConnection) replConnection;
+    connection.getQueryExecutor().getBackendPID();
 
     assertThat("Replication connection as Simple connection can be check on valid",
         result, equalTo(true)
@@ -53,7 +54,7 @@ public class ReplicationConnectionTest {
 
   @Test
   public void testConnectionNotValidWhenSessionTerminated() throws Exception {
-    int backendId = ((PGConnection) replConnection).getBackendPID();
+    int backendId = ((PgConnection) replConnection).getQueryExecutor().getBackendPID();
 
     Connection sqlConnection = TestUtil.openDB();
 
