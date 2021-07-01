@@ -12,6 +12,7 @@ import static org.junit.Assert.fail;
 import org.postgresql.PGConnection;
 import org.postgresql.core.ServerVersion;
 import org.postgresql.ds.PGConnectionPoolDataSource;
+import org.postgresql.jdbc.PgConnection;
 import org.postgresql.jdbc2.optional.ConnectionPool;
 import org.postgresql.test.TestUtil;
 
@@ -329,7 +330,7 @@ public class ConnectionPoolTest extends BaseDataSourceTest {
       Assume.assumeTrue("pg_terminate_backend requires PostgreSQL 8.4+",
           TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_4));
 
-      int pid = ((PGConnection) con).getBackendPID();
+      int pid = ((PgConnection) con).getQueryExecutor().getBackendPID();
 
       Connection adminCon = TestUtil.openPrivilegedDB();
       try {

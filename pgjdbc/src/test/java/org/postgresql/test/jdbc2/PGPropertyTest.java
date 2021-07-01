@@ -16,6 +16,7 @@ import org.postgresql.PGProperty;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.postgresql.ds.common.BaseDataSource;
 import org.postgresql.test.TestUtil;
+import org.postgresql.util.PSQLException;
 import org.postgresql.util.URLCoder;
 
 import org.junit.After;
@@ -92,10 +93,15 @@ public class PGPropertyTest {
   @Test
   public void testDriverGetPropertyInfo() {
     Driver driver = new Driver();
-    DriverPropertyInfo[] infos = driver.getPropertyInfo(
-        "jdbc:postgresql://localhost/test?user=fred&password=secret&ssl=true",
-        // this is the example we give in docs
-        new Properties());
+    DriverPropertyInfo[] infos = new DriverPropertyInfo[0];
+    try {
+      infos = driver.getPropertyInfo(
+          "jdbc:postgresql://localhost/test?user=fred&password=secret&ssl=true",
+          // this is the example we give in docs
+          new Properties());
+    } catch (PSQLException throwables) {
+      throwables.printStackTrace();
+    }
     for (DriverPropertyInfo info : infos) {
       if ("user".equals(info.name)) {
         assertEquals("fred", info.value);
@@ -209,7 +215,12 @@ public class PGPropertyTest {
         + URLCoder.encode(databaseName)
         + "?user=" + URLCoder.encode(userName)
         + "&password=" + URLCoder.encode(password);
-    Properties parsed = Driver.parseURL(url, new Properties());
+    Properties parsed = null;
+    try {
+      parsed = Driver.parseURL(url, new Properties());
+    } catch (PSQLException throwables) {
+      throwables.printStackTrace();
+    }
     assertEquals("database", databaseName, PGProperty.PG_DBNAME.get(parsed));
     assertEquals("user", userName, PGProperty.USER.get(parsed));
     assertEquals("password", password, PGProperty.PASSWORD.get(parsed));
@@ -271,7 +282,12 @@ public class PGPropertyTest {
     dataSource.setPassword(password);
     dataSource.setApplicationName(applicationName);
 
-    Properties parsed = Driver.parseURL(dataSource.getURL(), new Properties());
+    Properties parsed = null;
+    try {
+      parsed = Driver.parseURL(dataSource.getURL(), new Properties());
+    } catch (PSQLException throwables) {
+      throwables.printStackTrace();
+    }
     assertEquals("database", databaseName, PGProperty.PG_DBNAME.get(parsed));
     // datasources do not pass username and password as URL parameters
     assertFalse("user", PGProperty.USER.isPresent(parsed));
