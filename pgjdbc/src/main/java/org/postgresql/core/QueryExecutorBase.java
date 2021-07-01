@@ -178,6 +178,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
     } catch (IOException e) {
       // Safe to ignore.
       LOGGER.trace("Ignoring exception on cancel request:", e);
+      throw new SQLException("Cancel request on this connection failed");
     } finally {
       if (cancelStream != null) {
         try {
