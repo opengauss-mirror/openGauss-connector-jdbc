@@ -1143,7 +1143,11 @@ public class PgConnection implements BaseConnection {
   @Override
   public void cancelQuery() throws SQLException {
     checkClosed();
-    queryExecutor.sendQueryCancel();
+    try {
+      queryExecutor.sendQueryCancel();
+    } catch (SQLException e) {
+      queryExecutor.close();
+    }
   }
 
   @Override
