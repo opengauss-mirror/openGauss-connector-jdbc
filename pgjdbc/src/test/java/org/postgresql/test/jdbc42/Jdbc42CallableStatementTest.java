@@ -35,9 +35,9 @@ public class Jdbc42CallableStatementTest extends BaseTest4 {
     try (Statement stmt = con.createStatement();) {
       stmt.execute(
               "CREATE OR REPLACE FUNCTION testspg__getResultSetWithoutArg() "
-                      + "RETURNS refcursor AS '  "
-                      + "declare ref refcursor;"
-                      + "begin OPEN ref FOR SELECT 1; RETURN ref; end; ' LANGUAGE plpgsql;");
+                      + "RETURNS refcursor AS $$ "
+                      + "declare refcur refcursor;"
+                      + "begin OPEN refcur FOR SELECT 1; RETURN refcur; end; $$ LANGUAGE plpgsql;");
     }
   }
 
