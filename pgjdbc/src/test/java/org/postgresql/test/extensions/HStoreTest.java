@@ -56,7 +56,7 @@ public class HStoreTest extends BaseTest4 {
   public void testHStoreSelect() throws SQLException {
     PreparedStatement pstmt = con.prepareStatement("SELECT 'a=>1,b=>2'::hstore");
     ResultSet rs = pstmt.executeQuery();
-    assertEquals(Map.class.getName(), rs.getMetaData().getColumnClassName(1));
+    assertEquals(getCompareOfMapType(), rs.getMetaData().getColumnClassName(1));
     assertTrue(rs.next());
     String str = rs.getString(1);
     if (!("\"a\"=>\"1\", \"b\"=>\"2\"".equals(str) || "\"b\"=>\"2\", \"a\"=>\"1\"".equals(str))) {
@@ -72,7 +72,7 @@ public class HStoreTest extends BaseTest4 {
   public void testHStoreSelectNullValue() throws SQLException {
     PreparedStatement pstmt = con.prepareStatement("SELECT 'a=>NULL'::hstore");
     ResultSet rs = pstmt.executeQuery();
-    assertEquals(Map.class.getName(), rs.getMetaData().getColumnClassName(1));
+    assertEquals(getCompareOfMapType(), rs.getMetaData().getColumnClassName(1));
     assertTrue(rs.next());
     assertEquals("\"a\"=>NULL", rs.getString(1));
     Map<String, Object> correct = Collections.singletonMap("a", null);
@@ -107,10 +107,13 @@ public class HStoreTest extends BaseTest4 {
     PreparedStatement pstmt = con.prepareStatement("SELECT ?");
     pstmt.setObject(1, correct);
     ResultSet rs = pstmt.executeQuery();
-    assertEquals(Map.class.getName(), rs.getMetaData().getColumnClassName(1));
+    assertEquals(getCompareOfMapType(), rs.getMetaData().getColumnClassName(1));
     assertTrue(rs.next());
     assertEquals(correct, rs.getObject(1));
     assertEquals("\"a\"=>\"t'e\ns\\\"t\"", rs.getString(1));
   }
 
+  private static String getCompareOfMapType() {
+    return Object.class.getName();
+  }
 }
