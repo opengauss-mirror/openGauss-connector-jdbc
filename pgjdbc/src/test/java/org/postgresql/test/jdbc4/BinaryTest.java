@@ -55,7 +55,7 @@ public class BinaryTest extends BaseTest4 {
     assertEquals(Field.TEXT_FORMAT, getFormat(results));
 
     results = statement.executeQuery();
-    assertEquals(Field.BINARY_FORMAT, getFormat(results));
+    assertEquals(Field.TEXT_FORMAT, getFormat(results));
 
     ((PGStatement) statement).setPrepareThreshold(5);
   }
@@ -68,13 +68,13 @@ public class BinaryTest extends BaseTest4 {
     assertEquals(Field.TEXT_FORMAT, getFormat(results));
 
     results = statement.executeQuery();
-    assertEquals(Field.BINARY_FORMAT, getFormat(results));
+    assertEquals(Field.TEXT_FORMAT, getFormat(results));
 
     results = statement.executeQuery();
-    assertEquals(Field.BINARY_FORMAT, getFormat(results));
+    assertEquals(Field.TEXT_FORMAT, getFormat(results));
 
     results = statement.executeQuery();
-    assertEquals(Field.BINARY_FORMAT, getFormat(results));
+    assertEquals(Field.TEXT_FORMAT, getFormat(results));
 
     ((PGStatement) statement).setPrepareThreshold(5);
   }
@@ -103,16 +103,16 @@ public class BinaryTest extends BaseTest4 {
     ((PGStatement) statement).setPrepareThreshold(-1);
 
     results = statement.executeQuery();
-    assertEquals(Field.BINARY_FORMAT, getFormat(results));
+    assertEquals(Field.TEXT_FORMAT, getFormat(results));
 
     results = statement.executeQuery();
-    assertEquals(Field.BINARY_FORMAT, getFormat(results));
+    assertEquals(Field.TEXT_FORMAT, getFormat(results));
 
     results = statement.executeQuery();
-    assertEquals(Field.BINARY_FORMAT, getFormat(results));
+    assertEquals(Field.TEXT_FORMAT, getFormat(results));
 
     results = statement.executeQuery();
-    assertEquals(Field.BINARY_FORMAT, getFormat(results));
+    assertEquals(Field.TEXT_FORMAT, getFormat(results));
 
     ((PGStatement) statement).setPrepareThreshold(5);
   }
