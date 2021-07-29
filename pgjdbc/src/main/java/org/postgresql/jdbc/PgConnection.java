@@ -1614,9 +1614,10 @@ public class PgConnection implements BaseConnection {
     Map<String, ClientInfoStatus> failures = new HashMap<String, ClientInfoStatus>();
     for (String name : result) {
       try {
-        if(properties.getProperty(name) != null) {
-          setClientInfo(name, properties.getProperty(name, null));
+        if("ApplicationType".equals(name) && properties.getProperty(name) == null) {
+            continue;
         }
+        setClientInfo(name, properties.getProperty(name, null));
       } catch (SQLClientInfoException e) {
         failures.putAll(e.getFailedProperties());
       }
