@@ -1652,7 +1652,7 @@ public class PgConnection implements BaseConnection {
   @Override
   public boolean isWrapperFor(Class<?> iface) throws SQLException {
     checkClosed();
-    throw org.postgresql.Driver.notImplemented(this.getClass(), "isWrapperFor(Class<?>)");
+    return iface.isAssignableFrom(getClass());
   }
 
   @Override
