@@ -1242,8 +1242,6 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
       ref.add(new StringRefAddr("password", password));
     }
 
-    ref.add(new StringRefAddr("allowEncodingChanges", Boolean.toString(allowEncodingChanges)));
-    
     ref.add(new StringRefAddr("characterEncoding", characterEncoding));
 
 	ref.add(new StringRefAddr("connectionExtraInfo", Boolean.toString(connectionExtraInfo)));
