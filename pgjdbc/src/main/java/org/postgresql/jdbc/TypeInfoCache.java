@@ -328,7 +328,26 @@ public class TypeInfoCache implements TypeInfo {
 
   public int getPGArrayType(String elementTypeName) throws SQLException {
     elementTypeName = getTypeForAlias(elementTypeName);
-    return getPGType(elementTypeName + "[]");
+    int pgType = Oid.UNSPECIFIED;
+    for (String newTypeName: new String[] {
+            combainStringIfOneQuoted("_", elementTypeName),
+            combainStringIfOneQuoted(elementTypeName, "[]")}) {
+        pgType = getPGType(newTypeName);
+        if (pgType != Oid.UNSPECIFIED) {
+          return pgType;
+        }
+    }
+    return pgType;
+  }
+
+  private static String combainStringIfOneQuoted(String first, String second) {
+    if (first.startsWith("\"")) {
+      return first.substring(0, first.length() - 1) + second + "\"";
+    }
+    if (second.startsWith("\"")) {
+      return "\"" + first + second.substring(1);
+    }
+    return first + second;
   }
 
   /**

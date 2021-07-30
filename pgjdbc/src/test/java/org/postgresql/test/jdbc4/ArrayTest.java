@@ -63,8 +63,8 @@ public class ArrayTest extends BaseTest4 {
     TestUtil.createTable(_conn, "arrcompprnttest", "id serial, name character(10)");
     TestUtil.createTable(_conn, "arrcompchldttest",
         "id serial, name character(10), description character varying, parent integer");
-    TestUtil.createTable(_conn, "\"CorrectCasing\"", "id serial");
-    TestUtil.createTable(_conn, "\"Evil.Table\"", "id serial");
+    TestUtil.createTable(_conn, "\"correctcasing\"", "id serial");
+    TestUtil.createTable(_conn, "\"evil.table\"", "id serial");
   }
 
   @Override
@@ -443,13 +443,13 @@ public class ArrayTest extends BaseTest4 {
         TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_3));
 
     PGobject cc = new PGobject();
-    cc.setType("\"CorrectCasing\"");
+    cc.setType("correctcasing");
     cc.setValue("(1)");
     Object[] in = new Object[1];
     in[0] = cc;
 
-    Array arr = _conn.createArrayOf("\"CorrectCasing\"", in);
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::\"CorrectCasing\"[]");
+    Array arr = _conn.createArrayOf("correctcasing", in);
+    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::correctcasing[]");
     pstmt.setArray(1, arr);
     ResultSet rs = pstmt.executeQuery();
 
@@ -476,8 +476,8 @@ public class ArrayTest extends BaseTest4 {
 
   @Test
   public void testCasingBuiltinNonAlias() throws SQLException {
-    Array arr = _conn.createArrayOf("INT4", new Integer[]{1, 2, 3});
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::INT4[]");
+    Array arr = _conn.createArrayOf("int4", new Integer[]{1, 2, 3});
+    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::int4[]");
     pstmt.setArray(1, arr);
     ResultSet rs = pstmt.executeQuery();
 
@@ -493,13 +493,13 @@ public class ArrayTest extends BaseTest4 {
         TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_3));
 
     PGobject cc = new PGobject();
-    cc.setType("\"Evil.Table\"");
+    cc.setType("\"evil.table\"");
     cc.setValue("(1)");
     Object[] in = new Object[1];
     in[0] = cc;
 
-    Array arr = _conn.createArrayOf("\"Evil.Table\"", in);
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::\"Evil.Table\"[]");
+    Array arr = _conn.createArrayOf("evil.table", in);
+    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::\"evil.table\"[]");
     pstmt.setArray(1, arr);
     ResultSet rs = pstmt.executeQuery();
 
