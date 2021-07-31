@@ -19,6 +19,7 @@ import org.junit.Test;
 
 import java.lang.reflect.Method;
 import java.sql.Date;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -38,6 +39,8 @@ public class DeepBatchedInsertStatementTest extends BaseTest4 {
   @Override
   public void setUp() throws Exception {
     super.setUp();
+    con.unwrap(PgConnection.class).batchInsert = false;
+
     Statement stmt = con.createStatement();
 
     /*
