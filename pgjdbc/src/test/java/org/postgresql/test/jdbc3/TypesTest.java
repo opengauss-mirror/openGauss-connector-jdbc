@@ -22,6 +22,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.Properties;
 
 public class TypesTest extends BaseTest4 {
 
@@ -30,6 +31,8 @@ public class TypesTest extends BaseTest4 {
   @Override
   public void setUp() throws Exception {
     super.setUp();
+    Properties props = new Properties();
+    updateProperties(props);
     _conn = con;
     Statement stmt = _conn.createStatement();
     stmt.execute(
@@ -44,6 +47,12 @@ public class TypesTest extends BaseTest4 {
     stmt.close();
     super.tearDown();
   }
+
+    @Override
+    protected void updateProperties(Properties props) {
+        super.updateProperties(props);
+        props.setProperty("use_boolean", "true");
+    }
 
   @Test
   public void testPreparedBoolean() throws SQLException {
