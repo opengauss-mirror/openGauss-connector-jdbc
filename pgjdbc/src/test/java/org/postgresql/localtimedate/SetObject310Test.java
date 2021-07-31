@@ -14,13 +14,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.postgresql.util.DataBaseCompatibility;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Time;
-import java.sql.Types;
+import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -380,9 +376,17 @@ public class SetObject310Test extends BaseTest4 {
   @Test
   public void testSetLocalDateWithType() throws SQLException {
     LocalDate data = LocalDate.parse("1971-12-15");
-    java.sql.Date actual = insertThenReadWithType(data, Types.DATE, "date_column", java.sql.Date.class);
-    java.sql.Date expected = java.sql.Date.valueOf("1971-12-15");
-    assertEquals(expected, actual);
+    if (DataBaseCompatibility.isADatabase(con)) {
+      java.sql.Timestamp actual = insertThenReadWithType(data, Types.DATE, "date_column", java.sql.Timestamp.class);
+      java.sql.Timestamp expected = new Timestamp(java.sql.Date.valueOf("1971-12-15").getTime());
+      assertEquals(expected, actual);
+
+    } else {
+      java.sql.Date actual = insertThenReadWithType(data, Types.DATE, "date_column", java.sql.Date.class);
+      java.sql.Date expected = java.sql.Date.valueOf("1971-12-15");
+      assertEquals(expected, actual);
+
+    }
   }
 
   /**

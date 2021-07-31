@@ -20,6 +20,7 @@ import org.postgresql.geometric.PGpath;
 import org.postgresql.geometric.PGpoint;
 import org.postgresql.geometric.PGpolygon;
 import org.postgresql.test.TestUtil;
+import org.postgresql.util.DataBaseCompatibility;
 import org.postgresql.util.PGInterval;
 import org.postgresql.util.PGmoney;
 
@@ -83,11 +84,11 @@ public class GetObjectTest {
             + "date_column date,"
             + "time_without_time_zone_column time without time zone,"
             + "time_with_time_zone_column time with time zone,"
-            + "blob_column bytea,"
+            + "blob_column blob,"
+            + "clob_column clob,"
             + "lob_column oid,"
             + "array_column text[],"
             + "point_column point,"
-            + "line_column line,"
             + "lseg_column lseg,"
             + "box_column box,"
             + "path_column path,"
@@ -138,7 +139,7 @@ public class GetObjectTest {
     _conn.setAutoCommit(false);
     try {
       char[] data = new char[]{'d', 'e', 'a', 'd', 'b', 'e', 'e', 'f'};
-      PreparedStatement insertPS = _conn.prepareStatement(TestUtil.insertSQL("table1", "lob_column", "?"));
+      PreparedStatement insertPS = _conn.prepareStatement(TestUtil.insertSQL("table1", "clob_column", "?"));
       try {
         insertPS.setObject(1, new SerialClob(data), Types.CLOB);
         insertPS.executeUpdate();
@@ -146,10 +147,10 @@ public class GetObjectTest {
         insertPS.close();
       }
 
-      ResultSet rs = stmt.executeQuery(TestUtil.selectSQL("table1", "lob_column"));
+      ResultSet rs = stmt.executeQuery(TestUtil.selectSQL("table1", "clob_column"));
       try {
         assertTrue(rs.next());
-        Clob blob = rs.getObject("lob_column", Clob.class);
+        Clob blob = rs.getObject("clob_column", Clob.class);
         assertEquals(data.length, blob.length());
         assertEquals(new String(data), blob.getSubString(1, data.length));
         blob.free();
@@ -329,9 +330,15 @@ public class GetObjectTest {
       calendar.set(Calendar.YEAR, 1999);
       calendar.set(Calendar.MONTH, Calendar.JANUARY);
       calendar.set(Calendar.DAY_OF_MONTH, 8);
-      Date expectedNoZone = new Date(calendar.getTimeInMillis());
-      assertEquals(expectedNoZone, rs.getObject("date_column", Date.class));
-      assertEquals(expectedNoZone, rs.getObject(1, Date.class));
+      if (DataBaseCompatibility.isADatabase(_conn)) {
+        Timestamp expectedNoZone = new Timestamp(calendar.getTimeInMillis());
+        assertEquals(expectedNoZone, rs.getObject("date_column", Timestamp.class));
+        assertEquals(expectedNoZone, rs.getObject(1, Timestamp.class));
+      } else {
+        Date expectedNoZone = new Date(calendar.getTimeInMillis());
+        assertEquals(expectedNoZone, rs.getObject("date_column", Date.class));
+        assertEquals(expectedNoZone, rs.getObject(1, Date.class));
+      }
     } finally {
       rs.close();
     }
@@ -635,7 +642,7 @@ public class GetObjectTest {
     _conn.setAutoCommit(false);
     try {
       byte[] data = new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF};
-      PreparedStatement insertPS = _conn.prepareStatement(TestUtil.insertSQL("table1", "lob_column", "?"));
+      PreparedStatement insertPS = _conn.prepareStatement(TestUtil.insertSQL("table1", "blob_column", "?"));
       try {
         insertPS.setObject(1, new SerialBlob(data), Types.BLOB);
         insertPS.executeUpdate();
@@ -643,10 +650,10 @@ public class GetObjectTest {
         insertPS.close();
       }
 
-      ResultSet rs = stmt.executeQuery(TestUtil.selectSQL("table1", "lob_column"));
+      ResultSet rs = stmt.executeQuery(TestUtil.selectSQL("table1", "blob_column"));
       try {
         assertTrue(rs.next());
-        Blob blob = rs.getObject("lob_column", Blob.class);
+        Blob blob = rs.getObject("blob_column", Blob.class);
         assertEquals(data.length, blob.length());
         assertArrayEquals(data, blob.getBytes(1, data.length));
         blob.free();
@@ -698,7 +705,14 @@ public class GetObjectTest {
     }
     Statement stmt = _conn.createStatement();
     String content = "<book><title>Manual</title></book>";
-    stmt.executeUpdate(TestUtil.insertSQL("table1","xml_column","XMLPARSE (DOCUMENT '<?xml version=\"1.0\"?><book><title>Manual</title></book>')"));
+    try {
+      stmt.executeUpdate(TestUtil.insertSQL("table1","xml_column","XMLPARSE (DOCUMENT '<?xml version=\"1.0\"?><book><title>Manual</title></book>')"));
+    } catch (SQLException sqlExp) {
+      if (sqlExp.getMessage().contains("unsupported XML feature")) {
+        return;
+      }
+      throw sqlExp;
+    }
 
     ResultSet rs = stmt.executeQuery(TestUtil.selectSQL("table1", "xml_column"));
     try {
