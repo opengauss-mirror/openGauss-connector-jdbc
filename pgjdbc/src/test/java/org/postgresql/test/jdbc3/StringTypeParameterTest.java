@@ -140,7 +140,7 @@ public class StringTypeParameterTest extends BaseTest4 {
     // all good
 
     update.clearParameters();
-    update.setObject(1, "happy", Types.VARCHAR);
+    update.setObject(1, "happy");
     update.executeUpdate();
     // all good
     update.close();
@@ -149,14 +149,14 @@ public class StringTypeParameterTest extends BaseTest4 {
     query.setString(1, "happy");
     ResultSet rs = query.executeQuery();
     assertTrue(rs.next());
-    assertEquals("happy", rs.getObject("m"));
+    assertEquals("happy", rs.getString("m"));
     rs.close();
 
     query.clearParameters();
-    query.setObject(1, "happy", Types.VARCHAR);
+    query.setObject(1, "happy");
     rs = query.executeQuery();
     assertTrue(rs.next());
-    assertEquals("happy", rs.getObject("m"));
+    assertEquals("happy", rs.getObject("m").toString());
 
     // all good
     rs.close();
