@@ -24,12 +24,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.sql.CallableStatement;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
+import java.util.concurrent.locks.Condition;
 
 import javax.sql.ConnectionEvent;
 import javax.sql.ConnectionEventListener;
@@ -324,18 +321,33 @@ public class ConnectionPoolTest extends BaseDataSourceTest {
   public void testBackendIsClosed() throws Exception {
     try {
       PooledConnection pc = getPooledConnection();
-      con = pc.getConnection();
+      Connection poolCon = pc.getConnection();
+      con = poolCon.unwrap(PgConnection.class);
       assertTrue(!con.isClosed());
 
       Assume.assumeTrue("pg_terminate_backend requires PostgreSQL 8.4+",
           TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_4));
 
-      int pid = ((PgConnection) con).getQueryExecutor().getBackendPID();
+
+      long pid = ((PgConnection) con).getQueryExecutor().getBackendPID();
+      try (Statement st = con.createStatement()) {
+        try (ResultSet rs = st.executeQuery("select pg_backend_pid()")) {
+          if (rs.next()) {
+            pid = rs.getLong(1);
+          }
+        }
+      }
 
       Connection adminCon = TestUtil.openPrivilegedDB();
       try {
         Statement statement = adminCon.createStatement();
-        statement.executeQuery("SELECT pg_terminate_backend(" + pid + ")");
+        try (ResultSet rs = statement.executeQuery("SELECT pg_terminate_backend(" + pid + ")")) {
+          if (rs.next()) {
+            System.out.println(rs.getBoolean(1));
+          } else {
+            System.out.println("terminal failed!");
+          }
+        }
       } finally {
         TestUtil.closeDB(adminCon);
       }
