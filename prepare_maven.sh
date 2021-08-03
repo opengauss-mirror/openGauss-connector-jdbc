@@ -4,6 +4,11 @@ for src in `find open_source -name '*.jar'`
 do
    cp $src ./libs/
 done
+JDBC_DIR=$(dirname $(readlink -f $0)) 
+cd ${JDBC_DIR}
+rm -rf "${JDBC_DIR}/jdbc"
+cp "${JDBC_DIR}/pgjdbc" "${JDBC_DIR}/jdbc" -r
+
 mvn install:install-file -Dfile=./libs/commons-logging-1.2.jar -DgroupId=commons-logging -DartifactId=commons-logging -Dversion=1.2 -Dpackaging=jar
 mvn install:install-file -Dfile=./libs/commons-codec-1.11.jar -DgroupId=commons-codec -DartifactId=commons-codec -Dversion=1.11 -Dpackaging=jar
 mvn install:install-file -Dfile=./libs/httpclient-4.5.13.jar  -DgroupId=org.apache.httpcomponents -DartifactId=httpclient -Dversion=4.5.13 -Dpackaging=jar

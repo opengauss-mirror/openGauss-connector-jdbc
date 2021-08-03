@@ -115,6 +115,8 @@ function install_jdbc()
 {
     export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF8"
     export COMMIT=$(git rev-parse --short HEAD)
+    export OPENGAUSS_PACKAGE_NAME="org.opengauss";
+
     export GS_VERSION="compiled at $(date +%Y-%m-%d-%H:%M:%S) build ${COMMIT}"
     export OUTPUT_DIR="${JDBC_DIR}/output"
     echo "Begin make jdbc..."
@@ -147,9 +149,28 @@ function install_jdbc()
     cd ${OUTPUT_DIR}
     rm -rf *.jar
     version=`awk '/<version>[^<]+<\/version>/{gsub(/<version>|<\/version>/,"",$1);print $1;exit;}' ${JDBC_DIR}/jdbc/pom.xml`
-    cp ${JDBC_DIR}/jdbc/target/opengauss-jdbc-${version}.jar .
     mv ${JDBC_DIR}/jdbc/target/opengauss-jdbc-${version}.jar ./postgresql.jar
     echo "Successfully make postgresql.jar"
+
+    rm -rf "${JDBC_DIR}/jdbc"
+    cp "${JDBC_DIR}/pgjdbc" "${JDBC_DIR}/jdbc" -r
+    cd "${JDBC_DIR}/jdbc"
+    find . -name 'Driver.java' | xargs sed -i "s/@GSVERSION@/${GS_VERSION}/g"
+    find . -name 'Driver.java' | xargs sed -i "s/jdbc:postgresql:/jdbc:opengauss:/g"
+    find . -name 'java.sql.Driver' | xargs sed -i "s#org\.postgresql#${OPENGAUSS_PACKAGE_NAME}#g"
+    find . -name '*.java' -type f | xargs sed -i "s#org\.postgresql#${OPENGAUSS_PACKAGE_NAME}#g"
+    if [ $? -ne 0 ]; then
+      die "failed to replace url name"
+    fi
+    find . -name 'BaseDataSource.java' | xargs sed -i "s/jdbc:postgresql:/jdbc:opengauss:/g"
+    if [ $? -ne 0 ]; then
+      die "fail to replace url name in BaseDataSource"
+    fi
+
+    mvn clean install -Dmaven.test.skip=true >> "$LOG_FILE" 2>&1
+    cp ${JDBC_DIR}/jdbc/target/opengauss-jdbc-${version}.jar ${OUTPUT_DIR}/
+    echo "Successfully make opengauss-jdbc jar package"
+
     cd ${OUTPUT_DIR}/
     tar -zcvf ${JDBC_DIR}/openGauss-${version}-JDBC.tar.gz *.jar
     echo "Successfully make jdbc jar package"
