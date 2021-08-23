@@ -130,54 +130,13 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
 
       if (columnType != functionReturnType[j]) {
         // this is here for the sole purpose of passing the cts
-        if (columnType == Types.DOUBLE && functionReturnType[j] == Types.REAL) {
-          // return it as a float
-          if (callResult[j] != null) {
-            callResult[j] = ((Double) callResult[j]).floatValue();
+        PgCallstatementTypeCompatibility typeCompatibility = new PgCallstatementTypeCompatibility(
+                columnType,
+                functionReturnType[j]);
+        if (typeCompatibility.isCompatibilityType()) {
+          if (callResult[j] != null && typeCompatibility.needConvert()) {
+            callResult[j] = typeCompatibility.convert(callResult[j]);
           }
-        }                     else if ( columnType == Types.INTEGER && functionReturnType[j] == Types.VARCHAR )
-        {
-            // return it as varchar
-            if ( callResult[j] != null)
-                callResult[j] = callResult[j].toString();
-        }
-        
-        else if ( columnType == Types.NUMERIC && functionReturnType[j] == Types.VARCHAR )
-        {
-            // return it as varchar
-            if ( callResult[j] != null)
-            	callResult[j] = callResult[j].toString();
-        }
-        
-        else if ( columnType == Types.VARCHAR && functionReturnType[j] == Types.CLOB )
-        {
-            // return it as varchar
-            if ( callResult[j] != null)
-            	callResult[j] = callResult[j].toString();
-            
-        }
-        else if (columnType ==  Types.NUMERIC && functionReturnType[j] == Types.INTEGER){
-        	if ( callResult[j] != null){
-        		String str = callResult[j].toString();
-        		int idex = str.lastIndexOf(".");
-        		if(idex > 0){
-        			String strNum = str.substring(0,idex);
-            		callResult[j] = Integer.valueOf(strNum);
-        		}else{
-        			callResult[j] = Integer.valueOf(callResult[j].toString());
-        		}
-        		
-        	}
-        }
-        else if(columnType == Types.INTEGER && functionReturnType[j] == Types.NUMERIC){
-        	if ( callResult[j] != null)
-        		callResult[j] = callResult[j];
-        }
-        else if ( columnType == Types.OTHER && functionReturnType[j] == -10 )
-        {                        
-        }
-        else if ( columnType == Types.OTHER && functionReturnType[j] == Types.BLOB )
-        {
         }
         else {
           throw new PSQLException(GT.tr(
