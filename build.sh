@@ -126,13 +126,14 @@ function install_jdbc()
     mvn clean install -Dmaven.test.skip=true >> "$LOG_FILE" 2>&1
     cd  "${JDBC_DIR}/shade/target"
     jar -xf demo-0.0.1-SNAPSHOT.jar
-    mkdir "${JDBC_DIR}/shade/temp/"
+    rm -rf "${JDBC_DIR}/shade/temp/"
+    mkdir -p "${JDBC_DIR}/shade/temp/"
     cp -r ./com "${JDBC_DIR}/shade/temp/"
     cd "${JDBC_DIR}/shade/temp"
     find ./com -name "*" | sort |xargs zip demo-0.0.1-SNAPSHOT.jar >> "$LOG_FILE" 2>&1
     mvn install:install-file -Dfile=${JDBC_DIR}/shade/temp/demo-0.0.1-SNAPSHOT.jar -DgroupId=com.huawei -DartifactId=demo-0.0.1-SNAPSHOT -Dversion=0.0.1 -Dpackaging=jar
     if [ $? -ne 0 ]; then
-        die "mvn failed."
+        die "mvn install demo failed."
     fi
     rm -rf "${JDBC_DIR}/jdbc"
     cp "${JDBC_DIR}/pgjdbc" "${JDBC_DIR}/jdbc" -r
@@ -140,7 +141,7 @@ function install_jdbc()
     find . -name 'Driver.java' | xargs sed -i "s/@GSVERSION@/${GS_VERSION}/g"
     mvn clean install -Dmaven.test.skip=true >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
-        die "mvn failed."
+        die "mvn install driver failed."
     fi
     echo ${OUTPUT_DIR}
     if [ ! -d "${OUTPUT_DIR}" ]; then

@@ -22,12 +22,21 @@ and associated mailing list:
 
 COMPILING
 
-To compile you will need to have a Java 8 and will need to have
-Maven installed.
+Linux:
+In the top level directory, your can use "sh build.sh -3rd ./open_source/" to build directly.
+in build.sh, maven and java8 will auto getted and use to build target.
 
-Once you have Maven, simply run mvn clean install -PexcludeOsgiFiles in the top level directory.
+If you have Java 8 and  Maven installed, you can use "sh build_on_windows_git.sh" to build
+directly.This shell can run in linux or windows git shell.
+To get build detail info, please read build_on_windows_git.sh's text.
+NOTICE: in windows git shell, mvn、java、zip、tar、xargs must in PATH.
+
 This will compile the correct driver for your JVM, and build a .jar file (Java ARchive)
-called postgresql.jar.
+called postgresql.jar and opengauss-jdbc-{version}.jar in output/, and you can get 
+openGauss-${version}-JDBC.tar.gz too.
+NOTICE: postgresql.jar is conflict use with postgres database. because all class was in package org.postgresql.
+opengauss-jdbc-${version}.jar is compatibility with postgres database, all java package renamed org.opengauss,
+and jdbc driver is:jdbc:opengauss:/
 
 REMEMBER: Once you have compiled the driver, it will work on ALL platforms
 that support that version of the API. You don't need to build it for each
@@ -45,13 +54,15 @@ To install the driver, the postgresql.jar file has to be in the classpath.
 ie: under LINUX/SOLARIS (the example here is my linux box):
 
 	export CLASSPATH=.:/usr/local/pgsql/share/java/postgresql.jar
+or  export CLASSPATH=.:/usr/local/pgsql/share/java/opengauss-jdbc-${version}.jar
 
 ---------------------------------------------------------------------------
 
 USING THE DRIVER
 
 To use the driver, you must introduce it to JDBC. Again, there's two ways
-of doing this:
+of doing this(to compatibility with postgres, all postgresql can replace with opengauss
+in opengauss-jdbc-${version}.jar):
 
 1: Hardcoded.
 
