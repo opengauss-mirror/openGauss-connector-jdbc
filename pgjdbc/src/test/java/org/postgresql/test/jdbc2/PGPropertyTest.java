@@ -121,6 +121,12 @@ public class PGPropertyTest {
     PGSimpleDataSource dataSource = new PGSimpleDataSource();
     BeanInfo info = Introspector.getBeanInfo(dataSource.getClass());
 
+    Set excluded = new HashSet();
+    excluded.add("logger");
+    excluded.add("sslprivatekeyfactory");
+    excluded.add("ApplicationType");
+    excluded.add("TLSCiphersSupperted");
+
     // index PropertyDescriptors by name
     Map<String, PropertyDescriptor> propertyDescriptors =
         new TreeMap<String, PropertyDescriptor>(String.CASE_INSENSITIVE_ORDER);
@@ -131,7 +137,7 @@ public class PGPropertyTest {
     // test for the existence of all read methods (getXXX/isXXX) and write methods (setXXX) for all
     // known properties
     for (PGProperty property : PGProperty.values()) {
-      if (!property.getName().startsWith("PG")) {
+      if (!property.getName().startsWith("PG") && !excluded.contains(property.getName())) {
         assertTrue("Missing getter/setter for property [" + property.getName() + "] in ["
             + BaseDataSource.class + "]", propertyDescriptors.containsKey(property.getName()));
 
@@ -147,7 +153,7 @@ public class PGPropertyTest {
 
     // test readability/writability of default value
     for (PGProperty property : PGProperty.values()) {
-      if (!property.getName().startsWith("PG")) {
+      if (!property.getName().startsWith("PG") && !excluded.contains(property.getName())) {
         Object propertyValue =
             propertyDescriptors.get(property.getName()).getReadMethod().invoke(dataSource);
         propertyDescriptors.get(property.getName()).getWriteMethod().invoke(dataSource,
@@ -246,6 +252,9 @@ public class PGPropertyTest {
     excluded.add("APPLICATION_NAME"); // [A]pplicationName
     excluded.add("GSS_LIB"); // gss[l]ib
     excluded.add("REWRITE_BATCHED_INSERTS"); // re[W]riteBatchedInserts
+    excluded.add("SSL_PRIVATEKEY_FACTORY"); // ssl[p]rivatekey[f]actory
+    excluded.add("APPLICATION_TYPE"); // [A]pplication[T]ype
+    excluded.add("TLS_CIPHERS_SUPPERTED"); // [TLS]CiphersSupperted
 
     for (PGProperty property : PGProperty.values()) {
       if (!property.name().startsWith("PG")) { // Ignore all properties that start with PG
