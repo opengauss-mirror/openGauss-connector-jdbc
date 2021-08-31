@@ -11,6 +11,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 import org.postgresql.test.TestUtil;
+import org.postgresql.util.DataBaseCompatibility;
 
 import org.junit.After;
 import org.junit.Before;
@@ -308,26 +309,33 @@ public class SetObject310Test {
     assumeTrue(TestUtil.haveIntegerDateTimes(con));
 
     // use BC for funsies
-    List<LocalDateTime> bcDates = new ArrayList<LocalDateTime>();
-    bcDates.add(LocalDateTime.parse("1997-06-30T23:59:59.999999").with(ChronoField.ERA, IsoEra.BCE.getValue()));
-    bcDates.add(LocalDateTime.parse("0997-06-30T23:59:59.999999").with(ChronoField.ERA, IsoEra.BCE.getValue()));
+    List<String> dates = new ArrayList<String>();
+    dates.add("1997-06-30T23:59:59.999999");
+    dates.add("0997-06-30T23:59:59.999999");
 
-    for (LocalDateTime bcDate : bcDates) {
-      // -1997-06-30T23:59:59.999999 -> 1997-06-30 23:59:59.999999 BC
-      String expected = bcDate.toString().substring(1).replace('T', ' ') + " BC";
+    for (String date : dates) {
+      // -1997-06-30T23:59:59.999999 -> 1996-06-30 23:59:59.999999 BC
+      LocalDateTime bcDate = LocalDateTime.parse(date).with(ChronoField.ERA, IsoEra.BCE.getValue());
+      String expected = date.replace('T', ' ') + " BC";
       localTimestamps(ZoneOffset.UTC, bcDate, expected);
     }
   }
 
   /**
-   * Test the behavior setObject for date columns.
+   * Test the behavior setObject for date/localDate columns.
    */
   @Test
   public void testSetLocalDateWithType() throws SQLException {
     LocalDate data = LocalDate.parse("1971-12-15");
-    java.sql.Date actual = insertThenReadWithType(data, Types.DATE, "date_column", java.sql.Date.class);
-    java.sql.Date expected = java.sql.Date.valueOf("1971-12-15");
-    assertEquals(expected, actual);
+    if (DataBaseCompatibility.isADatabase(con)) {
+      java.sql.Timestamp actual = insertThenReadWithType(data, Types.TIMESTAMP, "date_column", java.sql.Timestamp.class);
+      java.sql.Timestamp expected = java.sql.Timestamp.valueOf("1971-12-15 00:00:00");
+      assertEquals(expected, actual);
+    } else {
+      java.sql.Date actual = insertThenReadWithType(data, Types.DATE, "date_column", java.sql.Date.class);
+      java.sql.Date expected = java.sql.Date.valueOf("1971-12-15");
+      assertEquals(expected, actual);
+    }
   }
 
   /**
