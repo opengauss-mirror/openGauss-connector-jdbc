@@ -40,7 +40,7 @@ public class DatabaseEncodingTest {
   public void setUp() throws Exception {
     con = TestUtil.openDB();
     TestUtil.createTable(con, "testdbencoding",
-        "unicode_ordinal integer primary key not null, unicode_string varchar(" + STEP + ")");
+        "unicode_ordinal integer primary key not null, unicode_string text");
     // disabling auto commit makes the test run faster
     // by not committing each insert individually.
     con.setAutoCommit(false);
