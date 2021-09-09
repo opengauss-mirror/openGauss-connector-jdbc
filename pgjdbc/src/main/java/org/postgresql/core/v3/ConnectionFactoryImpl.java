@@ -290,7 +290,17 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         if(MultiHostChooser.isUsingAutoLoadBalance(info)){
           QueryCNListUtils.runRereshCNListQueryies(queryExecutor,info);
         }
-        queryExecutor.setGaussdbVersion(queryGaussdbVersion(queryExecutor));
+
+        String replication = PGProperty.REPLICATION.get(info);
+        if (replication == null) {
+          try {
+            String gaussVersion = queryGaussdbVersion(queryExecutor);
+            queryExecutor.setGaussdbVersion(gaussVersion);
+          } catch(Exception sqlExp) {
+            LOGGER.warn("query gaussVersion failed, use default instead");
+            queryExecutor.setGaussdbVersion("");
+          }
+        }
 
         LOGGER.info("Connect complete. ID: " + connectInfo);
         // And we're done.
