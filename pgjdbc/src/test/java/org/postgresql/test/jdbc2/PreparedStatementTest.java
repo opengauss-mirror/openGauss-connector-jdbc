@@ -40,6 +40,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -63,6 +64,12 @@ public class PreparedStatementTest extends BaseTest4 {
       ids.add(new Object[]{binaryMode});
     }
     return ids;
+  }
+
+  @Override
+  protected void updateProperties(Properties props) {
+    super.updateProperties(props);
+    props.setProperty("blobMode", "OFF");
   }
 
   @Override
@@ -862,10 +869,10 @@ public class PreparedStatementTest extends BaseTest4 {
     pstmt.executeUpdate();
     pstmt.close();
 
-    Integer maxInt = new Integer(127);
-    Integer minInt = new Integer(-127);
-    Float maxIntFloat = new Float(127);
-    Float minIntFloat = new Float(-127);
+    Integer maxInt = new Integer(255);
+    Integer minInt = new Integer(0);
+    Float maxIntFloat = new Float(255);
+    Float minIntFloat = new Float(0);
 
     pstmt = con.prepareStatement("insert into tiny_int values (?,?,?)");
     pstmt.setObject(1, maxIntFloat, Types.TINYINT);
@@ -1223,8 +1230,6 @@ public class PreparedStatementTest extends BaseTest4 {
     pstmt.setString(1, "1 week");
     try {
       pstmt.executeUpdate();
-      assertTrue("When using extended protocol, interval vs character varying type mismatch error is expected",
-          preferQueryMode == PreferQueryMode.SIMPLE);
     } catch (SQLException sqle) {
       // ERROR: column "i" is of type interval but expression is of type character varying
     }
@@ -1326,7 +1331,6 @@ public class PreparedStatementTest extends BaseTest4 {
     Assume.assumeTrue("simple protocol only does not support prepared statement requests",
         preferQueryMode != PreferQueryMode.SIMPLE);
 
-    con.setAutoCommit(false);
     PreparedStatement pstmt = null;
     ResultSet rs = null;
     try {
