@@ -118,6 +118,11 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
    */
   int QUERY_EXECUTE_AS_SIMPLE = 1024;
 
+  /**
+   * Execute the query and bypass the client logic
+   * Added to support queries coming from client logic (c++) and avoid a loop back
+   */
+  int QUERY_EXECUTE_BYPASS_CLIENT_LOGIC = 2048;
   
   /**
    * Execute several Query, passing results to a provided ResultHandler.
@@ -489,4 +494,6 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
   String getSocketAddress();
 
   void setGaussdbVersion(String gaussdbVersion);
+
+  void setAvailability(boolean availability);
 }

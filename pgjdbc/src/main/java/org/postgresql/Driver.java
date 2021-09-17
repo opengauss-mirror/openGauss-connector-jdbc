@@ -5,6 +5,7 @@
 
 package org.postgresql;
 
+import org.postgresql.clusterchooser.GlobalClusterStatusTracker;
 import org.postgresql.hostchooser.MultiHostChooser;
 import org.postgresql.jdbc.PgConnection;
 import org.postgresql.log.Logger;
@@ -291,6 +292,13 @@ public class Driver implements java.sql.Driver {
         LOGGER = Logger.getLogger("org.postgresql.Driver");
     }
 
+    if(PGProperty.PRIORITY_SERVERS.get(props) != null){
+      if(!GlobalClusterStatusTracker.isVaildPriorityServers(props)){
+        return null;
+      }
+      GlobalClusterStatusTracker.refreshProperties(props);
+    }
+
     if (MultiHostChooser.isUsingAutoLoadBalance(props)) {
       if(!MultiHostChooser.isVaildPriorityLoadBalance(props)){
         return null;
@@ -525,6 +533,7 @@ public class Driver implements java.sql.Driver {
    */
   private static Connection makeConnection(String url, Properties props) throws SQLException {
       PgConnection pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props, url);
+      GlobalConnectionTracker.possessConnectionReference(pgConnection.getQueryExecutor(), props);
       return pgConnection;
   }
 
@@ -722,7 +731,9 @@ public class Driver implements java.sql.Driver {
                 urlProps.setProperty(token.substring(0, l_pos), URLCoder.decode(token.substring(l_pos + 1)));
             }
         }
-
+        if(urlProps.getProperty("enable_ce") != null && urlProps.getProperty("enable_ce").equals("1")) {
+          urlProps.setProperty("CLIENTLOGIC", "1");
+        }
         return urlProps;
     }else {
         StringBuffer tmp = new StringBuffer();
@@ -860,6 +871,9 @@ public class Driver implements java.sql.Driver {
         }
         if(urlProps.getProperty("ssl") == null && urlProps.getProperty("sslmode") == null) {
             urlProps.setProperty("sslmode", "require");
+        }
+        if(urlProps.getProperty("enable_ce") != null && urlProps.getProperty("enable_ce").equals("1")) {
+          urlProps.setProperty("CLIENTLOGIC", "1");
         }
         return urlProps;
     }

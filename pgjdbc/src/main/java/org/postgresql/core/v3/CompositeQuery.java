@@ -53,6 +53,11 @@ class CompositeQuery implements Query {
   }
 
   @Override
+  public void replaceNativeSqlForClientLogic(String sql) {
+     // Empty Implementation for Composite Query
+  }
+
+  @Override
   public SqlCommand getSqlCommand() {
     return null;
   }

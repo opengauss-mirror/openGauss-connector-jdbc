@@ -144,7 +144,13 @@ public class QueryCNListUtils {
             checkLatestUpdate = cnList.lastUpdated;
         }
         ArrayList<HostSpec> cnListRefreshed = new ArrayList<>();
-        String query = "select node_host,node_port from pgxc_node where node_type='C' and nodeis_active = true;";
+        Boolean usingEip = PGProperty.USING_EIP.getBoolean(info);
+        String query;
+        if (usingEip) {
+            query = "select node_host1,node_port1 from pgxc_node where node_type='C' and nodeis_active = true order by node_host1;";
+        } else {
+            query = "select node_host,node_port from pgxc_node where node_type='C' and nodeis_active = true order by node_host;";
+        }
         List<byte[][]> results = SetupQueryRunner.runForList(queryExecutor, query, true);
         for (byte[][] result : results) {
             String host = queryExecutor.getEncoding().decode(result[0]);

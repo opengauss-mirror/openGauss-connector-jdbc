@@ -146,8 +146,16 @@ public class MultiHostChooser implements HostChooser {
    */
   private List<HostSpec> priorityRoundRobin(List<HostSpec> hostSpecs) {
     // Obtains the URL CN Host List.
-    List<HostSpec> urlHostSpecs = Arrays.asList(Driver.getURLHostSpecs(info));
+    List<HostSpec> urlHostSpecs;
     int priorityCNNumber = Integer.parseInt(info.getProperty("autoBalance").substring("priority".length()));
+    if(PGProperty.PRIORITY_SERVERS.get(info) != null){
+      urlHostSpecs = getUrlHostSpecs(hostSpecs);
+      if(priorityCNNumber > urlHostSpecs.size()){
+        priorityCNNumber = urlHostSpecs.size();
+      }
+    }else{
+      urlHostSpecs = Arrays.asList(Driver.getURLHostSpecs(info));
+    }
     // Obtain the currently active CN node that is in the priority state.
     List<HostSpec> priorityURLHostSpecs = getSurvivalPriorityURLHostSpecs(hostSpecs, urlHostSpecs, priorityCNNumber);
     List<HostSpec> nonPriorityHostSpecs = getNonPriorityHostSpecs(hostSpecs, priorityURLHostSpecs);
@@ -158,6 +166,20 @@ public class MultiHostChooser implements HostChooser {
       return resultHostSpecs;
     } else {
       return roundRobin(hostSpecs);
+    }
+  }
+
+  // Get the URL string of the current cluster when using disaster recovery switching
+  private List<HostSpec> getUrlHostSpecs(List<HostSpec> hostSpecs){
+    HostSpec[] urlHostSpecs = Driver.getURLHostSpecs(info);
+    Integer index = Integer.valueOf(PGProperty.PRIORITY_SERVERS.get(info));
+    HostSpec[] imaginaryMasterHostSpec = Arrays.copyOfRange(urlHostSpecs, 0, index);
+    HostSpec[] imaginarySlaveHostSpec = Arrays.copyOfRange(urlHostSpecs, index, urlHostSpecs.length);
+    HostSpec[] currentHostSpecs = hostSpecs.toArray(new HostSpec[0]);
+    if(Arrays.toString(currentHostSpecs).contains(imaginaryMasterHostSpec[0].toString())){
+      return Arrays.asList(imaginaryMasterHostSpec);
+    }else{
+      return Arrays.asList(imaginarySlaveHostSpec);
     }
   }
 

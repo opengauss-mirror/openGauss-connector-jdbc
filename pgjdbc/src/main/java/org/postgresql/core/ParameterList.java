@@ -104,6 +104,31 @@ public interface ParameterList {
   void setBytea(int index, byte[] data, int offset, int length) throws SQLException;
 
   /**
+   * Saves the literal value of the parameter,
+   * so when using binaryTransfer=true client logic can see the string value and pass it to the back-end
+   * @param index
+   * @param value
+   */
+  void saveLiteralValueForClientLogic(int index, String value) throws SQLException;
+  /**
+   * Similar to setBytea
+   * Binds a client logic value with a custom oid
+   * @param index the 1-based parameter index to bind.
+   * @param data an array containing the raw data value
+   * @param offset the offset within <code>data</code> of the start of the parameter data.
+   * @param length the number of bytes of parameter data within <code>data</code> to use.
+   * @param customOid custom oid value as recognized by the server
+   * @throws SQLException on error or if <code>index</code> is out of range
+   */
+  void setClientLogicBytea(int index, byte[] data, int offset, int length, int customOid) throws SQLException;
+
+  /**
+   *
+   * @return the literal values of the parameter saved for client logic in case of binary mode
+   */
+  String[] getLiteralValues();
+
+  /**
    * Binds a binary bytea value stored as an InputStream. The parameter's type is implicitly set to
    * 'bytea'. The stream should remain valid until query execution has completed.
    *

@@ -17,6 +17,7 @@ import org.junit.runners.Suite.SuiteClasses;
     PreparedStatementTest.class,
     Jdbc42CallableStatementTest.class,
     GetObject310InfinityTests.class,
+    LargeCountJdbc42Test.class,
     SetObject310Test.class})
 public class Jdbc42TestSuite {
 

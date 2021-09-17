@@ -28,31 +28,33 @@ import java.util.List;
  * Internal class, it is not a part of public API.
  */
 public class BatchResultHandler extends ResultHandlerBase {
-  private PgStatement pgStatement;
+
+  private final PgStatement pgStatement;
   private int resultIndex = 0;
 
   private final Query[] queries;
-  private final int[] updateCounts;
+  private final long[] longUpdateCounts;
   private final ParameterList[] parameterLists;
   private final boolean expectGeneratedKeys;
   private PgResultSet generatedKeys;
   private int committedRows; // 0 means no rows committed. 1 means row 0 was committed, and so on
-  private List<List<byte[][]>> allGeneratedRows;
+  private final List<List<byte[][]>> allGeneratedRows;
   private List<byte[][]> latestGeneratedRows;
   private PgResultSet latestGeneratedKeysRs;
 
   BatchResultHandler(PgStatement pgStatement, Query[] queries, ParameterList[] parameterLists,
-      boolean expectGeneratedKeys) {
+                     boolean expectGeneratedKeys) {
     this.pgStatement = pgStatement;
     this.queries = queries;
     this.parameterLists = parameterLists;
-    this.updateCounts = new int[queries.length];
+    this.longUpdateCounts = new long[queries.length];
     this.expectGeneratedKeys = expectGeneratedKeys;
     this.allGeneratedRows = !expectGeneratedKeys ? null : new ArrayList<List<byte[][]>>();
   }
 
+  @Override
   public void handleResultRows(Query fromQuery, Field[] fields, List<byte[][]> tuples,
-      ResultCursor cursor) {
+                               ResultCursor cursor) {
     // If SELECT, then handleCommandStatus call would just be missing
     resultIndex++;
     if (!expectGeneratedKeys) {
@@ -63,8 +65,7 @@ public class BatchResultHandler extends ResultHandlerBase {
       try {
         // If SELECT, the resulting ResultSet is not valid
         // Thus it is up to handleCommandStatus to decide if resultSet is good enough
-        latestGeneratedKeysRs =
-            (PgResultSet) pgStatement.createResultSet(fromQuery, fields,
+        latestGeneratedKeysRs = (PgResultSet) pgStatement.createResultSet(fromQuery, fields,
                 new ArrayList<byte[][]>(), cursor);
       } catch (SQLException e) {
         handleError(e);
@@ -73,7 +74,8 @@ public class BatchResultHandler extends ResultHandlerBase {
     latestGeneratedRows = tuples;
   }
 
-  public void handleCommandStatus(String status, int updateCount, long insertOID) {
+  @Override
+  public void handleCommandStatus(String status, long updateCount, long insertOID) {
     if (latestGeneratedRows != null) {
       // We have DML. Decrease resultIndex that was just increased in handleResultRows
       resultIndex--;
@@ -90,12 +92,12 @@ public class BatchResultHandler extends ResultHandlerBase {
 
     if (resultIndex >= queries.length) {
       handleError(new PSQLException(GT.tr("Too many update results were returned."),
-          PSQLState.TOO_MANY_RESULTS));
+              PSQLState.TOO_MANY_RESULTS));
       return;
     }
     latestGeneratedKeysRs = null;
 
-    updateCounts[resultIndex++] = updateCount;
+    longUpdateCounts[resultIndex++] = updateCount;
   }
 
   private boolean isAutoCommit() {
@@ -125,6 +127,7 @@ public class BatchResultHandler extends ResultHandlerBase {
     allGeneratedRows.clear();
   }
 
+  @Override
   public void handleWarning(SQLWarning warning) {
     pgStatement.addWarning(warning);
   }
@@ -132,7 +135,7 @@ public class BatchResultHandler extends ResultHandlerBase {
   @Override
   public void handleError(SQLException newError) {
     if (getException() == null) {
-      Arrays.fill(updateCounts, committedRows, updateCounts.length, Statement.EXECUTE_FAILED);
+      Arrays.fill(longUpdateCounts, committedRows, longUpdateCounts.length, Statement.EXECUTE_FAILED);
       if (allGeneratedRows != null) {
         allGeneratedRows.clear();
       }
@@ -142,11 +145,12 @@ public class BatchResultHandler extends ResultHandlerBase {
         queryString = queries[resultIndex].toString(parameterLists[resultIndex]);
       }
 
-      BatchUpdateException batchException = new BatchUpdateException(
-          GT.tr("Batch entry {0} {1} was aborted: {2}  Call getNextException to see other errors in the batch.",
-              resultIndex, queryString, newError.getMessage()),
-          newError.getSQLState(), uncompressUpdateCount());
-      batchException.initCause(newError);
+      BatchUpdateException batchException;
+      batchException = new BatchUpdateException(
+              GT.tr("Batch entry {0} {1} was aborted: {2}  Call getNextException to see other errors in the batch.",
+                      resultIndex, queryString, newError.getMessage()),
+              newError.getSQLState(), 0, uncompressLongUpdateCount(), newError);
+
       super.handleError(batchException);
     }
     resultIndex++;
@@ -154,18 +158,21 @@ public class BatchResultHandler extends ResultHandlerBase {
     super.handleError(newError);
   }
 
+  @Override
   public void handleCompletion() throws SQLException {
     updateGeneratedKeys();
     SQLException batchException = getException();
     if (batchException != null) {
       if (isAutoCommit()) {
         // Re-create batch exception since rows after exception might indeed succeed.
-        BatchUpdateException newException = new BatchUpdateException(
-            batchException.getMessage(),
-            batchException.getSQLState(),
-            uncompressUpdateCount()
+        BatchUpdateException newException;
+        newException = new BatchUpdateException(
+                batchException.getMessage(),
+                batchException.getSQLState(), 0,
+                uncompressLongUpdateCount(),
+                batchException.getCause()
         );
-        newException.initCause(batchException.getCause());
+
         SQLException next = batchException.getNextException();
         if (next != null) {
           newException.setNextException(next);
@@ -181,8 +188,21 @@ public class BatchResultHandler extends ResultHandlerBase {
   }
 
   private int[] uncompressUpdateCount() {
+    long[] original = uncompressLongUpdateCount();
+    int[] copy = new int[original.length];
+    for (int i = 0; i < original.length; i++) {
+      copy[i] = original[i] > Integer.MAX_VALUE ? Statement.SUCCESS_NO_INFO : (int) original[i];
+    }
+    return copy;
+  }
+
+  public int[] getUpdateCount() {
+    return uncompressUpdateCount();
+  }
+
+  private long[] uncompressLongUpdateCount() {
     if (!(queries[0] instanceof BatchedQuery)) {
-      return updateCounts;
+      return longUpdateCounts;
     }
     int totalRows = 0;
     boolean hasRewrites = false;
@@ -192,7 +212,7 @@ public class BatchResultHandler extends ResultHandlerBase {
       hasRewrites |= batchSize > 1;
     }
     if (!hasRewrites) {
-      return updateCounts;
+      return longUpdateCounts;
     }
 
     /* In this situation there is a batch that has been rewritten. Substitute
@@ -200,12 +220,12 @@ public class BatchResultHandler extends ResultHandlerBase {
      * indicate successful completion for each row the driver client added
      * to the batch.
      */
-    int[] newUpdateCounts = new int[totalRows];
+    long[] newUpdateCounts = new long[totalRows];
     int offset = 0;
     for (int i = 0; i < queries.length; i++) {
       Query query = queries[i];
       int batchSize = query.getBatchSize();
-      int superBatchResult = updateCounts[i];
+      long superBatchResult = longUpdateCounts[i];
       if (batchSize == 1) {
         newUpdateCounts[offset++] = superBatchResult;
         continue;
@@ -221,7 +241,7 @@ public class BatchResultHandler extends ResultHandlerBase {
     return newUpdateCounts;
   }
 
-  public int[] getUpdateCount() {
-    return uncompressUpdateCount();
+  public long[] getLargeUpdateCount() {
+    return uncompressLongUpdateCount();
   }
 }

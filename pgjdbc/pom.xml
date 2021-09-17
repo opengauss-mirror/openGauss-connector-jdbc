@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8" ?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.opengauss</groupId>
@@ -30,11 +31,6 @@
   </properties>
 
   <dependencies>
-   <dependency>
-    <groupId>org.slf4j</groupId>
-    <artifactId>slf4j-api</artifactId>
-    <version>1.7.30</version>
-</dependency>
 <dependency>
 	<groupId>com.huawei</groupId>
 	 <artifactId>demo-0.0.1-SNAPSHOT</artifactId>
@@ -132,6 +128,12 @@
               <testExcludes>
                 <exclude>org.postgresql/test/sspi/*.java</exclude>
               </testExcludes>
+              <source>1.8</source>
+              <target>1.8</target>
+              <showWarnings>true</showWarnings>
+              <compilerArgs>
+                <arg>-Xlint:all</arg>
+              </compilerArgs>
             </configuration>
           </plugin>
         </plugins>
@@ -160,6 +162,12 @@
                 <exclude>**/PGDataSourceFactoryTest.java</exclude>
                 <exclude>**/OsgiTestSuite.java</exclude>
               </testExcludes>
+              <source>1.8</source>
+              <target>1.8</target>
+              <showWarnings>true</showWarnings>
+              <compilerArgs>
+                <arg>-Xlint:all</arg>
+              </compilerArgs>
             </configuration>
           </plugin>
           <plugin>
@@ -264,12 +272,6 @@
               </excludes>
             </filter>
             <filter>
-              <artifact>org.slf4j:jcl-over-slf4j</artifact>
-              <excludes>
-                <exclude>**</exclude>
-              </excludes>
-            </filter>
-            <filter>
               <artifact>*:*</artifact>
               <excludes>
                 <exclude>com/sun/jna/**</exclude>
@@ -334,12 +336,25 @@
           <configuration>
             <source>1.8</source>
             <target>1.8</target>
+            <showWarnings>true</showWarnings>
+            <compilerArgs>
+              <arg>-Xlint:all</arg>
+            </compilerArgs>
           </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
   </build>
-
+  <distributionManagement>
+    <repository>
+      <id>ClouldArtifact-central</id>
+      <url>http://cmc.centralrepo.rnd.huawei.com/maven/</url>
+    </repository>
+    <snapshotRepository>
+      <id>ClouldArtifact-central</id>
+      <url>http://cmc.centralrepo.rnd.huawei.com/maven/</url>
+    </snapshotRepository>
+  </distributionManagement>
   <scm>
     <tag>REL42.2.5</tag>
   </scm>

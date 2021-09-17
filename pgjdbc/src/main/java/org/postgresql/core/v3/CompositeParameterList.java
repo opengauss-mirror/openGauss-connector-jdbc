@@ -92,6 +92,21 @@ class CompositeParameterList implements V3ParameterList {
     subparams[sub].setBinaryParameter(index - offsets[sub], value, oid);
   }
 
+  @Override
+  public String[] getLiteralValues() {
+    return new String[]{};
+  }
+
+  @Override
+  public void saveLiteralValueForClientLogic(int index, String value) throws SQLException {
+    throw new SQLException("saveLiteralValueForClientLogic is not supported");
+  }
+
+  @Override
+  public void setClientLogicBytea(int index, byte[] data, int offset, int length, int customOid) throws SQLException {
+    throw new SQLException("setClientLogicBytea is not supported");
+  }
+
   public void setBytea(int index, byte[] data, int offset, int length) throws SQLException {
     int sub = findSubParam(index);
     subparams[sub].setBytea(index - offsets[sub], data, offset, length);

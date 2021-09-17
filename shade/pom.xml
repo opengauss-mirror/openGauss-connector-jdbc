@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8" ?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -29,7 +30,7 @@
 		<dependency>
 			<groupId>com.alibaba</groupId>
 			<artifactId>fastjson</artifactId>
-			<version>1.2.70</version>
+			<version>1.2.75</version>
 		</dependency>
 		<dependency>
 			<groupId>joda-time</groupId>
@@ -61,6 +62,11 @@
                     <artifactId>bcprov-jdk15on</artifactId>
                     <version>1.68</version>
                 </dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.7.30</version>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
@@ -79,6 +85,10 @@
 						</goals>
 						<configuration>
 							<relocations>
+								<relocation>
+									<pattern>org.slf4j</pattern>
+									<shadedPattern>com.huawei.shade.org.slf4j</shadedPattern>
+								</relocation>
 								<relocation>
 									<pattern>org.apache</pattern>
 									<shadedPattern>com.huawei.shade.org.apache</shadedPattern>
@@ -105,6 +115,13 @@
                                                                 </relocation>
 							</relocations>
 							<filters>
+								<filter>
+									<artifact>org.slf4j:*</artifact>
+									<excludes>
+										<exclude>META-INF/LICENSE.txt</exclude>
+										<exclude>META-INF/NOTICE.txt</exclude>
+									</excludes>
+								</filter>
 								<filter>
 									<artifact>org.apache.httpcomponents:*</artifact>
 									<excludes>

@@ -138,6 +138,9 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
             callResult[j] = typeCompatibility.convert(callResult[j]);
           }
         }
+        else if ( columnType == Types.BLOB && functionReturnType[j] == Types.OTHER )
+        {
+        }
         else {
           throw new PSQLException(GT.tr(
               "A CallableStatement function was executed and the out parameter {0} was of type {1} however type {2} was registered.",
@@ -195,6 +198,9 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
         break;
       case Types.BOOLEAN:
         sqlType = Types.BIT;
+        break;
+      case Types.NCHAR:
+        sqlType = Types.CHAR;
         break;
       default:
         break;
@@ -489,10 +495,11 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
   }
 
   public Clob getClob(int i) throws SQLException {
-  	Clob clob =  new PGClob();
-  	clob.setString(1, getString(i));
-  	return clob;
-
+    PGClob pgClob = (PGClob) callResult[i-1];
+    String str = pgClob.getSubString(1, (int) pgClob.length());
+    Clob clob = new PGClob();
+    clob.setString(1, str);
+    return clob;
   }
 
   public Object getObjectImpl(int i, Map<String, Class<?>> map) throws SQLException {
@@ -659,7 +666,7 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
   }
 
   public String getNString(int parameterIndex) throws SQLException {
-    throw Driver.notImplemented(this.getClass(), "getNString(int)");
+    return this.getString(parameterIndex);
   }
 
   public String getNString(String parameterName) throws SQLException {

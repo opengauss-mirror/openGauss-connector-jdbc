@@ -91,6 +91,20 @@ public class PgConnection implements BaseConnection {
 
   private static final SQLPermission SQL_PERMISSION_ABORT = new SQLPermission("callAbort");
   private static final SQLPermission SQL_PERMISSION_NETWORK_TIMEOUT = new SQLPermission("setNetworkTimeout");
+  private static final Map<String,String> CONNECTION_INFO_REPORT_BLACK_LIST;
+  static {
+      CONNECTION_INFO_REPORT_BLACK_LIST = new HashMap<>();
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("user","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("sslcert","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("password","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("sslkey","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("sslpassword","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("PGHOSTURL","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("PGPORTURL","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("PGPORT","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("PGHOST","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("PGDBNAME","");
+  }
 
   //
   // Data initialized on construction:
@@ -109,6 +123,8 @@ public class PgConnection implements BaseConnection {
   private final Query commitQuery;
   /* Query that runs ROLLBACK */
   private final Query rollbackQuery;
+
+  private ClientLogic clientLogic = null;
 
   private final TypeInfo _typeCache;
 
@@ -242,8 +258,7 @@ public class PgConnection implements BaseConnection {
     if (LOGGER.isWarnEnabled() && !haveMinimumServerVersion(ServerVersion.v8_2)) {
       LOGGER.warn("Unsupported Server Version: " + queryExecutor.getServerVersion());
     }
-
-
+    
     Set<Integer> binaryOids = getBinaryOids(info);
     // split for receive and send for better control
     Set<Integer> useBinarySendForOids = new HashSet<Integer>(binaryOids);
@@ -307,6 +322,8 @@ public class PgConnection implements BaseConnection {
       _typeCache.addCoreType("uuid", Oid.UUID, Types.OTHER, "java.util.UUID", Oid.UUID_ARRAY);
       _typeCache.addCoreType("xml", Oid.XML, Types.SQLXML, "java.sql.SQLXML", Oid.XML_ARRAY);
     }
+    _typeCache.addCoreType("clob", Oid.CLOB, Types.CLOB, "java.sql.CLOB", Oid.UNSPECIFIED);
+    _typeCache.addCoreType("blob", Oid.BLOB, Types.BLOB, "java.sql.BLOB", Oid.UNSPECIFIED);
 
     this._clientInfo = new Properties();
     if (haveMinimumServerVersion(ServerVersion.v9_0)) {
@@ -336,7 +353,7 @@ public class PgConnection implements BaseConnection {
     Statement stmtGetGuc = null;
     ResultSet rsGetGuc = null;
     Statement stmtSetGuc = null;
-
+    
     try {
         String connectionExtraInfo = info.getProperty("connectionExtraInfo");
 
@@ -355,7 +372,7 @@ public class PgConnection implements BaseConnection {
 
         // Done to scan all GUC results here, and begin to do some initialization.
         if (useConnectionInfo) {
-            String connectionInfo = getConnectionInfo(useConnectionExtraInfo);
+            String connectionInfo = getConnectionInfo(useConnectionExtraInfo, info);
             String setConnectionInfoSql = "set connection_info = '" + connectionInfo.replace("'", "''") + "'";
             if (!setConnectionInfoSql.contains(";")) {
                 stmtSetGuc = createStatement();
@@ -425,7 +442,44 @@ public class PgConnection implements BaseConnection {
         LOGGER.trace("WARNING, unrecognized batchmode type");
         batchInsert = false;
     }
+    
+    initClientLogic(info);
+  }
 
+  /**
+   * Link the client logic JNI
+   * @param info connection settings
+   * @throws SQLException
+   */
+  private void initClientLogic(Properties info) throws SQLException {
+    //Connecting the Client Logic so
+    if (PGProperty.PG_CLIENT_LOGIC.get(info) != null && PGProperty.PG_CLIENT_LOGIC.get(info).equals("1")) {
+      String autoBalance = info.getProperty("autoBalance");
+      String targetType = info.getProperty("targetServerType");
+      if ((autoBalance != null && !autoBalance.equals("false")) || (targetType != null)) {
+        LOGGER.error("[client encryption] Failed connecting to client logic as autobalance or targetType is set");
+        clientLogic = null;
+        throw new PSQLException(
+           GT.tr("Failed connecting to client logic"),
+           PSQLState.INVALID_PARAMETER_VALUE);
+      }
+    	LOGGER.trace("Initiating client logic");
+      try {
+      	clientLogic = new ClientLogic();
+    		String databaseName = PGProperty.PG_DBNAME.get(info);
+    		clientLogic.linkClientLogic(databaseName, this);
+      } 
+      catch (ClientLogicException e) {
+      	clientLogic = null;
+      	LOGGER.error("Failed connecting to client logic");
+        throw new PSQLException(
+            GT.tr("Failed connecting to client logic" + e.getMessage()),
+            PSQLState.INVALID_PARAMETER_VALUE);
+      }
+    }
+    else {
+    	LOGGER.trace("Client logic is off");
+    }
   }
 
   private static Set<Integer> getBinaryOids(Properties info) throws PSQLException {
@@ -486,30 +540,63 @@ public class PgConnection implements BaseConnection {
     return sb.toString();
   }
 
-    private String getConnectionInfo(boolean withExtraInfo) {
+    private String getConnectionInfo(boolean withExtraInfo, Properties info) {
         String connectionInfo = "";
         String gsVersion = null;
         String driverPath = null;
         String OSUser = null;
-        try {
-            gsVersion = Driver.getGSVersion();
-            if (withExtraInfo) {
-                OSUser = System.getProperty("user.name");
+        String urlConfiguration = null;
+        gsVersion = Driver.getGSVersion();
+        if (withExtraInfo) {
+            OSUser = System.getProperty("user.name");
+            try {
                 File jarDir = new File(Driver.class.getProtectionDomain().getCodeSource().getLocation().toURI());
                 driverPath = jarDir.getCanonicalPath();
+            } catch (URISyntaxException | IOException | IllegalArgumentException e) {
+                driverPath = "";
+                LOGGER.trace("Failed to make connection_info as there is an exception: " + e.getMessage());
             }
-            connectionInfo = "{" + "\"driver_name\":\"JDBC\"," + "\"driver_version\":\""
-                    + gsVersion.replace("\"", "\\\"") + "\"";
-            if (withExtraInfo && driverPath != null) {
-                connectionInfo += ",\"driver_path\":\"" + driverPath.replace("\\", "\\\\").replace("\"", "\\\"") + "\","
-                        + "\"os_user\":\"" + OSUser.replace("\"", "\\\"") + "\"";
-            }
-            connectionInfo += "}";
-            return connectionInfo;
-        } catch (URISyntaxException | IOException e) {
-            LOGGER.trace("Failed to make connection_info as there is an exception: " + e.getMessage());
+            urlConfiguration = reassembleUrl(info);
         }
-        return "";
+        connectionInfo = "{" + "\"driver_name\":\"JDBC\"," + "\"driver_version\":\""
+                + gsVersion.replace("\"", "\\\"") + "\"";
+        if (withExtraInfo && driverPath != null) {
+            connectionInfo += ",\"driver_path\":\"" + driverPath.replace("\\", "\\\\").replace("\"", "\\\"") + "\","
+                    + "\"os_user\":\"" + OSUser.replace("\"", "\\\"") + "\","
+                    + "\"urlConfiguration\":\"" + urlConfiguration.replace("\"", "\\\"") + "\"";
+
+        }
+        connectionInfo += "}";
+        return connectionInfo;
+    }
+
+    private String reassembleUrl(Properties info) {
+        StringBuffer urlConfiguration = new StringBuffer();
+        if (creatingURL.startsWith("jdbc:postgresql:")) {
+            urlConfiguration.append("jdbc:postgresql://");
+        } else if (creatingURL.startsWith("jdbc:dws:iam:")) {
+            urlConfiguration.append("jdbc:dws:iam://");
+        } else if (creatingURL.startsWith("jdbc:opengauss:")) {
+            urlConfiguration.append("jdbc:opengauss://");
+        } else {
+            urlConfiguration.append("jdbc:gaussdb://");
+        }
+
+        String[] ports = info.getProperty("PGPORTURL").split(",");
+        String[] hosts = info.getProperty("PGHOSTURL").split(",", ports.length);
+        for (int i = 0; i < hosts.length; ++i) {
+            urlConfiguration.append(hosts[i] + ":" + ports[i] + ",");
+        }
+        urlConfiguration.deleteCharAt(urlConfiguration.length() - 1);
+
+        urlConfiguration.append("/" + info.getProperty("PGDBNAME") + "?");
+        for (String propertyName : info.stringPropertyNames()) {
+            if(CONNECTION_INFO_REPORT_BLACK_LIST.get(propertyName) == null){
+                urlConfiguration.append(propertyName+"="+info.getProperty(propertyName)+"&");
+            }
+        }
+        urlConfiguration.deleteCharAt(urlConfiguration.length() - 1);
+        return urlConfiguration.toString();
     }
   private final TimestampUtils timestampUtils;
 
@@ -812,6 +899,14 @@ public class PgConnection implements BaseConnection {
     }
   }
 
+    @Override
+    /**
+     * Returns reffrence to the client logic object, if the feature is off null is returned
+     */
+    public ClientLogic getClientLogic() {
+        return clientLogic;
+    }
+
   /**
    * <B>Note:</B> even though {@code Statement} is automatically closed when it is garbage
    * collected, it is better to close it explicitly to lower resource consumption.
@@ -820,6 +915,10 @@ public class PgConnection implements BaseConnection {
    */
   @Override
   public void close() throws SQLException {
+    if (clientLogic != null) {
+      clientLogic.close();
+      clientLogic = null;
+    }
     if (queryExecutor == null) {
       // This might happen in case constructor throws an exception (e.g. host being not available).
       // When that happens the connection is still registered in the finalizer queue, so it gets finalized

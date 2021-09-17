@@ -149,11 +149,82 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     this.statement = statement;
     this.fields = fields;
     this.rows = tuples;
+    clientLogicGetData();
     this.cursor = cursor;
     this.maxRows = maxRows;
     this.maxFieldSize = maxFieldSize;
     this.resultsettype = rsType;
     this.resultsetconcurrency = rsConcurrency;
+  }
+
+  private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
+  /**
+   * helper function for clientLogicGetData when the client logic data received as binary
+   * @param bytes bytes
+   * @return hexadecimal presentation of the binary data
+   */
+  public static String bytesArrayToHexString(byte[] bytes) {
+    char[] hexCharArray = new char[bytes.length * 2];
+    for (int i = 0; i < bytes.length; i++) {
+      int val = bytes[i] & 0xFF;
+      hexCharArray[i * 2] = HEX_ARRAY[val >>> 4];
+      hexCharArray[i * 2 + 1] = HEX_ARRAY[val & 0x0F];
+    }
+    return new String(hexCharArray);
+  }
+
+  /**
+   * This method is used to transform data that is client logic from client logic back to user input format
+   */
+  private void clientLogicGetData() {
+    ClientLogic clientLogic = connection.getClientLogic();
+    // if client logic is off, no need to progress
+    if (clientLogic == null) {
+      return;
+    }
+    Encoding encoding = null;
+    try {
+      encoding = connection.getEncoding();
+    } catch (SQLException e1) {
+      // If we cannot get the encoding object, cannot move on.
+      connection.getLogger().error("client logic failed - could not get connection encoding");
+      return;
+    }
+    int fieldIndex = 0;
+    // Loop thru the list of fields
+    for (Field field : this.fields) {
+      if (ClientLogic.isClientLogicField(field.getOID())) {
+        for (int rowIndex = 0; rowIndex < rows.size(); ++rowIndex) {
+          try {
+            if (rows.get(rowIndex)[fieldIndex] != null) {
+              String clientLogicValue = "";
+              // The client logic fields may arrive as binary or as UTF-8.
+              // Need to find out what is it and act accordingly
+              if (field.getFormat() == Field.BINARY_FORMAT) {
+                clientLogicValue = "\\x" + bytesArrayToHexString(rows.get(rowIndex)[fieldIndex]);
+              } else {
+                clientLogicValue = encoding.decode(rows.get(rowIndex)[fieldIndex]);
+              }
+              String userInputValue = "";
+              try {
+                userInputValue = clientLogic.runClientLogic(clientLogicValue, field.getMod());
+                // Encode the data back the same way, so the field is now not binary
+              }
+              catch (ClientLogicException e) {
+                connection.getLogger().error("client logic failed for field:" + field.getColumnLabel() +
+                        ", value: " + clientLogicValue + " Error:" +
+                        e.getErrorCode() + ":" + e.getErrorText());
+              }
+              rows.get(rowIndex)[fieldIndex] = encoding.encode(userInputValue);
+            }
+          }
+          catch (IOException e) {
+            connection.getLogger().error("client logic failed encoding on IOException for field:" + field.getColumnLabel());
+          }
+        }
+      }
+      ++fieldIndex;
+    }
   }
 
   public java.net.URL getURL(int columnIndex) throws SQLException {
@@ -1812,17 +1883,21 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
   public class CursorResultHandler extends ResultHandlerBase {
 
+    @Override
     public void handleResultRows(Query fromQuery, Field[] fields, List<byte[][]> tuples,
         ResultCursor cursor) {
       PgResultSet.this.rows = tuples;
+      PgResultSet.this.clientLogicGetData();//for client logic case, need to run pre-process
       PgResultSet.this.cursor = cursor;
     }
 
-    public void handleCommandStatus(String status, int updateCount, long insertOID) {
+    @Override
+    public void handleCommandStatus(String status, long updateCount, long insertOID) {
       handleError(new PSQLException(GT.tr("Unexpected command status: {0}.", status),
           PSQLState.PROTOCOL_VIOLATION));
     }
 
+    @Override
     public void handleCompletion() throws SQLException {
       SQLWarning warning = getWarning();
       if (warning != null) {
@@ -2854,6 +2929,10 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
    * @return True if the column is in binary format.
    */
   protected boolean isBinary(int column) {
+    ClientLogic clientLogic = connection.getClientLogic();
+    if (clientLogic != null && ClientLogic.isClientLogicField(fields[column - 1].getOID())) {
+      return false;//Even it is received as binary is it encoded in clientLogicGetData
+    }
     return fields[column - 1].getFormat() == Field.BINARY_FORMAT;
   }
 
@@ -3621,8 +3700,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public String getNString(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getNString columnIndex: " + columnIndex);
-    throw org.postgresql.Driver.notImplemented(this.getClass(), "getNString(int)");
+    return this.getString(columnIndex);
   }
 
   public String getNString(String columnName) throws SQLException {

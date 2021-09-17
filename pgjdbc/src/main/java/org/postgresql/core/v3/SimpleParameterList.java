@@ -43,6 +43,7 @@ class SimpleParameterList implements V3ParameterList {
   private static final byte BINARY = 4;
 
   SimpleParameterList(int paramCount, TypeTransferModeRegistry transferModeRegistry) {
+    this.paramLiteralValues = new String[paramCount];
     this.paramValues = new Object[paramCount];
     this.paramTypes = new int[paramCount];
     this.encoded = new byte[paramCount][];
@@ -125,14 +126,39 @@ class SimpleParameterList implements V3ParameterList {
 
   public void setLiteralParameter(int index, String value, int oid) throws SQLException {
     bind(index, value, oid, TEXT);
+    saveLiteralValueForClientLogic(index, value);
   }
 
   public void setStringParameter(int index, String value, int oid) throws SQLException {
     bind(index, value, oid, TEXT);
+    saveLiteralValueForClientLogic(index, value);
   }
 
   public void setBinaryParameter(int index, byte[] value, int oid) throws SQLException {
     bind(index, value, oid, BINARY);
+  }
+
+  @Override
+  public void saveLiteralValueForClientLogic(int index, String value) throws SQLException {
+    if (index < 1 || index > paramValues.length) {
+      throw new PSQLException(
+              GT.tr("The column index is out of range: {0}, number of columns: {1}.",
+                      index, paramValues.length),
+              PSQLState.INVALID_PARAMETER_VALUE);
+    }
+
+    --index;
+    this.paramLiteralValues[index] = value;
+  }
+
+  @Override
+  public String[] getLiteralValues() {
+    return this.paramLiteralValues;
+  }
+
+  @Override
+  public void setClientLogicBytea(int index, byte[] data, int offset, int length, int customOid) throws SQLException {
+    bind(index, new StreamWrapper(data, offset, length), customOid, BINARY);
   }
 
   @Override
@@ -408,6 +434,7 @@ class SimpleParameterList implements V3ParameterList {
 
   public ParameterList copy() {
     SimpleParameterList newCopy = new SimpleParameterList(paramValues.length, transferModeRegistry);
+    System.arraycopy(paramLiteralValues, 0, newCopy.paramLiteralValues, 0, paramLiteralValues.length);
     System.arraycopy(paramValues, 0, newCopy.paramValues, 0, paramValues.length);
     System.arraycopy(paramTypes, 0, newCopy.paramTypes, 0, paramTypes.length);
     System.arraycopy(flags, 0, newCopy.flags, 0, flags.length);
@@ -481,6 +508,7 @@ class SimpleParameterList implements V3ParameterList {
     return ts.toString();
   }
 
+  private final String[] paramLiteralValues;
   private final Object[] paramValues;
   private final int[] paramTypes;
   private final byte[] flags;

@@ -7,6 +7,8 @@
 package org.postgresql.core.v3;
 
 import org.postgresql.PGProperty;
+import org.postgresql.clusterchooser.ClusterStatus;
+import org.postgresql.clusterchooser.GlobalClusterStatusTracker;
 import org.postgresql.core.ConnectionFactory;
 import org.postgresql.core.PGStream;
 import org.postgresql.core.QueryExecutor;
@@ -18,12 +20,7 @@ import org.postgresql.core.Version;
 import org.postgresql.hostchooser.*;
 import org.postgresql.jdbc.SslMode;
 import org.postgresql.QueryCNListUtils;
-import org.postgresql.util.GT;
-import org.postgresql.util.HostSpec;
-import org.postgresql.util.MD5Digest;
-import org.postgresql.util.PSQLException;
-import org.postgresql.util.PSQLState;
-import org.postgresql.util.ServerErrorMessage;
+import org.postgresql.util.*;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
 
@@ -159,20 +156,17 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
 
   @Override
   public QueryExecutor openConnectionImpl(HostSpec[] hostSpecs, String user, String database,
-      Properties info) throws SQLException {
-	if (info.getProperty("characterEncoding") != null)
-        {
-        	if ("UTF8".equals((info.getProperty("characterEncoding")).toUpperCase(Locale.ENGLISH)) 
-	        || "GBK".equals((info.getProperty("characterEncoding")).toUpperCase(Locale.ENGLISH)) )
-            {
-        	    setClientEncoding(info.getProperty("characterEncoding"));
-            }
-        }
-	
-	if (info.getProperty("use_boolean") != null)
-	{
-	    setUseBooleang(info.getProperty("use_boolean").toUpperCase(Locale.ENGLISH));
-	}
+                                          Properties info) throws SQLException {
+    if (info.getProperty("characterEncoding") != null) {
+      if ("UTF8".equals((info.getProperty("characterEncoding")).toUpperCase(Locale.ENGLISH))
+              || "GBK".equals((info.getProperty("characterEncoding")).toUpperCase(Locale.ENGLISH))) {
+        setClientEncoding(info.getProperty("characterEncoding"));
+      }
+    }
+
+    if (info.getProperty("use_boolean") != null) {
+      setUseBooleang(info.getProperty("use_boolean").toUpperCase(Locale.ENGLISH));
+    }
 
     SslMode sslMode = SslMode.of(info);
 
@@ -182,170 +176,217 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       targetServerType = HostRequirement.getTargetServerType(targetServerTypeStr);
     } catch (IllegalArgumentException ex) {
       throw new PSQLException(
-          GT.tr("Invalid targetServerType value: {0}", targetServerTypeStr),
-          PSQLState.CONNECTION_UNABLE_TO_CONNECT);
+              GT.tr("Invalid targetServerType value: {0}", targetServerTypeStr),
+              PSQLState.CONNECTION_UNABLE_TO_CONNECT);
     }
 
     SocketFactory socketFactory = SocketFactoryFactory.getSocketFactory(info);
 
-    HostChooser hostChooser =
-        HostChooserFactory.createHostChooser(hostSpecs, targetServerType, info);
-    Iterator<CandidateHost> hostIter = hostChooser.iterator();
-    Map<HostSpec, HostStatus> knownStates = new HashMap<HostSpec, HostStatus>();
-    while (hostIter.hasNext()) {
-      CandidateHost candidateHost = hostIter.next();
-      HostSpec hostSpec = candidateHost.hostSpec;
+    Iterator<ClusterSpec> clusterIter = GlobalClusterStatusTracker.getClusterFromHostSpecs(hostSpecs, info);
+    Map<HostSpec, HostStatus> knownStates = new HashMap<>();
+    Exception exception = new Exception();
+    while (clusterIter.hasNext()) {
+      ClusterSpec clusterSpec = clusterIter.next();
+      HostSpec[] currentHostSpecs = clusterSpec.getHostSpecs();
 
-      // Note: per-connect-attempt status map is used here instead of GlobalHostStatusTracker
-      // for the case when "no good hosts" match (e.g. all the hosts are known as "connectfail")
-      // In that case, the system tries to connect to each host in order, thus it should not look into
-      // GlobalHostStatusTracker
-      HostStatus knownStatus = knownStates.get(hostSpec);
-      if (knownStatus != null && !candidateHost.targetServerType.allowConnectingTo(knownStatus)) {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Known status of host " + hostSpec + " is " + knownStatus + ", and required status was " + candidateHost.targetServerType + ". Will try next host");
+      HostChooser hostChooser =
+              HostChooserFactory.createHostChooser(currentHostSpecs, targetServerType, info);
+      Iterator<CandidateHost> hostIter = hostChooser.iterator();
+      boolean isMasterCluster = false;
+      while (hostIter.hasNext()) {
+        CandidateHost candidateHost = hostIter.next();
+        HostSpec hostSpec = candidateHost.hostSpec;
+
+        // Note: per-connect-attempt status map is used here instead of GlobalHostStatusTracker
+        // for the case when "no good hosts" match (e.g. all the hosts are known as "connectfail")
+        // In that case, the system tries to connect to each host in order, thus it should not look into
+        // GlobalHostStatusTracker
+        HostStatus knownStatus = knownStates.get(hostSpec);
+        if (knownStatus != null && !candidateHost.targetServerType.allowConnectingTo(knownStatus)) {
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Known status of host " + hostSpec + " is " + knownStatus + ", and required status was " + candidateHost.targetServerType + ". Will try next host");
+          }
+          continue;
         }
-        continue;
-      }
 
-      //
-      // Establish a connection.
-      //
-      connectInfo = UUID.randomUUID().toString(); // this is used to trace the time taken to establish the connection.
-      LOGGER.info("[" + connectInfo + "] " + "Try to connect." + " IP: " + hostSpec.toString());
-      PGStream newStream = null;
-      try {
+        //
+        // Establish a connection.
+        //
+        connectInfo = UUID.randomUUID().toString(); // this is used to trace the time taken to establish the connection.
+        LOGGER.info("[" + connectInfo + "] " + "Try to connect." + " IP: " + hostSpec.toString());
+        PGStream newStream = null;
         try {
-          newStream = tryConnect(user, database, info, socketFactory, hostSpec, sslMode);
-        } catch (SQLException e) {
-          if (sslMode == SslMode.PREFER
-              && PSQLState.INVALID_AUTHORIZATION_SPECIFICATION.getState().equals(e.getSQLState())) {
-            // Try non-SSL connection to cover case like "non-ssl only db"
-            // Note: PREFER allows loss of encryption, so no significant harm is made
-            Throwable ex = null;
-            try {
-              newStream =
-                  tryConnect(user, database, info, socketFactory, hostSpec, SslMode.DISABLE);
-              LOGGER.debug("Downgraded to non-encrypted connection for host " + hostSpec);
-            } catch (SQLException ee) {
-              ex = ee;
-            } catch (IOException ee) {
-              ex = ee; // Can't use multi-catch in Java 6 :(
-            }
-            if (ex != null) {
-              LOGGER.debug("sslMode==PREFER, however non-SSL connection failed as well", ex);
-              // non-SSL failed as well, so re-throw original exception
-              throw e;
-            }
-          } else if (sslMode == SslMode.ALLOW
-              && PSQLState.INVALID_AUTHORIZATION_SPECIFICATION.getState().equals(e.getSQLState())) {
-            // Try using SSL
-            Throwable ex = null;
-            try {
-              newStream =
-                  tryConnect(user, database, info, socketFactory, hostSpec, SslMode.REQUIRE);
-              LOGGER.debug("Upgraded to encrypted connection for host " + 
-                  hostSpec);
-            } catch (SQLException ee) {
-              ex = ee;
-            } catch (IOException ee) {
-              ex = ee; // Can't use multi-catch in Java 6 :(
-            }
-            if (ex != null) {
-              LOGGER.debug("sslMode==ALLOW, however SSL connection failed as well", ex);
-              // non-SSL failed as well, so re-throw original exception
-              throw e;
-            }
-
-          } else {
-            throw e;
-          }
-        }
-
-        int cancelSignalTimeout = Integer.parseInt(PGProperty.CANCEL_SIGNAL_TIMEOUT.getDefaultValue());
-        if (PGProperty.CANCEL_SIGNAL_TIMEOUT.getInt(info) <= Integer.MAX_VALUE / 1000) {
-            cancelSignalTimeout = PGProperty.CANCEL_SIGNAL_TIMEOUT.getInt(info) * 1000;
-        } else {
-            LOGGER.debug("integer cancelSignalTimeout is too large, it will occur error after multiply by 1000.");
-        }
-        String socketAddress = newStream.getConnectInfo();
-        LOGGER.info("[" + socketAddress + "] " + "Connection is established. ID: " + connectInfo);
-        // Do final startup.
-        QueryExecutor queryExecutor = new QueryExecutorImpl(newStream, user, database,
-            cancelSignalTimeout, info);
-        queryExecutor.setProtocolVersion(this.protocolVerion);
-        // Check Master or Secondary
-        HostStatus hostStatus = HostStatus.ConnectOK;
-        if (candidateHost.targetServerType != HostRequirement.any) {
-          hostStatus = isMaster(queryExecutor) ? HostStatus.Master : HostStatus.Secondary;
-        }
-        GlobalHostStatusTracker.reportHostStatus(hostSpec, hostStatus);
-        knownStates.put(hostSpec, hostStatus);
-        if (!candidateHost.targetServerType.allowConnectingTo(hostStatus)) {
-          queryExecutor.close();
-          continue;
-        }
-
-        runInitialQueries(queryExecutor, info);
-        if(MultiHostChooser.isUsingAutoLoadBalance(info)){
-          QueryCNListUtils.runRereshCNListQueryies(queryExecutor,info);
-        }
-
-        String replication = PGProperty.REPLICATION.get(info);
-        if (replication == null) {
           try {
-            String gaussVersion = queryGaussdbVersion(queryExecutor);
-            queryExecutor.setGaussdbVersion(gaussVersion);
-          } catch(Exception sqlExp) {
-            LOGGER.warn("query gaussVersion failed, use default instead");
-            queryExecutor.setGaussdbVersion("");
-          }
-        }
+            newStream = tryConnect(user, database, info, socketFactory, hostSpec, sslMode);
+          } catch (SQLException e) {
+            if (sslMode == SslMode.PREFER
+                    && PSQLState.INVALID_AUTHORIZATION_SPECIFICATION.getState().equals(e.getSQLState())) {
+              // Try non-SSL connection to cover case like "non-ssl only db"
+              // Note: PREFER allows loss of encryption, so no significant harm is made
+              Throwable ex = null;
+              try {
+                newStream =
+                        tryConnect(user, database, info, socketFactory, hostSpec, SslMode.DISABLE);
+                LOGGER.debug("Downgraded to non-encrypted connection for host " + hostSpec);
+              } catch (SQLException ee) {
+                ex = ee;
+              } catch (IOException ee) {
+                ex = ee; // Can't use multi-catch in Java 6 :(
+              }
+              if (ex != null) {
+                LOGGER.debug("sslMode==PREFER, however non-SSL connection failed as well", ex);
+                // non-SSL failed as well, so re-throw original exception
+                throw e;
+              }
+            } else if (sslMode == SslMode.ALLOW
+                    && PSQLState.INVALID_AUTHORIZATION_SPECIFICATION.getState().equals(e.getSQLState())) {
+              // Try using SSL
+              Throwable ex = null;
+              try {
+                newStream =
+                        tryConnect(user, database, info, socketFactory, hostSpec, SslMode.REQUIRE);
+                LOGGER.debug("Upgraded to encrypted connection for host " +
+                        hostSpec);
+              } catch (SQLException ee) {
+                ex = ee;
+              } catch (IOException ee) {
+                ex = ee; // Can't use multi-catch in Java 6 :(
+              }
+              if (ex != null) {
+                LOGGER.debug("sslMode==ALLOW, however SSL connection failed as well", ex);
+                // non-SSL failed as well, so re-throw original exception
+                throw e;
+              }
 
-        LOGGER.info("Connect complete. ID: " + connectInfo);
-        // And we're done.
-        return queryExecutor;
-      } catch (ConnectException cex) {
-        // Added by Peter Mount <peter@retep.org.uk>
-        // ConnectException is thrown when the connection cannot be made.
-        // we trap this an return a more meaningful message for the end user
-        GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail);
-        knownStates.put(hostSpec, HostStatus.ConnectFail);
-        if (hostIter.hasNext()) {
-          LOGGER.info("ConnectException occured while connecting to {0}" + hostSpec, cex);
-          // still more addresses to try
-          continue;
+            } else {
+              throw e;
+            }
+          }
+
+          int cancelSignalTimeout = Integer.parseInt(PGProperty.CANCEL_SIGNAL_TIMEOUT.getDefaultValue());
+          if (PGProperty.CANCEL_SIGNAL_TIMEOUT.getInt(info) <= Integer.MAX_VALUE / 1000) {
+            cancelSignalTimeout = PGProperty.CANCEL_SIGNAL_TIMEOUT.getInt(info) * 1000;
+          } else {
+            LOGGER.debug("integer cancelSignalTimeout is too large, it will occur error after multiply by 1000.");
+          }
+          String socketAddress = newStream.getConnectInfo();
+          LOGGER.info("[" + socketAddress + "] " + "Connection is established. ID: " + connectInfo);
+          // Do final startup.
+          QueryExecutor queryExecutor = new QueryExecutorImpl(newStream, user, database,
+                  cancelSignalTimeout, info);
+          queryExecutor.setProtocolVersion(this.protocolVerion);
+
+          //Check MasterCluster or SecondaryCluster
+          if (PGProperty.PRIORITY_SERVERS.get(info) != null) {
+            ClusterStatus currentClusterStatus = queryClusterStatus(queryExecutor);
+            //report cluster status
+            GlobalClusterStatusTracker.reportClusterStatus(clusterSpec, currentClusterStatus);
+            if (currentClusterStatus == ClusterStatus.MasterCluster) {
+              isMasterCluster = true;
+              //report the main cluster currently found
+              GlobalClusterStatusTracker.reportMasterCluster(info, clusterSpec);
+            } else {
+              queryExecutor.close();
+              break;
+            }
+          }
+
+          // Check Master or Secondary
+          HostStatus hostStatus = HostStatus.ConnectOK;
+          if (candidateHost.targetServerType != HostRequirement.any) {
+            hostStatus = isMaster(queryExecutor) ? HostStatus.Master : HostStatus.Secondary;
+            LOGGER.info("Known status of host " + hostSpec + " is " + hostStatus);
+          }
+          GlobalHostStatusTracker.reportHostStatus(hostSpec, hostStatus, info);
+          knownStates.put(hostSpec, hostStatus);
+          if (!candidateHost.targetServerType.allowConnectingTo(hostStatus)) {
+            queryExecutor.close();
+            continue;
+          }
+
+          //query and update statements cause logical replication to fail, temporarily evade
+          if (info.getProperty("replication") == null) {
+            runInitialQueries(queryExecutor, info);
+            queryExecutor.setGaussdbVersion(queryGaussdbVersion(queryExecutor));
+          }
+          if (MultiHostChooser.isUsingAutoLoadBalance(info)) {
+            QueryCNListUtils.runRereshCNListQueryies(queryExecutor, info);
+          }
+
+          LOGGER.info("Connect complete. ID: " + connectInfo);
+          // And we're done.
+          return queryExecutor;
+        } catch (ConnectException cex) {
+          // Added by Peter Mount <peter@retep.org.uk>
+          // ConnectException is thrown when the connection cannot be made.
+          // we trap this an return a more meaningful message for the end user
+          GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail, info);
+          knownStates.put(hostSpec, HostStatus.ConnectFail);
+          if (hostIter.hasNext() || clusterIter.hasNext()) {
+            LOGGER.info("ConnectException occured while connecting to {0}" + hostSpec, cex);
+            exception.addSuppressed(cex);
+            // still more addresses to try
+            continue;
+          }
+          if (exception.getSuppressed().length > 0) {
+            cex.addSuppressed(exception);
+          }
+          throw new PSQLException(GT.tr(
+                  "Connection to {0} refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.",
+                  hostSpec), PSQLState.CONNECTION_UNABLE_TO_CONNECT, cex);
+        } catch (IOException ioe) {
+          closeStream(newStream);
+          GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail, info);
+          knownStates.put(hostSpec, HostStatus.ConnectFail);
+          if (hostIter.hasNext() || clusterIter.hasNext()) {
+            LOGGER.info("IOException occured while connecting to " + hostSpec, ioe);
+            exception.addSuppressed(ioe);
+            // still more addresses to try
+            continue;
+          }
+          if (exception.getSuppressed().length > 0) {
+            ioe.addSuppressed(exception);
+          }
+          throw new PSQLException(GT.tr("The connection attempt failed."),
+                  PSQLState.CONNECTION_UNABLE_TO_CONNECT, ioe);
+        } catch (SQLException se) {
+          closeStream(newStream);
+          GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail, info);
+          knownStates.put(hostSpec, HostStatus.ConnectFail);
+          if (hostIter.hasNext() || clusterIter.hasNext()) {
+            LOGGER.info("SQLException occured while connecting to " + hostSpec, se);
+            exception.addSuppressed(se);
+            // still more addresses to try
+            continue;
+          }
+          if (exception.getSuppressed().length > 0) {
+            se.addSuppressed(exception);
+          }
+          throw se;
         }
-        throw new PSQLException(GT.tr(
-            "Connection to {0} refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.",
-            hostSpec), PSQLState.CONNECTION_UNABLE_TO_CONNECT, cex);
-      } catch (IOException ioe) {
-        closeStream(newStream);
-        GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail);
-        knownStates.put(hostSpec, HostStatus.ConnectFail);
-        if (hostIter.hasNext()) {
-          LOGGER.info("IOException occured while connecting to " + hostSpec, ioe);
-          // still more addresses to try
-          continue;
-        }
-        throw new PSQLException(GT.tr("The connection attempt failed."),
-            PSQLState.CONNECTION_UNABLE_TO_CONNECT, ioe);
-      } catch (SQLException se) {
-        closeStream(newStream);
-        GlobalHostStatusTracker.reportHostStatus(hostSpec, HostStatus.ConnectFail);
-        knownStates.put(hostSpec, HostStatus.ConnectFail);
-        if (hostIter.hasNext()) {
-          LOGGER.info("SQLException occured while connecting to " + hostSpec, se);
-          // still more addresses to try
-          continue;
-        }
-        throw se;
+      }
+      //When the cluster is a production cluster and there is no exception, still unable to return connection, throw an exception
+      if (isMasterCluster) {
+        LOGGER.info("Could not find a server with specified targetServerType: " + targetServerType + ". The current server known status is: " + knownStates.entrySet().toString());
+        throw new PSQLException(GT
+                .tr("Could not find a server with specified targetServerType: {0}", targetServerType),
+                PSQLState.CONNECTION_UNABLE_TO_CONNECT);
+      } else {
+        //update clusterStatus
+        GlobalClusterStatusTracker.reportClusterStatus(clusterSpec, ClusterStatus.ConnectFail);
       }
     }
-    LOGGER.info("Could not find a server with specified targetServerType: " + targetServerType + ". The current server known status is: " + knownStates.entrySet().toString());
-    throw new PSQLException(GT
-        .tr("Could not find a server with specified targetServerType: {0}", targetServerType),
-        PSQLState.CONNECTION_UNABLE_TO_CONNECT);
+
+    if (PGProperty.PRIORITY_SERVERS.get(info) != null) {
+      LOGGER.info("Could not find production cluster");
+      throw new PSQLException(GT.tr("Could not find production cluster"), PSQLState.CONNECTION_UNABLE_TO_CONNECT);
+    } else {
+      LOGGER.info("Could not find a server with specified targetServerType: " + targetServerType + ". The current server known status is: " + knownStates.entrySet().toString());
+      throw new PSQLException(GT
+              .tr("Could not find a server with specified targetServerType: {0}", targetServerType),
+              PSQLState.CONNECTION_UNABLE_TO_CONNECT);
+    }
+
   }
 
   private List<String[]> getParametersForStartup(String user, String database, Properties info) {
@@ -378,6 +419,10 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     String currentSchema = PGProperty.CURRENT_SCHEMA.get(info);
     if (currentSchema != null) {
       paramList.add(new String[]{"search_path", currentSchema});
+    }
+
+    if (PGProperty.PG_CLIENT_LOGIC.get(info) != null && PGProperty.PG_CLIENT_LOGIC.get(info).equals("1")) {
+      paramList.add(new String[]{"enable_full_encryption", "1"});
     }
     return paramList;
   }
@@ -802,6 +847,16 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       return "openGauss";
     } else {
       return "";
+    }
+  }
+
+  private ClusterStatus queryClusterStatus(QueryExecutor queryExecutor) throws SQLException, IOException {
+    byte[][] result = SetupQueryRunner.run(queryExecutor, "select barrier_id from gs_get_local_barrier_status();", true);
+    String barrierId = queryExecutor.getEncoding().decode(result[0]);
+    if(barrierId != null && !barrierId.equals("")){
+      return ClusterStatus.SecondaryCluster;
+    }else{
+      return ClusterStatus.MasterCluster;
     }
   }
 }

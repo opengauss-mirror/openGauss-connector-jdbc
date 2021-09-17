@@ -695,6 +695,22 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
   }
 
   /**
+   * @param usingEip using eip
+   * @see PGProperty#USING_EIP
+   */
+  public void setUsingEip(String usingEip){
+    PGProperty.USING_EIP.set(properties, usingEip);
+  }
+
+  /**
+   * @return using eip
+   * @see PGProperty#USING_EIP
+   */
+  public String getUsingEip(){
+    return PGProperty.USING_EIP.get(properties);
+  }
+
+  /**
    * @param loadBalanceHosts load balance hosts
    * @see PGProperty#LOAD_BALANCE_HOSTS
    */
