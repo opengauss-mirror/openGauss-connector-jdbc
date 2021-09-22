@@ -2743,7 +2743,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       s = "-" + s.substring(2);
     }
 
-    return s;
+    return s.replace(",", "");
   }
 
   protected String getPGType(int column) throws SQLException {
