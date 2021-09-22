@@ -286,10 +286,10 @@ public class Jdbc3CallableStatementTest extends BaseTest4 {
       boolean ret = stmt.execute("create or replace function "
           + "insert_bit( inout IMAX boolean, inout IMIN boolean, inout INUL boolean)  as "
           + "'begin "
-          + "insert into bit_tab values( imax, imin, inul);"
           + "select max_val into imax from bit_tab;"
           + "select min_val into imin from bit_tab;"
           + "select null_val into inul from bit_tab;"
+          + "insert into bit_tab values( imax, imin, inul);"
           + " end;' "
           + "language plpgsql;");
     } catch (Exception ex) {
