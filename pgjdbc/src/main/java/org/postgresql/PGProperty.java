@@ -20,6 +20,12 @@ import java.util.Properties;
 public enum PGProperty {
 
   /**
+   * If to turn on client encryption feature
+   */
+  PG_CLIENT_LOGIC("enable_ce", null,
+          "value of 1 is used to turn on the client logic driver feature", false),
+
+  /**
    * Database name to connect to (may be specified directly in the JDBC URL).
    */
   PG_DBNAME("PGDBNAME", null,
@@ -375,11 +381,25 @@ public enum PGProperty {
   TARGET_SERVER_TYPE("targetServerType", "any", "Specifies what kind of server to connect", false,
       "any", "master", "slave", "secondary",  "preferSlave", "preferSecondary"),
 
+  /**
+   * Specify the number of nodes to be connected first
+   */
+  PRIORITY_SERVERS("priorityServers",null,"Specify the number of nodes to be connected first"),
+
+  /**
+   * When using the priority load balancing feature, if use the node_host field of the pgxc_node table
+   * Load balancing feature will be invalid, So we use EIP uniformly unless data IP must be used.
+   */
+  USING_EIP("usingEip", "true", "Use elastic IP address when loadBalance"),
+
   LOAD_BALANCE_HOSTS("loadBalanceHosts", "false",
       "If disabled hosts are connected in the given order. If enabled hosts are chosen randomly from the set of suitable candidates"),
 
   HOST_RECHECK_SECONDS("hostRecheckSeconds", "10",
       "Specifies period (seconds) after which the host status is checked again in case it has changed"),
+
+  FORCE_TARGET_SERVER_SLAVE("forceTargetServerSlave", "false",
+          "whether to close old connections to standby node once it was promoted as primary node."),
 
   /**
    * <p>Specifies which mode is used to execute queries to database: simple means ('Q' execute, no parse, no bind, text mode only),

@@ -5,6 +5,7 @@
 
 package org.postgresql.core;
 
+import org.postgresql.GlobalConnectionTracker;
 import org.postgresql.PGNotification;
 import org.postgresql.PGProperty;
 import org.postgresql.jdbc.AutoSave;
@@ -43,9 +44,11 @@ public abstract class QueryExecutorBase implements QueryExecutor {
   private final PreferQueryMode preferQueryMode;
   private AutoSave autoSave;
   private boolean flushCacheOnDeallocate = true;
+  private Properties props;
 
   // default value for server versions that don't report standard_conforming_strings
   private boolean standardConformingStrings = false;
+  private boolean valid = true;
 
   private SQLWarning warnings;
   private final ArrayList<PGNotification> notifications = new ArrayList<PGNotification>();
@@ -54,7 +57,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
   private final CachedQueryCreateAction cachedQueryCreateAction;
 
   protected QueryExecutorBase(PGStream pgStream, String user,
-      String database, int cancelSignalTimeout, Properties info) throws SQLException {
+                              String database, int cancelSignalTimeout, Properties info) throws SQLException {
     this.pgStream = pgStream;
     this.user = user;
     this.database = database;
@@ -65,17 +68,18 @@ public abstract class QueryExecutorBase implements QueryExecutor {
     this.preferQueryMode = PreferQueryMode.of(preferMode);
     this.autoSave = AutoSave.of(PGProperty.AUTOSAVE.get(info));
     this.cachedQueryCreateAction = new CachedQueryCreateAction(this);
+    this.props = info;
     statementCache = new LruCache<Object, CachedQuery>(
-        Math.max(0, PGProperty.PREPARED_STATEMENT_CACHE_QUERIES.getInt(info)),
-        Math.max(0, PGProperty.PREPARED_STATEMENT_CACHE_SIZE_MIB.getInt(info) * 1024 * 1024),
-        false,
-        cachedQueryCreateAction,
-        new LruCache.EvictAction<CachedQuery>() {
-          @Override
-          public void evict(CachedQuery cachedQuery) throws SQLException {
-            cachedQuery.query.close();
-          }
-        });
+            Math.max(0, PGProperty.PREPARED_STATEMENT_CACHE_QUERIES.getInt(info)),
+            Math.max(0, PGProperty.PREPARED_STATEMENT_CACHE_SIZE_MIB.getInt(info) * 1024 * 1024),
+            false,
+            cachedQueryCreateAction,
+            new LruCache.EvictAction<CachedQuery>() {
+              @Override
+              public void evict(CachedQuery cachedQuery) throws SQLException {
+                cachedQuery.query.close();
+              }
+            });
   }
 
   protected abstract void sendCloseMessage() throws IOException;
@@ -120,8 +124,8 @@ public abstract class QueryExecutorBase implements QueryExecutor {
     try {
       pgStream.getSocket().close();
     } catch (IOException e) {
-        // ignore
-        LOGGER.trace("Catch IOException on close:", e);
+      // ignore
+      LOGGER.trace("Catch IOException on close:", e);
     }
     closed = true;
   }
@@ -137,6 +141,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
       sendCloseMessage();
       pgStream.flush();
       pgStream.close();
+      GlobalConnectionTracker.releaseConnectionReference(this, props);
     } catch (IOException ioe) {
       LOGGER.trace("Discarding IOException on close:", ioe);
     }
@@ -146,7 +151,12 @@ public abstract class QueryExecutorBase implements QueryExecutor {
 
   @Override
   public boolean isClosed() {
-    return closed;
+    return !valid || closed;
+  }
+
+  @Override
+  public void setAvailability(boolean availability){
+    valid = availability;
   }
 
   @Override
@@ -164,7 +174,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
       }
 
       cancelStream =
-          new PGStream(pgStream.getSocketFactory(), pgStream.getHostSpec(), cancelSignalTimeout);
+              new PGStream(pgStream.getSocketFactory(), pgStream.getHostSpec(), cancelSignalTimeout);
       if (cancelSignalTimeout > 0) {
         cancelStream.getSocket().setSoTimeout(cancelSignalTimeout);
       }
@@ -184,8 +194,8 @@ public abstract class QueryExecutorBase implements QueryExecutor {
         try {
           cancelStream.close();
         } catch (IOException e) {
-            // Ignored.
-            LOGGER.trace("Catch IOException on close:", e);
+          // Ignored.
+          LOGGER.trace("Catch IOException on close:", e);
         }
       }
     }
@@ -283,7 +293,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
   @Override
   public final CachedQuery borrowReturningQuery(String sql, String[] columnNames) throws SQLException {
     return statementCache.borrow(new QueryWithReturningColumnsKey(sql, true, true,
-        columnNames
+            columnNames
     ));
   }
 
@@ -299,7 +309,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
 
   @Override
   public final Object createQueryKey(String sql, boolean escapeProcessing,
-      boolean isParameterized, String... columnNames) {
+                                     boolean isParameterized, String... columnNames) {
     Object key;
     if (columnNames == null || columnNames.length != 0) {
       // Null means "return whatever sensible columns are" (e.g. primary key, or serial, or something like that)
@@ -320,8 +330,8 @@ public abstract class QueryExecutorBase implements QueryExecutor {
 
   @Override
   public final CachedQuery createQuery(String sql, boolean escapeProcessing,
-      boolean isParameterized, String... columnNames)
-      throws SQLException {
+                                       boolean isParameterized, String... columnNames)
+          throws SQLException {
     Object key = createQueryKey(sql, escapeProcessing, isParameterized, columnNames);
     // Note: cache is not reused here for two reasons:
     //   1) Simplify initial implementation for simple statements
@@ -353,7 +363,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
       return true;
     }
     if (PSQLState.INVALID_CACHE_PLAN.getState().equals(e.getSQLState())) {
-      return true;  
+      return true;
     }
     if (!PSQLState.NOT_IMPLEMENTED.getState().equals(e.getSQLState())) {
       return false;
@@ -372,7 +382,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
     // "cached plan must not change result type"
     String routine = pe.getServerErrorMessage().getRoutine();
     return "RevalidateCachedQuery".equals(routine) // 9.2+
-        || "RevalidateCachedPlan".equals(routine); // <= 9.1
+            || "RevalidateCachedPlan".equals(routine); // <= 9.1
   }
 
   @Override

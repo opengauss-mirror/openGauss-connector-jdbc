@@ -124,8 +124,15 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
 
   public int executeUpdate() throws SQLException {
     executeWithFlags(QueryExecutor.QUERY_NO_RESULTS);
+    checkNoResultUpdate();
+    return getUpdateCount();
+  }
 
-    return getNoResultUpdateCount();
+  @Override
+  public long executeLargeUpdate() throws SQLException {
+    executeWithFlags(QueryExecutor.QUERY_NO_RESULTS);
+    checkNoResultUpdate();
+    return getLargeUpdateCount();
   }
 
   public boolean execute(String p_sql) throws SQLException {
@@ -237,6 +244,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       byte[] val = new byte[2];
       ByteConverter.int2(val, 0, x);
       bindBytes(parameterIndex, val, Oid.INT2);
+      preparedParameters.saveLiteralValueForClientLogic(parameterIndex, Integer.toString(x));
       return;
     }
     bindLiteral(parameterIndex, Integer.toString(x), Oid.INT2);
@@ -248,6 +256,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
             byte[] val = new byte[2];
             ByteConverter.int2(val, 0, x);
             bindBytes(parameterIndex, val, Oid.INT2);
+            preparedParameters.saveLiteralValueForClientLogic(parameterIndex, Integer.toString(x));
             return;
         }
         bindLiteral(parameterIndex, Integer.toString(x), Oid.INT2);
@@ -259,6 +268,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       byte[] val = new byte[4];
       ByteConverter.int4(val, 0, x);
       bindBytes(parameterIndex, val, Oid.INT4);
+      preparedParameters.saveLiteralValueForClientLogic(parameterIndex, Integer.toString(x));
       return;
     }
     bindLiteral(parameterIndex, Integer.toString(x), Oid.INT4);
@@ -270,6 +280,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       byte[] val = new byte[8];
       ByteConverter.int8(val, 0, x);
       bindBytes(parameterIndex, val, Oid.INT8);
+      preparedParameters.saveLiteralValueForClientLogic(parameterIndex, Long.toString(x));
       return;
     }
     bindLiteral(parameterIndex, Long.toString(x), Oid.INT8);
@@ -281,6 +292,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       byte[] val = new byte[4];
       ByteConverter.float4(val, 0, x);
       bindBytes(parameterIndex, val, Oid.FLOAT4);
+      preparedParameters.saveLiteralValueForClientLogic(parameterIndex, Float.toString(x));
       return;
     }
     bindLiteral(parameterIndex, Float.toString(x), Oid.FLOAT8);
@@ -292,6 +304,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       byte[] val = new byte[8];
       ByteConverter.float8(val, 0, x);
       bindBytes(parameterIndex, val, Oid.FLOAT8);
+      preparedParameters.saveLiteralValueForClientLogic(parameterIndex, Double.toString(x));
       return;
     }
     bindLiteral(parameterIndex, Double.toString(x), Oid.FLOAT8);
@@ -467,6 +480,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       byte[] data = new byte[binObj.lengthInBytes()];
       binObj.toBytes(data, 0);
       bindBytes(parameterIndex, data, oid);
+      preparedParameters.saveLiteralValueForClientLogic(parameterIndex, x.getValue());
     } else {
       setString(parameterIndex, x.getValue(), oid);
     }
@@ -1105,6 +1119,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
      PgArray arr = (PgArray) x;
      if (arr.isBinary()) {
        bindBytes(i, arr.toBytes(), oid);
+       preparedParameters.saveLiteralValueForClientLogic(i, x.toString());
        return;
      }
    }
@@ -1386,7 +1401,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
  }
 
  public void setNString(int parameterIndex, String value) throws SQLException {
-   throw Driver.notImplemented(this.getClass(), "setNString(int, String)");
+   this.setString(parameterIndex, value);
  }
 
  public void setNCharacterStream(int parameterIndex, Reader value, long length)

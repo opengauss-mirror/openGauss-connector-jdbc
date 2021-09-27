@@ -14,7 +14,7 @@ public class NativeQuery {
   private static final String[] BIND_NAMES = new String[128 * 10];
   private static final int[] NO_BINDS = new int[0];
 
-  public final String nativeSql;
+  public String nativeSql; /* cannot be final because may be changed with the client encryption feature */
   public final int[] bindPositions;
   public final SqlCommand command;
   public final boolean multiStatement;

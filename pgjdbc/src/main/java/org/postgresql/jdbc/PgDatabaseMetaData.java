@@ -1451,6 +1451,15 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
   public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern,
                               String columnNamePattern) throws SQLException {
 
+    /* Adding client logic code to show the real data type and not the client logic data types */
+    boolean isClientLogicOn = false;
+    String clientLogicSelectClause = " ";
+    String clientLogicFromClause = " ";
+    if (connection.getClientLogic() != null) {
+      isClientLogicOn = true;
+      clientLogicSelectClause = ",data_type_original_oid, data_type_original_mod ";
+      clientLogicFromClause = " LEFT JOIN pg_catalog.gs_encrypted_columns ce ON (a.attrelid=ce.rel_id AND a.attname = ce.column_name) ";
+    }
     int numberOfFields = 23; // JDBC4
     List<byte[][]> v = new ArrayList<byte[][]>(); // The new ResultSet tuple stuff
     Field[] f = new Field[numberOfFields]; // The field descriptors for the new ResultSet
@@ -1509,6 +1518,7 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
       sql += "null as attidentity,";
     }
     sql += "pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype "
+           + clientLogicSelectClause
            + " FROM pg_catalog.pg_namespace n "
            + " JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid) "
            + " JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid) "
@@ -1517,6 +1527,7 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
            + " LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid) "
            + " LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class') "
            + " LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog') "
+           + clientLogicFromClause
            + " WHERE c.relkind in ('r','p','v','f','m') and a.attnum > 0 AND NOT a.attisdropped ";
 
     if (schemaPattern != null && !schemaPattern.isEmpty()) {
@@ -1538,7 +1549,19 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
     while (rs.next()) {
       byte[][] tuple = new byte[numberOfFields][];
       int typeOid = (int) rs.getLong("atttypid");
+      int clientLogicOriginalType = 0;
+      if (isClientLogicOn) {
+        if (rs.getString("data_type_original_oid") != null){
+          clientLogicOriginalType = typeOid;
+          typeOid = (int)rs.getLong("data_type_original_oid");
+        }
+      }
       int typeMod = rs.getInt("atttypmod");
+      if (isClientLogicOn) {
+        if (rs.getString("data_type_original_mod") != null){
+          typeMod = (int)rs.getLong("data_type_original_mod");
+        }
+      }
 
       tuple[0] = null; // Catalog name, not supported
       tuple[1] = rs.getBytes("nspname"); // Schema
@@ -1597,6 +1620,10 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
       tuple[11] = rs.getBytes("description"); // Description (if any)
       tuple[12] = rs.getBytes("adsrc"); // Column default
       tuple[13] = null; // sql data type (unused)
+      if (clientLogicOriginalType > 0) {
+        //Add in this unused value the client logic type id
+        tuple[13] = connection.encodeString(Integer.toString(clientLogicOriginalType));
+      }
       tuple[14] = null; // sql datetime sub (unused)
       tuple[15] = tuple[6]; // char octet length
       tuple[16] = connection.encodeString(String.valueOf(rs.getInt("attnum"))); // ordinal position

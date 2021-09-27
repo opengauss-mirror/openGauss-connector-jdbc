@@ -366,9 +366,9 @@ public class MultiHostsConnectionTest {
 
   @Test
   public void testHostRechecks() throws SQLException, InterruptedException {
-    GlobalHostStatusTracker.reportHostStatus(hostSpec(master1), Secondary);
-    GlobalHostStatusTracker.reportHostStatus(hostSpec(secondary1), Master);
-    GlobalHostStatusTracker.reportHostStatus(hostSpec(fake1), Secondary);
+    GlobalHostStatusTracker.reportHostStatus(hostSpec(master1), Secondary, new Properties());
+    GlobalHostStatusTracker.reportHostStatus(hostSpec(secondary1), Master, new Properties());
+    GlobalHostStatusTracker.reportHostStatus(hostSpec(fake1), Secondary, new Properties());
 
     try {
       getConnection(master, false, fake1, secondary1, master1);
@@ -376,9 +376,9 @@ public class MultiHostsConnectionTest {
     } catch (SQLException ex) {
     }
 
-    GlobalHostStatusTracker.reportHostStatus(hostSpec(master1), Secondary);
-    GlobalHostStatusTracker.reportHostStatus(hostSpec(secondary1), Master);
-    GlobalHostStatusTracker.reportHostStatus(hostSpec(fake1), Secondary);
+    GlobalHostStatusTracker.reportHostStatus(hostSpec(master1), Secondary, new Properties());
+    GlobalHostStatusTracker.reportHostStatus(hostSpec(secondary1), Master, new Properties());
+    GlobalHostStatusTracker.reportHostStatus(hostSpec(fake1), Secondary, new Properties());
 
     SECONDS.sleep(3);
 
@@ -388,9 +388,9 @@ public class MultiHostsConnectionTest {
 
   @Test
   public void testNoGoodHostsRechecksEverything() throws SQLException, InterruptedException {
-    GlobalHostStatusTracker.reportHostStatus(hostSpec(master1), Secondary);
-    GlobalHostStatusTracker.reportHostStatus(hostSpec(secondary1), Secondary);
-    GlobalHostStatusTracker.reportHostStatus(hostSpec(fake1), Secondary);
+    GlobalHostStatusTracker.reportHostStatus(hostSpec(master1), Secondary, new Properties());
+    GlobalHostStatusTracker.reportHostStatus(hostSpec(secondary1), Secondary, new Properties());
+    GlobalHostStatusTracker.reportHostStatus(hostSpec(fake1), Secondary, new Properties());
 
     getConnection(master, false, secondary1, fake1, master1);
     assertRemote(masterIp);

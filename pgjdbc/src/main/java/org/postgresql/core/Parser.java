@@ -27,6 +27,7 @@ import java.util.Locale;
  */
 public class Parser {
   private static final int[] NO_BINDS = new int[0];
+  private static final char[] chars = new char[]{' ','\n','\r','\t'};
 
   /**
    * Parses JDBC query into PostgreSQL's native format. Several queries might be given if separated
@@ -296,13 +297,13 @@ public class Parser {
           break;
         case 'b':
         case 'B':
-            if(i + 4 < aChars.length)
-            {
-                if ("E".equalsIgnoreCase(String.valueOf(aChars[i + 1])) 
+            if(i + 5 < aChars.length && i - 1 > 0) {
+                if ("E".equalsIgnoreCase(String.valueOf(aChars[i + 1]))
                    && "G".equalsIgnoreCase(String.valueOf(aChars[i + 2])) 
                    && "I".equalsIgnoreCase(String.valueOf(aChars[i + 3])) 
-                   && "N".equalsIgnoreCase(String.valueOf(aChars[i + 4])))
-                {
+                   && "N".equalsIgnoreCase(String.valueOf(aChars[i + 4]))
+                   && isSpecialCharacters(aChars[i - 1])
+                   && isSpecialCharacters(aChars[i + 5])) {
                     inBeginEnd ++;
                 }
             }
@@ -443,6 +444,15 @@ public class Parser {
   	}
   }
   
+  public static boolean isSpecialCharacters(char aChar){
+      for (char specialChar : chars) {
+          if(specialChar == aChar){
+              return true;
+          }
+      }
+      return false;
+  }
+
   public static  String removeFirstComment(String str){
       String queryTemp = str.trim();
       str = str.trim();

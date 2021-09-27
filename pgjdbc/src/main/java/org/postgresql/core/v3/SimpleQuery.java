@@ -112,6 +112,11 @@ class SimpleQuery implements Query {
     return nativeQuery.nativeSql;
   }
 
+  @Override
+  public void replaceNativeSqlForClientLogic(String sql) {
+    nativeQuery.nativeSql = sql;
+  }
+
   void setStatementName(String statementName, short deallocateEpoch) {
     assert statementName != null : "statement name should not be null";
     this.statementName = statementName;

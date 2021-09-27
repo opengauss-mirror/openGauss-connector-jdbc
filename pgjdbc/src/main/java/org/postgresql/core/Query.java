@@ -46,6 +46,12 @@ public interface Query {
   String getNativeSql();
 
   /**
+   * Client logic may replace the native query
+   * @param sql modified native sql
+   */
+  void replaceNativeSqlForClientLogic(String sql);
+
+  /**
    * Returns properties of the query (sql keyword, and some other parsing info).
    * @return returns properties of the query (sql keyword, and some other parsing info) or null if not applicable
    */

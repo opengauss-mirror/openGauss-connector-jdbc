@@ -20,6 +20,9 @@ kernel=""
 if [ -f "/etc/euleros-release" ]
 then
 	kernel=$(cat /etc/euleros-release | awk -F ' ' '{print $1}' | tr A-Z a-z)
+elif [ -f "/etc/kylin-release" ]
+then
+	kernel=$(cat /etc/kylin-release | awk -F ' ' '{print $1}' | tr A-Z a-z)
 else
 	kernel=$(lsb_release -d | awk -F ' ' '{print $2}'| tr A-Z a-z)
 fi
@@ -55,7 +58,7 @@ then
 fi
 
 ##################################################################################
-# suse platform 
+# suse platform
 # the result form like this: suse11_sp1_x86_64
 ##################################################################################
 if [ "$kernel"x = "suse"x ]
@@ -70,7 +73,7 @@ then
 fi
 
 ##################################################################################
-# euler platform 
+# euler platform
 # the result form like this: euleros2.0_sp8_aarch64
 ##################################################################################
 if [ "$kernel"x = "euleros"x ]
@@ -80,7 +83,7 @@ then
 fi
 
 ##################################################################################
-# deepin platform 
+# deepin platform
 # the result form like this: deepin_aarch64
 ##################################################################################
 if [ "$kernel"x = "deepin"x ]
@@ -93,7 +96,7 @@ then
 fi
 ##################################################################################
 # centos7.6_x86_64 platform
-# centos7.5+aarch64 platform 
+# centos7.5+aarch64 platform
 # the result form like this: centos7.6_x86_64 or centos_7.5_aarch64
 ##################################################################################
 if [ "$kernel"x = "centos"x ]
@@ -116,6 +119,14 @@ then
     plat_form_str=openeuler_"$cpu_bit"
 fi
 
+##################################################################################
+# kylin platform
+# the result form like this: kylin_aarch64
+##################################################################################
+if [ "$kernel"x = "kylin"x ]
+then
+    plat_form_str=kylin_"$cpu_bit"
+fi
 
 ##################################################################################
 #

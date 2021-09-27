@@ -6,18 +6,9 @@
 package org.postgresql.jdbc;
 
 import org.postgresql.Driver;
-import org.postgresql.core.BaseConnection;
-import org.postgresql.core.BaseStatement;
-import org.postgresql.core.CachedQuery;
-import org.postgresql.core.Field;
-import org.postgresql.core.NoticeListener;
-import org.postgresql.core.ParameterList;
-import org.postgresql.core.Query;
-import org.postgresql.core.QueryExecutor;
-import org.postgresql.core.ResultCursor;
-import org.postgresql.core.ResultHandlerBase;
-import org.postgresql.core.SqlCommand;
+import org.postgresql.core.*;
 import org.postgresql.util.GT;
+import org.postgresql.util.PGbytea;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.log.Logger;
@@ -45,7 +36,7 @@ public class PgStatement implements Statement, BaseStatement {
       Boolean.getBoolean("org.postgresql.forceBinary");
   // only for testing purposes. even single shot statements will use binary transfers
   private boolean forceBinaryTransfers = DEFAULT_FORCE_BINARY_TRANSFERS;
-
+  
   protected ArrayList<Query> batchStatements = null;
   protected ArrayList<ParameterList> batchParameters = null;
   protected final int resultsettype; // the resultset type to return (ResultSet.TYPE_xxx)
@@ -140,6 +131,11 @@ public class PgStatement implements Statement, BaseStatement {
 
   protected int maxfieldSize = 0;
 
+  /**
+   * Used for client encryption to identify the statement name in libpq/clientlogic
+   */
+  protected String statementName = "";
+
   PgStatement(PgConnection c, int rsType, int rsConcurrency, int rsHoldability)
       throws SQLException {
     this.connection = c;
@@ -147,12 +143,16 @@ public class PgStatement implements Statement, BaseStatement {
     resultsettype = rsType;
     concurrency = rsConcurrency;
     setFetchSize(c.getDefaultFetchSize());
-	if(c.getFetchSize() >= 0){
+	  if(c.getFetchSize() >= 0){
     	this.fetchSize = c.getFetchSize();
     }
 
     setPrepareThreshold(c.getPrepareThreshold());
     this.rsHoldability = rsHoldability;
+
+    if (c.getClientLogic() != null) {
+      this.statementName = c.getClientLogic().getStatementName();
+    }    
   }
 
   public ResultSet createResultSet(Query originalQuery, Field[] fields, List<byte[][]> tuples,
@@ -221,7 +221,7 @@ public class PgStatement implements Statement, BaseStatement {
     }
 
     @Override
-    public void handleCommandStatus(String status, int updateCount, long insertOID) {
+    public void handleCommandStatus(String status, long updateCount, long insertOID) {
       append(new ResultWrapper(updateCount, insertOID));
     }
 
@@ -233,13 +233,32 @@ public class PgStatement implements Statement, BaseStatement {
   }
 
   public java.sql.ResultSet executeQuery(String p_sql) throws SQLException {
+    ClientLogic clientLogic = this.connection.getClientLogic();
+    String exception = "No results were returned by the query.";
+    if (clientLogic != null) {
+      exception = "";
+    }
     if (!executeWithFlags(p_sql, 0)) {
-      throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
+      throw new PSQLException(GT.tr(exception), PSQLState.NO_DATA);
     }
 
     return getSingleResultSet();
   }
 
+  /**
+   * This method was added for supporting fetchDataFromQuery method in the ClientLogicImpl class
+   * executes query and bypass client logic to get client logic data 
+   * @param p_sql the query to run
+   * @return ResultSet with the data
+   * @throws SQLException
+   */
+  java.sql.ResultSet executeQueryWithNoCL(String p_sql) throws SQLException {
+	  if (!executeWithFlags(p_sql, QueryExecutor.QUERY_EXECUTE_BYPASS_CLIENT_LOGIC)) {
+		  throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
+	  }
+	  return getSingleResultSet();
+  }
+  
   protected java.sql.ResultSet getSingleResultSet() throws SQLException {
     synchronized (this) {
       checkClosed();
@@ -254,10 +273,11 @@ public class PgStatement implements Statement, BaseStatement {
 
   public int executeUpdate(String p_sql) throws SQLException {
     executeWithFlags(p_sql, QueryExecutor.QUERY_NO_RESULTS);
-    return getNoResultUpdateCount();
+    checkNoResultUpdate();
+    return getUpdateCount();
   }
 
-  protected int getNoResultUpdateCount() throws SQLException {
+  protected final void checkNoResultUpdate() throws SQLException {
     synchronized (this) {
       checkClosed();
       ResultWrapper iter = result;
@@ -270,7 +290,7 @@ public class PgStatement implements Statement, BaseStatement {
         iter = iter.getNext();
       }
 
-      return getUpdateCount();
+
     }
   }
 
@@ -387,10 +407,74 @@ public class PgStatement implements Statement, BaseStatement {
     }
   }
 
+  /**
+   * Sets parameter value of prepared statement to client logic binary format
+   * @param queryParameters the query parameters
+   * @param parameterIndex the index to change
+   * @param x bytes data
+   * @param customOid the field oid
+   * @throws SQLException
+   */
+  private void setClientLogicBytea(ParameterList queryParameters, int parameterIndex, byte[] x, int customOid) throws SQLException {
+    checkClosed();
+
+    if (null == x) {
+      queryParameters.setNull(parameterIndex, Oid.BYTEA);
+      return;
+    }
+    byte[] copy = new byte[x.length];
+    System.arraycopy(x, 0, copy, 0, x.length);
+    queryParameters.setClientLogicBytea(parameterIndex, copy, 0, x.length, customOid);
+  }
+  /**
+   * For prepared statements, replace client logic parameters from user input value to binary client logic value
+   * @param statementName statement name that was used by preQuery on libpq
+   * @param queryParameters the query parameters
+   * @throws SQLException
+   */
+  private void replaceClientLogicParameters(String statementName, ParameterList queryParameters) throws SQLException {
+    if (queryParameters.getInParameterCount() > 0) {
+      ClientLogic clientLogic = this.connection.getClientLogic();
+      if (clientLogic != null) {
+        List<String> listParameterValuesBeeforeCL = new ArrayList<>();
+        //Getting the string values of all parameters
+        String[] arrParameterValuesBeforeCL = queryParameters.getLiteralValues();
+        if (arrParameterValuesBeforeCL != null){
+          for(int i = 0; i < queryParameters.getInParameterCount(); ++i) {
+            String valueBeforCL = arrParameterValuesBeforeCL[i];
+            if (valueBeforCL == null) {
+              valueBeforCL = "";
+            }
+            listParameterValuesBeeforeCL.add(valueBeforCL);
+          }
+          List<String> modifiedParameters;
+          try {
+            //Getting the client logic binary value from the back-end
+            modifiedParameters = clientLogic.replaceStatementParams(statementName, listParameterValuesBeeforeCL);
+          }
+          catch (ClientLogicException e) {
+            LOGGER.error("Errror: '" + e.getErrorText() + "' while running client logic to change parameters");
+            throw new SQLException("Errror: '" + e.getErrorText() + "' while running client logic to change parameters");
+          }
+          int indexParam = 1;
+          for (String mnodifiedParam: modifiedParameters) {
+            if (mnodifiedParam != null) {
+              //Convert the data to binary
+              byte[] dataInBytes = PGbytea.toBytes(mnodifiedParam.getBytes());
+              this.setClientLogicBytea(queryParameters, indexParam, dataInBytes, 4402);
+            }
+            ++indexParam;
+          }
+        }
+      }
+    }
+  }
+
   private void executeInternal(CachedQuery cachedQuery, ParameterList queryParameters, int flags)
       throws SQLException {
     closeForNextExecution();
-
+    // Replace the query for client logic case
+    ClientLogic clientLogic = replaceQueryForClientLogic(cachedQuery, queryParameters, flags);
     // Enable cursor-based resultset if possible.
     if (fetchSize > 0 && !wantsScrollableResultSet() && !connection.getAutoCommit()
         && !wantsHoldableResultSet()) {
@@ -402,7 +486,6 @@ public class PgStatement implements Statement, BaseStatement {
 
       // If the no results flag is set (from executeUpdate)
       // clear it so we get the generated keys results.
-      //
       if ((flags & QueryExecutor.QUERY_NO_RESULTS) != 0) {
         flags &= ~(QueryExecutor.QUERY_NO_RESULTS);
       }
@@ -436,8 +519,13 @@ public class PgStatement implements Statement, BaseStatement {
       // thus sending a describe request.
       int flags2 = flags | QueryExecutor.QUERY_DESCRIBE_ONLY;
       StatementResultHandler handler2 = new StatementResultHandler();
-      connection.getQueryExecutor().execute(queryToExecute, queryParameters, handler2, 0, 0,
-          flags2);
+      if (clientLogic != null) {
+        runQueryExecutorForClientLogic(queryParameters, clientLogic, queryToExecute, flags2, handler2, 0, 0);
+      }
+      else {
+        connection.getQueryExecutor().execute(queryToExecute, queryParameters, handler2, 0, 0,
+                flags2);
+      }
       ResultWrapper result2 = handler2.getResults();
       if (result2 != null) {
         result2.getResultSet().close();
@@ -448,13 +536,38 @@ public class PgStatement implements Statement, BaseStatement {
     synchronized (this) {
       result = null;
     }
+    runQueryExecutor(queryParameters, flags, clientLogic, queryToExecute, handler);
+    updateGeneratedKeyStatus(clientLogic, handler);
+    runQueryPostProcess(clientLogic);
+  }
+
+  private void runQueryPostProcess(ClientLogic clientLogic) {
+    try {
+      if (clientLogic != null && !(this instanceof PgPreparedStatement)) {
+        clientLogic.runQueryPostProcess();
+      }
+    }
+    catch(ClientLogicException e) {
+      LOGGER.error("Failed running runQueryPostProcess Error: " + e.getErrorCode() + ":" + e.getErrorText());
+    }
+  }
+
+  private void runQueryExecutor(ParameterList queryParameters, int flags, ClientLogic clientLogic, Query queryToExecute, org.postgresql.jdbc.PgStatement.StatementResultHandler handler) throws SQLException {
     try {
       startTimer();
-      connection.getQueryExecutor().execute(queryToExecute, queryParameters, handler, maxrows,
-          fetchSize, flags);
+      if (clientLogic != null) {
+        runQueryExecutorForClientLogic(queryParameters, clientLogic, queryToExecute, flags, handler, maxrows, fetchSize);
+      }
+      else {
+        connection.getQueryExecutor().execute(queryToExecute, queryParameters, handler, maxrows,
+                fetchSize, flags);
+      }
     } finally {
       killTimerTask();
     }
+  }
+
+  private void updateGeneratedKeyStatus(ClientLogic clientLogic, org.postgresql.jdbc.PgStatement.StatementResultHandler handler) throws SQLException {
     synchronized (this) {
       checkClosed();
       result = firstUnclosedResult = handler.getResults();
@@ -470,6 +583,55 @@ public class PgStatement implements Statement, BaseStatement {
     }
   }
 
+  private void runQueryExecutorForClientLogic(ParameterList queryParameters, ClientLogic clientLogic, Query queryToExecute, int flags2, org.postgresql.jdbc.PgStatement.StatementResultHandler handler2, int i, int i2) throws SQLException {
+    try {
+      connection.getQueryExecutor().execute(queryToExecute, queryParameters, handler2, i, i2,
+              flags2);
+    } catch (SQLException sqlException) {
+      //Client logic should be able to change the error message back to use user input
+      String updatedMessage = clientLogic.clientLogicMessage(sqlException.getMessage());
+      throw new SQLException(updatedMessage);
+    }
+  }
+
+  private ClientLogic replaceQueryForClientLogic(CachedQuery cachedQuery, ParameterList queryParameters, int flags) throws SQLException {
+  	ClientLogic clientLogic = null;
+    if ((flags & QueryExecutor.QUERY_EXECUTE_BYPASS_CLIENT_LOGIC) == 0) {
+  		clientLogic = this.connection.getClientLogic();
+    }
+    if (clientLogic != null) {
+      // we use subqueires to check multiple statements scenario return null if query is simpleQuery
+      if (cachedQuery.query.getSubqueries() != null) {
+        LOGGER.error("multiple statements is not allowed under client logic routine.");
+        throw new SQLException("multiple statements is not allowed under client logic routine, please split it up into simpleQuery per statement.");
+      }
+      String modifiedQuery = cachedQuery.query.getNativeSql();
+      try {
+        if (this instanceof PgPreparedStatement) {
+          modifiedQuery = clientLogic.prepareQuery(modifiedQuery, statementName);
+          replaceClientLogicParameters(statementName, queryParameters);
+        }
+        else {
+          modifiedQuery = clientLogic.runQueryPreProcess(cachedQuery.query.getNativeSql());
+        }
+        cachedQuery.query.replaceNativeSqlForClientLogic(modifiedQuery);
+      }
+      catch(ClientLogicException e) {
+        if (e.isParsingError()) {
+          /* 
+           * we should not block bad queries to be sent to the server
+    	     * PgConnection.isValid is based on error that is not parsed correctly
+    	     */
+    	    LOGGER.debug("pre query failed for parsing error, moving on"); 
+        } else {
+          LOGGER.debug("Failed running runQueryPreProcess on executeInternal " + e.getErrorCode() + ":" + e.getErrorText());
+          throw new SQLException(e.getErrorText());
+        }
+      }
+    }
+    return clientLogic;
+  }
+
   public void setCursorName(String name) throws SQLException {
     checkClosed();
     // No-op.
@@ -477,6 +639,7 @@ public class PgStatement implements Statement, BaseStatement {
 
   private volatile boolean isClosed = false;
 
+  @Override
   public int getUpdateCount() throws SQLException {
     synchronized (this) {
       checkClosed();
@@ -484,7 +647,8 @@ public class PgStatement implements Statement, BaseStatement {
         return -1;
       }
 
-      return result.getUpdateCount();
+      long count = result.getUpdateCount();
+      return count > Integer.MAX_VALUE ? Statement.SUCCESS_NO_INFO : (int) count;
     }
   }
 
@@ -750,26 +914,18 @@ public class PgStatement implements Statement, BaseStatement {
         wantsGeneratedKeysAlways);
   }
 
-  public int[] executeBatch() throws SQLException {
-    checkClosed();
-
-    closeForNextExecution();
-
-    if (batchStatements == null || batchStatements.isEmpty()) {
-      return new int[0];
-    }
+  private BatchResultHandler internalExecuteBatch() throws SQLException {
 
     // Construct query/parameter arrays.
     transformQueriesAndParameters();
     // Empty arrays should be passed to toArray
     // see http://shipilev.net/blog/2016/arrays-wisdom-ancients/
     Query[] queries = batchStatements.toArray(new Query[0]);
-    ParameterList[] parameterLists =
-        batchParameters.toArray(new ParameterList[0]);
+    ParameterList[] parameterLists = batchParameters.toArray(new ParameterList[0]);
     batchStatements.clear();
     batchParameters.clear();
 
-    int flags = 0;
+    int flags;
 
     // Force a Describe before any execution? We need to do this if we're going
     // to send anything dependent on the Describe results, e.g. binary parameters.
@@ -831,6 +987,9 @@ public class PgStatement implements Statement, BaseStatement {
       flags |= QueryExecutor.QUERY_SUPPRESS_BEGIN;
     }
 
+    //Client logic case - handle the queries
+    handleQueriesForClientLogic(queries, parameterLists);
+
     BatchResultHandler handler;
     handler = createBatchHandler(queries, parameterLists);
 
@@ -890,7 +1049,46 @@ public class PgStatement implements Statement, BaseStatement {
     	    }
     }
 
-    return handler.getUpdateCount();
+    return handler;
+  }
+
+  private void handleQueriesForClientLogic(Query[] queries, ParameterList[] parameterLists) throws SQLException {
+    ClientLogic clientLogic = this.connection.getClientLogic();
+
+    if (clientLogic != null) {
+      for (int queriesCounter = 0; queriesCounter < queries.length; ++queriesCounter) {
+        String modifiedQuery = queries[queriesCounter].getNativeSql();
+        try {
+          if (this instanceof PgPreparedStatement) {
+            clientLogic.prepareQuery(modifiedQuery, statementName);
+            if (parameterLists != null && parameterLists.length  > queriesCounter) {
+              if (parameterLists[queriesCounter] != null) {
+                replaceClientLogicParameters(statementName, parameterLists[queriesCounter]);
+              }
+            }
+          }
+          else {
+            modifiedQuery = clientLogic.runQueryPreProcess(modifiedQuery);
+            queries[queriesCounter].replaceNativeSqlForClientLogic(modifiedQuery);
+          }
+        }
+        catch(ClientLogicException e) {
+          LOGGER.debug("Failed running runQueryPreProcess on executeBatch " + e.getErrorCode() + ":" + e.getErrorText());
+          throw new SQLException(e.getErrorText());
+        }
+      }
+    }
+  }
+
+  public int[] executeBatch() throws SQLException {
+    checkClosed();
+    closeForNextExecution();
+
+    if (batchStatements == null || batchStatements.isEmpty()) {
+      return new int[0];
+    }
+
+    return internalExecuteBatch().getUpdateCount();
   }
 
 	public boolean checkParameterList(ParameterList[] paramlist){
@@ -1049,8 +1247,16 @@ public class PgStatement implements Statement, BaseStatement {
     return forceBinaryTransfers;
   }
 
+  @Override
   public long getLargeUpdateCount() throws SQLException {
-    throw Driver.notImplemented(this.getClass(), "getLargeUpdateCount");
+    synchronized (this) {
+      checkClosed();
+      if (result == null || result.getResultSet() != null) {
+        return -1;
+      }
+
+      return result.getUpdateCount();
+    }
   }
 
   public void setLargeMaxRows(long max) throws SQLException {
@@ -1061,28 +1267,54 @@ public class PgStatement implements Statement, BaseStatement {
     throw Driver.notImplemented(this.getClass(), "getLargeMaxRows");
   }
 
+  @Override
   public long[] executeLargeBatch() throws SQLException {
-    throw Driver.notImplemented(this.getClass(), "executeLargeBatch");
+    checkClosed();
+    closeForNextExecution();
+
+    if (batchStatements == null || batchStatements.isEmpty()) {
+      return new long[0];
+    }
+
+    return internalExecuteBatch().getLargeUpdateCount();
   }
 
+  @Override
   public long executeLargeUpdate(String sql) throws SQLException {
-    throw Driver.notImplemented(this.getClass(), "executeLargeUpdate");
+    executeWithFlags(sql, QueryExecutor.QUERY_NO_RESULTS);
+    checkNoResultUpdate();
+    return getLargeUpdateCount();
   }
 
+  @Override
   public long executeLargeUpdate(String sql, int autoGeneratedKeys) throws SQLException {
-    throw Driver.notImplemented(this.getClass(), "executeLargeUpdate");
+    if (autoGeneratedKeys == Statement.NO_GENERATED_KEYS) {
+      return executeLargeUpdate(sql);
+    }
+
+    return executeLargeUpdate(sql, (String[]) null);
   }
 
+  @Override
   public long executeLargeUpdate(String sql, int[] columnIndexes) throws SQLException {
-    throw Driver.notImplemented(this.getClass(), "executeLargeUpdate");
+    if (columnIndexes == null || columnIndexes.length == 0) {
+      return executeLargeUpdate(sql);
+    }
+
+    throw new PSQLException(GT.tr("Returning autogenerated keys by column index is not supported."),
+            PSQLState.NOT_IMPLEMENTED);
   }
 
+  @Override
   public long executeLargeUpdate(String sql, String[] columnNames) throws SQLException {
-    throw Driver.notImplemented(this.getClass(), "executeLargeUpdate");
-  }
+    if (columnNames != null && columnNames.length == 0) {
+      return executeLargeUpdate(sql);
+    }
 
-  public long executeLargeUpdate() throws SQLException {
-    throw Driver.notImplemented(this.getClass(), "executeLargeUpdate");
+    wantsGeneratedKeysOnce = true;
+    executeCachedSql(sql, 0, columnNames);
+
+    return getLargeUpdateCount();
   }
 
   public boolean isClosed() throws SQLException {

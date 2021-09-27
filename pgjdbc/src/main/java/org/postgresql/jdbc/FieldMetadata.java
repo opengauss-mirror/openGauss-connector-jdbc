@@ -59,18 +59,20 @@ public class FieldMetadata implements CanEstimateSize {
   final String schemaName;
   final int nullable;
   final boolean autoIncrement;
+  final int clientLogicOriginalMod;
 
   public FieldMetadata(String columnName) {
-    this(columnName, "", "", PgResultSetMetaData.columnNullableUnknown, false);
+    this(columnName, "", "", PgResultSetMetaData.columnNullableUnknown, false, 0);
   }
 
   FieldMetadata(String columnName, String tableName, String schemaName, int nullable,
-      boolean autoIncrement) {
+      boolean autoIncrement, int clientLogicOriginalMod) {
     this.columnName = columnName;
     this.tableName = tableName;
     this.schemaName = schemaName;
     this.nullable = nullable;
     this.autoIncrement = autoIncrement;
+    this.clientLogicOriginalMod = clientLogicOriginalMod;
   }
 
   public long getSize() {
@@ -78,7 +80,8 @@ public class FieldMetadata implements CanEstimateSize {
         + tableName.length() * 2
         + schemaName.length() * 2
         + 4L
-        + 1L;
+        + 1L
+        + 4L; //for clientLogic data
   }
 
   @Override

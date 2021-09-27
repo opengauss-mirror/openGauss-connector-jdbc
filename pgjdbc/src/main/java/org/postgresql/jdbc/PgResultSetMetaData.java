@@ -72,6 +72,9 @@ public class PgResultSetMetaData implements ResultSetMetaData, PGResultSetMetaDa
    */
   public boolean isCaseSensitive(int column) throws SQLException {
     Field field = getField(column);
+    if (isCleintLogicOn() && ClientLogic.isClientLogicField(field.getOID())) {
+      return connection.getTypeInfo().isCaseSensitive(field.getMod());
+    }
     return connection.getTypeInfo().isCaseSensitive(field.getOID());
   }
 
@@ -129,11 +132,19 @@ public class PgResultSetMetaData implements ResultSetMetaData, PGResultSetMetaDa
    */
   public boolean isSigned(int column) throws SQLException {
     Field field = getField(column);
+    if (isCleintLogicOn() && ClientLogic.isClientLogicField(field.getOID())) {
+      fetchFieldMetaData();
+      return connection.getTypeInfo().isSigned(field.getMod());
+    }
     return connection.getTypeInfo().isSigned(field.getOID());
   }
 
   public int getColumnDisplaySize(int column) throws SQLException {
     Field field = getField(column);
+    if (isCleintLogicOn() && ClientLogic.isClientLogicField(field.getOID())) {
+      fetchFieldMetaData();
+      return connection.getTypeInfo().getDisplaySize(field.getMod(), field.getMetadata().clientLogicOriginalMod);
+    }
     return connection.getTypeInfo().getDisplaySize(field.getOID(), field.getMod());
   }
 
@@ -184,24 +195,42 @@ public class PgResultSetMetaData implements ResultSetMetaData, PGResultSetMetaDa
     return allOk;
   }
 
-  private StringBuilder getSql() {
-      StringBuilder sql = new StringBuilder(
-              "SELECT c.oid, a.attnum, a.attname, c.relname, n.nspname, "
-                  + "a.attnotnull OR (t.typtype = 'd' AND t.typnotnull), ");
-
-          if (connection.haveMinimumServerVersion(ServerVersion.v10)) {
-              sql.append("a.attidentity != '' OR pg_catalog.pg_get_expr(d.adbin, d.adrelid) LIKE '%nextval(%' ");
-          } else {
-              sql.append("pg_catalog.pg_get_expr(d.adbin, d.adrelid) LIKE '%nextval(%' ");
-          }
-          sql.append( "FROM pg_catalog.pg_class c "
-                  + "JOIN pg_catalog.pg_namespace n ON (c.relnamespace = n.oid) "
-                  + "JOIN pg_catalog.pg_attribute a ON (c.oid = a.attrelid) "
-                  + "JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid) "
-                  + "LEFT JOIN pg_catalog.pg_attrdef d ON (d.adrelid = a.attrelid AND d.adnum = a.attnum) "
-                  + "JOIN (");
-          return sql;
+  private Boolean isCleintLogicOn() {
+    ClientLogic clientLogic = this.connection.getClientLogic();
+    if (clientLogic == null) {
+      return false;
+    }
+    return true;
   }
+
+  private StringBuilder getSql() {
+
+    StringBuilder sql = new StringBuilder(
+            "SELECT c.oid, a.attnum, a.attname, c.relname, n.nspname, "
+                    + "a.attnotnull OR (t.typtype = 'd' AND t.typnotnull), ");
+
+    if (connection.haveMinimumServerVersion(ServerVersion.v10)) {
+      sql.append("a.attidentity != '' OR pg_catalog.pg_get_expr(d.adbin, d.adrelid) LIKE '%nextval(%' ");
+    } else {
+      sql.append("pg_catalog.pg_get_expr(d.adbin, d.adrelid) LIKE '%nextval(%' ");
+    }
+    if (isCleintLogicOn()) {
+      sql.append(",data_type_original_oid, data_type_original_mod ");
+    }
+    sql.append( "FROM pg_catalog.pg_class c "
+            + "JOIN pg_catalog.pg_namespace n ON (c.relnamespace = n.oid) "
+            + "JOIN pg_catalog.pg_attribute a ON (c.oid = a.attrelid) ");
+
+    if (isCleintLogicOn()) {
+      sql.append("LEFT JOIN pg_catalog.gs_encrypted_columns ce ON (a.attrelid=ce.rel_id AND a.attname = ce.column_name)");
+    }
+
+    sql.append("JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid) "
+            + "LEFT JOIN pg_catalog.pg_attrdef d ON (d.adrelid = a.attrelid AND d.adnum = a.attnum) "
+            + "JOIN (");
+    return sql;
+  }
+
   private void executeSql(StringBuilder sql) throws SQLException {
       Statement stmt = connection.createStatement();
       ResultSet rs = null;
@@ -215,11 +244,15 @@ public class PgResultSetMetaData implements ResultSetMetaData, PGResultSetMetaDa
           String columnName = rs.getString(3);
           String tableName = rs.getString(4);
           String schemaName = rs.getString(5);
+          int clientLogicOriginalMod = 0;
           int nullable =
               rs.getBoolean(6) ? ResultSetMetaData.columnNoNulls : ResultSetMetaData.columnNullable;
           boolean autoIncrement = rs.getBoolean(7);
+          if (isCleintLogicOn()) {
+            clientLogicOriginalMod  = rs.getInt(9);
+          }
           FieldMetadata fieldMetadata =
-              new FieldMetadata(columnName, tableName, schemaName, nullable, autoIncrement);
+              new FieldMetadata(columnName, tableName, schemaName, nullable, autoIncrement, clientLogicOriginalMod);
           FieldMetadata.Key key = new FieldMetadata.Key(table, column);
           md.put(key, fieldMetadata);
         }
@@ -292,11 +325,19 @@ public class PgResultSetMetaData implements ResultSetMetaData, PGResultSetMetaDa
 
   public int getPrecision(int column) throws SQLException {
     Field field = getField(column);
+    if (isCleintLogicOn() && ClientLogic.isClientLogicField(field.getOID())) {
+      fetchFieldMetaData();
+      return connection.getTypeInfo().getPrecision(field.getMod(), field.getMetadata().clientLogicOriginalMod);
+    }
     return connection.getTypeInfo().getPrecision(field.getOID(), field.getMod());
   }
 
   public int getScale(int column) throws SQLException {
     Field field = getField(column);
+    if (isCleintLogicOn() && ClientLogic.isClientLogicField(field.getOID())) {
+      fetchFieldMetaData();
+      return connection.getTypeInfo().getScale(field.getMod(), field.getMetadata().clientLogicOriginalMod);
+    }
     return connection.getTypeInfo().getScale(field.getOID(), field.getMod());
   }
 
@@ -418,10 +459,16 @@ public class PgResultSetMetaData implements ResultSetMetaData, PGResultSetMetaDa
   }
 
   protected String getPGType(int columnIndex) throws SQLException {
+    if (isCleintLogicOn() && ClientLogic.isClientLogicField(getField(columnIndex).getOID())) {
+      return connection.getTypeInfo().getPGType(getField(columnIndex).getMod());
+    }
     return connection.getTypeInfo().getPGType(getField(columnIndex).getOID());
   }
 
   protected int getSQLType(int columnIndex) throws SQLException {
+    if (isCleintLogicOn() && ClientLogic.isClientLogicField(getField(columnIndex).getOID())) {
+      return connection.getTypeInfo().getSQLType(getField(columnIndex).getMod());
+    }
     return connection.getTypeInfo().getSQLType(getField(columnIndex).getOID());
   }
 
@@ -432,7 +479,11 @@ public class PgResultSetMetaData implements ResultSetMetaData, PGResultSetMetaDa
 
   public String getColumnClassName(int column) throws SQLException {
     Field field = getField(column);
-    String result = connection.getTypeInfo().getJavaClass(field.getOID());
+    int actualOID = field.getOID();
+    if (ClientLogic.isClientLogicField(actualOID)) {
+      actualOID  = field.getMod();
+    }
+    String result = connection.getTypeInfo().getJavaClass(actualOID);
 
     if (result != null) {
       return result;

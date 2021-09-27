@@ -6,6 +6,7 @@
 package org.postgresql.core;
 
 import org.postgresql.PGConnection;
+import org.postgresql.jdbc.ClientLogic;
 import org.postgresql.jdbc.FieldMetadata;
 import org.postgresql.jdbc.TimestampUtils;
 import org.postgresql.log.Log;
@@ -21,6 +22,13 @@ import java.util.TimerTask;
  * Driver-internal connection interface. Application code should not use this interface.
  */
 public interface BaseConnection extends PGConnection, Connection {
+  /**
+   * Retrives the connection ClientLogic instance.
+   * If the client logic option is not turned on, returns null
+   *
+   */
+  ClientLogic getClientLogic();
+
   /**
    * Cancel the current query executing on this connection.
    *
