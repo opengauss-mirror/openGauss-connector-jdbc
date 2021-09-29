@@ -4,9 +4,14 @@ import java.lang.reflect.Method;
 import java.security.PrivateKey;
 import java.security.Provider;
 import java.security.Security;
+import java.sql.SQLException;
 import java.util.Arrays;
 
 import javax.security.auth.callback.PasswordCallback;
+
+import org.postgresql.util.GT;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.PSQLState;
 
 /**
  * 
@@ -22,6 +27,25 @@ public class BouncyCastlePrivateKeyFactory implements PrivateKeyFactory {
     private static Class<?> inputDecryptorProvider = null;
     private static Class<?> pkcs8EncryptedPkeyInfo = null;
     private static Class<?> encryptPrivateKeyInfo;
+
+    /**
+     * Initial Bouncy Castle Provider
+     *
+     * @return Provider the bouncy castleprovider
+     * @throws SQLException the sql exception
+     */
+    public static Provider initBouncyCastleProvider() throws SQLException {
+        String bouncyCastle = "org.bouncycastle.jce.provider.BouncyCastleProvider";
+        try {
+            Class<?> bouncyCastleProvider = Class.forName(bouncyCastle);
+            Object bcObj = bouncyCastleProvider.newInstance();
+            return (Provider) bcObj;
+        } catch (InstantiationException | ClassNotFoundException | IllegalAccessException exception) {
+            throw new PSQLException(
+                    GT.tr("Could not found bouncycastle provider, please load bcprov-jdk15on jar package manually"),
+                    PSQLState.CONNECTION_REJECTED);
+        }
+    }
     
     private static void initBc() throws Exception {
       String bouncyCastle = "org.bouncycastle.jce.provider.BouncyCastleProvider";

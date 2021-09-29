@@ -57,11 +57,6 @@
 			<artifactId>hw-java-sdk-core</artifactId>
 			<version>3.0.12</version>
 		</dependency>
-                <dependency>
-                    <groupId>org.bouncycastle</groupId>
-                    <artifactId>bcprov-jdk15on</artifactId>
-                    <version>1.68</version>
-                </dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
@@ -73,7 +68,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
-				<version>3.2.4</version>
+				<version>3.2.0</version>
 				<configuration>
 					<createDependencyReducedPom>false</createDependencyReducedPom>
 				</configuration>
@@ -109,10 +104,6 @@
 									<pattern>com.cloud</pattern>
 									<shadedPattern>com.huawei.shade.com.cloud</shadedPattern>
 								</relocation>
-                                                                <relocation>
-                                                                        <pattern>org.bouncycastle</pattern>
-                                                                        <shadedPattern>com.huawei.shade.org.bouncycastle</shadedPattern>
-                                                                </relocation>
 							</relocations>
 							<filters>
 								<filter>
@@ -164,13 +155,6 @@
 										<exclude>META-INF/NOTICE.txt</exclude>
 									</excludes>
 								</filter>
-                                                                <filter>
-                                                                        <artifact>bcprov-jdk15on:*</artifact>
-                                                                        <excludes>
-                                                                                <exclude>META-INF/LICENSE.txt</exclude>
-                                                                                <exclude>META-INF/NOTICE.txt</exclude>
-                                                                        </excludes>
-                                                                </filter>
 							</filters>
 						</configuration>
 					</execution>

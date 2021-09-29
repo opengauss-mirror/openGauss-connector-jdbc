@@ -5,6 +5,7 @@
 
 package org.postgresql.util;
 import org.postgresql.log.Logger;
+import org.postgresql.ssl.BouncyCastlePrivateKeyFactory;
 import org.postgresql.log.Log;
 
 import java.security.MessageDigest;
@@ -12,9 +13,9 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.Security;
 import java.io.UnsupportedEncodingException;
-import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.spec.InvalidKeySpecException;
+import java.sql.SQLException;
 import java.util.Locale;
 
 import javax.crypto.SecretKeyFactory;
@@ -22,8 +23,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec; 
 import javax.crypto.spec.PBEKeySpec;
 
-import com.huawei.shade.org.bouncycastle.jce.provider.BouncyCastleProvider;
-import static com.huawei.shade.org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME;
+
 
 /**
  * MD5-based utility function to obfuscate passwords before network transmission.
@@ -31,19 +31,9 @@ import static com.huawei.shade.org.bouncycastle.jce.provider.BouncyCastleProvide
  * @author Jeremy Wohl
  */
 public class MD5Digest {
-	private static final Provider provider = new BouncyCastleProvider();
-	
-	private static boolean isSha256 = true;
-	
-	public static boolean getIsSha256 () {
-		return isSha256;
-	}
-	
-	public static void setIsSha256 (boolean val) {
-		isSha256 = val;
-	}
-	
     private static Log LOGGER = Logger.getLogger(MD5Digest.class.getName());
+
+    private static final String SM3_PROVIDER_NAME = "BC";
 
   private MD5Digest() {
   }
@@ -151,12 +141,19 @@ public class MD5Digest {
     }
 
     private static byte[] sm3(byte[] str) {
-    	Security.addProvider(provider);
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance("SM3", PROVIDER_NAME);
-        } catch (GeneralSecurityException e) {
-            LOGGER.info("Sm3 encode failed.", e);
+            Provider provider = null;
+            if (Security.getProvider(SM3_PROVIDER_NAME) == null) {
+                provider = BouncyCastlePrivateKeyFactory.initBouncyCastleProvider();
+                Security.addProvider(provider);
+                LOGGER.info("Load sm3 provider by JDBC Driver");
+            } else {
+                provider = Security.getProvider(SM3_PROVIDER_NAME);
+            }
+            md = MessageDigest.getInstance("SM3", provider);
+        } catch (NoSuchAlgorithmException | SQLException exp) {
+            LOGGER.info("SM3 encode failed.", exp);
         }
         if (md == null) {
             return new byte[0];
@@ -287,30 +284,30 @@ public class MD5Digest {
 
     public static byte[] RFC5802Algorithm(String password, String random64code, String token) {
         int server_iteration_350 = 2048;
-        return RFC5802Algorithm(password, random64code, token, null, server_iteration_350);
+        return RFC5802Algorithm(password, random64code, token, null, server_iteration_350, true);
     }
 
     public static byte[] RFC5802Algorithm(
-            String password, String random64code, String token, String server_signature, int server_iteration) {
-        byte[] h = null;
+            String password, String random64code, String token, String server_signature, int server_iteration, boolean isSha256) {
+        byte[] hValue = null;
         byte[] result = null;
         try {
             byte[] K = generateKFromPBKDF2(password, random64code, server_iteration);
             byte[] server_key = getKeyFromHmac(K, "Sever Key".getBytes("UTF-8"));
-            byte[] client_key = getKeyFromHmac(K, "Client Key".getBytes("UTF-8"));
-            byte[] stored_key = null;
-            if (getIsSha256()) {
-            	stored_key = sha256(client_key);           	
+            byte[] clientKey = getKeyFromHmac(K, "Client Key".getBytes("UTF-8"));
+            byte[] storedKey = null;
+            if (isSha256) {
+                storedKey = sha256(clientKey);
             } else {
-            	stored_key = sm3(client_key);
+                storedKey = sm3(clientKey);	
             }
             byte[] tokenbyte = hexStringToBytes(token);
             byte[] client_signature = getKeyFromHmac(server_key, tokenbyte);
             if (server_signature != null && !server_signature.equals(bytesToHexString(client_signature))) return new byte[0];
-            byte[] hmac_result = getKeyFromHmac(stored_key, tokenbyte);
-            h = XOR_between_password(hmac_result, client_key, client_key.length);
-            result = new byte[h.length * 2];
-            bytesToHex(h, result, 0, h.length);
+            byte[] hmac_result = getKeyFromHmac(storedKey, tokenbyte);
+            hValue = XOR_between_password(hmac_result, clientKey, clientKey.length);
+            result = new byte[hValue.length * 2];
+            bytesToHex(hValue, result, 0, hValue.length);
         } catch (Exception e) {
             LOGGER.info("RFC5802Algorithm failed. " + e.toString());
         }
@@ -318,7 +315,7 @@ public class MD5Digest {
     }
 
     public static byte[] RFC5802Algorithm(String password, String random64code, String token, int server_iteration) {
-        return RFC5802Algorithm(password, random64code, token, null, server_iteration);
+        return RFC5802Algorithm(password, random64code, token, null, server_iteration, true);
     }
 
 }
