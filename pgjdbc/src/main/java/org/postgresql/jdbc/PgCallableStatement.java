@@ -495,10 +495,18 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
   }
 
   public Clob getClob(int i) throws SQLException {
-    PGClob pgClob = (PGClob) callResult[i-1];
-    String str = pgClob.getSubString(1, (int) pgClob.length());
-    Clob clob = new PGClob();
-    clob.setString(1, str);
+    Clob clob = null;
+    if (callResult[i - 1] instanceof PGClob) {
+      PGClob pgClob = (PGClob) callResult[i - 1];
+      String str = pgClob.getSubString(1, (int) pgClob.length());
+      clob = new PGClob();
+      clob.setString(1, str);
+    } else {
+      /* before c20 version, clob type is actually text */
+      /* we just use 'getString' method to get Text and set it into clob Object */
+      clob = new PGClob();
+      clob.setString(1, getString(i));
+    }
     return clob;
   }
 

@@ -1,7 +1,7 @@
 package org.postgresql.log;
 
-import com.huawei.shade.org.slf4j.Logger;
-import com.huawei.shade.org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Slf4JLogger implements Log {
     private Logger logger;
