@@ -48,7 +48,7 @@ public class CopyTest {
       {"First Row\t1\t1.10\n",
           "Second Row\t2\t-22.20\n",
           "\\N\t\\N\t\\N\n",
-          "\t4\t444.40\n"};
+          "\\N\t4\t444.40\n"};
   private int dataRows = origData.length;
 
   private byte[] getData(String[] origData) {
@@ -356,7 +356,7 @@ public class CopyTest {
     Statement stmt = con.createStatement();
     ResultSet rs = stmt.executeQuery("select pg_backend_pid()");
     rs.next();
-    int pid = rs.getInt(1);
+    Long pid = rs.getLong(1);
     rs.close();
     stmt.close();
 
@@ -420,7 +420,7 @@ public class CopyTest {
     }
   }
 
-  private void killConnection(int pid) throws SQLException {
+  private void killConnection(Long pid) throws SQLException {
     Connection killerCon;
     try {
       killerCon = TestUtil.openPrivilegedDB();
@@ -430,7 +430,7 @@ public class CopyTest {
     }
     try {
       PreparedStatement stmt = killerCon.prepareStatement("select pg_terminate_backend(?)");
-      stmt.setInt(1, pid);
+      stmt.setLong(1, pid);
       stmt.execute();
     } finally {
       killerCon.close();
