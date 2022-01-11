@@ -241,7 +241,7 @@ public class TypeInfoCache implements TypeInfo {
   private PreparedStatement getOidStatement(String pgTypeName) throws SQLException {
 	  if (_getOidStatementSimple == null) {
 		  String sql;
-          sql = "SELECT oid FROM pg_catalog.pg_type WHERE typname = ?";
+          sql = "SELECT oid, typname FROM pg_catalog.pg_type WHERE typname = ?";
           _getOidStatementSimple = _conn.prepareStatement(sql);
 	  }
 	  _getOidStatementSimple.setString(1, pgTypeName);
