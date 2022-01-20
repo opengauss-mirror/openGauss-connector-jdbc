@@ -28,8 +28,10 @@ import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.sql.DriverPropertyInfo;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeMap;
 
 
