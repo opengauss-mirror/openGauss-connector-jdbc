@@ -45,7 +45,7 @@ public class GeometricTest extends BaseTest4 {
 
   @Parameterized.Parameters(name = "binary = {0}")
   public static Iterable<Object[]> data() {
-    Collection<Object[]> ids = new ArrayList<Object[]>();
+    Collection<Object[]> ids = new ArrayList<>();
     for (BinaryMode binaryMode : BinaryMode.values()) {
       ids.add(new Object[]{binaryMode});
     }
@@ -55,7 +55,7 @@ public class GeometricTest extends BaseTest4 {
   public void setUp() throws Exception {
     super.setUp();
     TestUtil.createTable(con, "testgeometric",
-        "boxval box, circleval circle, lsegval lseg, pathval path, polygonval polygon, pointval point, lineval line");
+        "boxval box, circleval circle, lsegval lseg, pathval path, polygonval polygon, pointval point");
   }
 
   public void tearDown() throws SQLException {
