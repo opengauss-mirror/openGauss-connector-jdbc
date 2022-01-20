@@ -1087,6 +1087,14 @@ public class PgStatement implements Statement, BaseStatement {
     if (batchStatements == null || batchStatements.isEmpty()) {
       return new int[0];
     }
+    
+    if (this.connection instanceof PgConnection) {
+      PgConnection con = (PgConnection) this.connection;
+      if (con.isBatchInsert() && batchStatements.get(0).getSqlCommand().isBatchedReWriteCompatible()) {
+        throw new PSQLException(GT.tr("batchMode and reWriteBatchedInserts can not both set true!"),
+                PSQLState.NOT_IMPLEMENTED);
+      }
+    }
 
     return internalExecuteBatch().getUpdateCount();
   }
