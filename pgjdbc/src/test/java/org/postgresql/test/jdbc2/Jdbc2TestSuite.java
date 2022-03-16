@@ -101,6 +101,7 @@ import org.junit.runners.Suite;
         DeepBatchedInsertStatementTest.class,
         JBuilderTest.class,
         MiscTest.class,
+        NotifyTest.class,
         DatabaseEncodingTest.class,
         ClientEncodingTest.class,
 

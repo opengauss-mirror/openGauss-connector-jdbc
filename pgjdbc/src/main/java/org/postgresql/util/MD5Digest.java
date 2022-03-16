@@ -13,6 +13,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.Security;
 import java.io.UnsupportedEncodingException;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.spec.InvalidKeySpecException;
 import java.sql.SQLException;
@@ -299,7 +300,7 @@ public class MD5Digest {
             if (isSha256) {
                 storedKey = sha256(clientKey);
             } else {
-                storedKey = sm3(clientKey);	
+                storedKey = sm3(clientKey);
             }
             byte[] tokenbyte = hexStringToBytes(token);
             byte[] client_signature = getKeyFromHmac(server_key, tokenbyte);

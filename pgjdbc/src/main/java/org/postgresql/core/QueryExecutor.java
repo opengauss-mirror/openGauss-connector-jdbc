@@ -123,6 +123,11 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
    * Added to support queries coming from client logic (c++) and avoid a loop back
    */
   int QUERY_EXECUTE_BYPASS_CLIENT_LOGIC = 2048;
+
+    /**
+     * Execute the query again after client logic cache was reloaded
+     */
+    int QUERY_RETRY_WITH_CLIENT_LOGIC_CACHE_RELOADS = 4096;
   
   /**
    * Execute several Query, passing results to a provided ResultHandler.
@@ -495,5 +500,38 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
 
   void setGaussdbVersion(String gaussdbVersion);
 
+
+  /**
+   * Sets the version of the currently connected database
+   *
+   * @param workingVersionNum value of workingVersionNum
+   */
+  void setWorkingVersionNum(String workingVersionNum);
+
+  /**
+   * Get workingVersionNum
+   *
+   * @return value of workingVersionNum
+   */
+  String getWorkingVersionNum();
+
   void setAvailability(boolean availability);
+
+  String getCompatibilityMode();
+
+  void setCompatibilityMode(String compatibilityMode);
+
+  /**
+   * Get reload status
+   *
+   * @return state true or false
+   */
+  boolean getEnableOutparamOveride();
+
+  /**
+   * Set reload status
+   *
+   * @param enableOutparamOveride true or false
+   */
+  void setEnableOutparamOveride(boolean enableOutparamOveride);
 }

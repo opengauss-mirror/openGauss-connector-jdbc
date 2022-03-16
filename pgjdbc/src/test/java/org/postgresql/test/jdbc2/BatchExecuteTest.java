@@ -10,7 +10,6 @@ import org.postgresql.PGStatement;
 import org.postgresql.test.TestUtil;
 
 import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -155,7 +154,6 @@ public class BatchExecuteTest extends BaseTest4 {
 
   @Test
   public void testPreparedNoParameters() throws SQLException {
-    Assume.assumeTrue(insertRewrite == true);
     PreparedStatement ps = null;
     try {
       ps = con.prepareStatement("INSERT INTO prep(a) VALUES (1)");
@@ -408,16 +406,15 @@ public class BatchExecuteTest extends BaseTest4 {
 
     ResultSet rs = stmt.executeQuery("SELECT d FROM batchescape");
     Assert.assertTrue(rs.next());
-    Assert.assertEquals("2007-11-20 00:00:00", rs.getString(1));
+    Assert.assertEquals("2007-11-20", rs.getString(1));
     Assert.assertTrue(rs.next());
-    Assert.assertEquals("2007-11-20 00:00:00", rs.getString(1));
+    Assert.assertEquals("2007-11-20", rs.getString(1));
     Assert.assertTrue(!rs.next());
     TestUtil.closeQuietly(stmt);
   }
 
   @Test
   public void testBatchWithEmbeddedNulls() throws SQLException {
-    Assume.assumeTrue(insertRewrite == true);
     Statement stmt = con.createStatement();
     stmt.execute("CREATE TEMP TABLE batchstring (a text)");
 
@@ -748,6 +745,10 @@ org.postgresql.util.PSQLException: ERROR: incorrect binary data format in bind p
       ps = con.prepareStatement("insert into prep(a,b)  values(?::int4,?)");
       ps.setInt(1, 2);
       ps.setInt(2, 2);
+      ps.addBatch();
+      ps.addBatch();
+      ps.addBatch();
+      ps.addBatch();
       ps.addBatch();
       ps.setString(1, "1");
       ps.setInt(2, 2);
@@ -1220,7 +1221,6 @@ Server SQLState: 25001)
    */
   @Test
   public void testBatchWithRepeatedInsertStatement() throws SQLException {
-    Assume.assumeTrue(insertRewrite == true);
     PreparedStatement pstmt = null;
     /* Optimization to re-write insert statements is disabled by default.
      * Do nothing here.
@@ -1282,7 +1282,6 @@ Server SQLState: 25001)
   */
   @Test
   public void testBatchWithTwoMultiInsertStatements() throws SQLException {
-    Assume.assumeTrue(insertRewrite == true);
     PreparedStatement pstmt = null;
     try {
       pstmt = con.prepareStatement("INSERT INTO testbatch VALUES (?,?),(?,?)");
@@ -1336,12 +1335,11 @@ Server SQLState: 25001)
 
   @Test
   public void testServerPrepareMultipleRows() throws SQLException {
-    Assume.assumeTrue(insertRewrite == true);
     PreparedStatement ps = null;
     try {
       ps = con.prepareStatement("INSERT INTO prep(a) VALUES (?)");
       // 2 is not enough for insertRewrite=true case since it would get executed as a single multi-insert statement
-      for (int i = 0; i < 4; i++) {
+      for (int i = 0; i < 3; i++) {
         ps.setInt(1, i);
         ps.addBatch();
       }
@@ -1349,7 +1347,7 @@ Server SQLState: 25001)
       Assert.assertTrue(
           "More than 1 row is inserted via executeBatch, it should lead to multiple server statements, thus the statements should be server-prepared",
           ((PGStatement) ps).isUseServerPrepare());
-      assertBatchResult("3 rows inserted via batch", new int[]{1, 1, 1, 1}, actual);
+      assertBatchResult("3 rows inserted via batch", new int[]{1, 1, 1}, actual);
     } finally {
       TestUtil.closeQuietly(ps);
     }

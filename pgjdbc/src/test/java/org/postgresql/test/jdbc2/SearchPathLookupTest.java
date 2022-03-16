@@ -6,7 +6,6 @@
 package org.postgresql.test.jdbc2;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.postgresql.core.BaseConnection;
@@ -49,14 +48,13 @@ public class SearchPathLookupTest {
       TestUtil.createTable(con, "third_schema.x", "third_schema_field_n float");
       TestUtil.createSchema(con, "last_schema");
       TestUtil.createTable(con, "last_schema.x", "last_schema_field_n text");
-      stmt.execute("SET search_path TO third_schema");
-      ResultSet rs1 = stmt.executeQuery("SELECT 'x'::regtype::oid");
-      assertTrue(rs1.next());
-      int OID = rs1.getInt(1);
-      ResultSet rs2 = stmt.executeQuery("SELECT 'third_schema.x'::regtype::oid");
-      assertTrue(rs2.next());
-      assertEquals(OID, rs2.getInt(1));
-      assertFalse(rs2.next());
+      stmt.execute("SET search_path TO third_schema;");
+      TypeInfo typeInfo = con.getTypeInfo();
+      int OID = typeInfo.getPGType("x");
+      ResultSet rs = stmt.executeQuery("SELECT 'third_schema.x'::regtype::oid");
+      assertTrue(rs.next());
+      assertEquals(OID, rs.getInt(1));
+      assertTrue(!rs.next());
       TestUtil.dropSchema(con, "first_schema");
       TestUtil.dropSchema(con, "second_schema");
       TestUtil.dropSchema(con, "third_schema");
@@ -86,13 +84,13 @@ public class SearchPathLookupTest {
       TestUtil.createTable(con, "third_schema.x", "third_schema_field_n float");
       TestUtil.createSchema(con, "last_schema");
       TestUtil.createTable(con, "last_schema.y", "last_schema_field_n text");
-      stmt.execute("SET search_path TO first_schema, second_schema, last_schema, public");
+      stmt.execute("SET search_path TO first_schema, second_schema, last_schema, public;");
       TypeInfo typeInfo = con.getTypeInfo();
       int OID = typeInfo.getPGType("y");
       ResultSet rs = stmt.executeQuery("SELECT 'second_schema.y'::regtype::oid");
       assertTrue(rs.next());
       assertEquals(OID, rs.getInt(1));
-      assertFalse(rs.next());
+      assertTrue(!rs.next());
       TestUtil.dropSchema(con, "first_schema");
       TestUtil.dropSchema(con, "second_schema");
       TestUtil.dropSchema(con, "third_schema");
@@ -116,10 +114,10 @@ public class SearchPathLookupTest {
       TypeInfo typeInfo = con.getTypeInfo();
       int OID = typeInfo.getPGType("x");
       ResultSet rs = stmt
-          .executeQuery("SELECT oid FROM pg_type WHERE typname = 'x' ORDER BY oid LIMIT 1");
+          .executeQuery("SELECT oid FROM pg_type WHERE typname = 'x' ORDER BY oid DESC LIMIT 1");
       assertTrue(rs.next());
       assertEquals(OID, rs.getInt(1));
-      assertFalse(rs.next());
+      assertTrue(!rs.next());
       TestUtil.dropSchema(con, "first_schema");
       TestUtil.dropSchema(con, "second_schema");
     } finally {

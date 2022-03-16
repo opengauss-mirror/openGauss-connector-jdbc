@@ -14,7 +14,6 @@ import org.postgresql.core.Query;
 import org.postgresql.core.QueryExecutor;
 import org.postgresql.core.ServerVersion;
 import org.postgresql.core.TypeInfo;
-import org.postgresql.core.types.PGBlob;
 import org.postgresql.core.v3.BatchedQuery;
 import org.postgresql.core.v3.ConnectionFactoryImpl;
 import org.postgresql.largeobject.LargeObject;
@@ -31,20 +30,17 @@ import org.postgresql.util.PSQLState;
 import org.postgresql.util.ReaderInputStream;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
+import org.postgresql.util.HintNodeName;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
-import java.io.Writer;
-import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
-import java.nio.charset.Charset;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.Clob;
@@ -151,6 +147,10 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
 
       if (connection.getPreferQueryMode() == PreferQueryMode.SIMPLE) {
         flags |= QueryExecutor.QUERY_EXECUTE_AS_SIMPLE;
+      }
+      // Update when the value of nodeName changes
+      if (connection.getClientInfo("nodeName") != null ) {
+        this.preparedQuery.query.setNodeName(connection.getClientInfo("nodeName"));
       }
 
       execute(preparedQuery, preparedParameters, flags);
@@ -426,22 +426,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
                 throw new PSQLException(
                         GT.tr("Invalid stream length {0}.", Integer.valueOf(length)), PSQLState.INVALID_PARAMETER_VALUE);
             }
-            Blob blob = new PGBlob();
-            byte[] tmp = new byte[length];
-            try {
-                int len = x.read(tmp);
-                if (len < length) {
-                    throw new PSQLException(
-                            GT.tr("Invalid stream length {0}.", Integer.valueOf(length)),
-                            PSQLState.INVALID_PARAMETER_VALUE);
-                }
-                blob.setBytes(1, tmp);
-            } catch (IOException e) {
-                throw new PSQLException(GT.tr("Provided InputStream failed."), PSQLState.UNEXPECTED_ERROR, e);
-            }
-
-            setBlob(parameterIndex, blob);
-
+            preparedParameters.setBlob(parameterIndex, x, length);
         } else {
         if (x == null) {
           setNull(parameterIndex, Types.VARBINARY);
@@ -1434,11 +1419,20 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
      throw new PSQLException(GT.tr("Object is too large to send over the protocol."),
          PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE);
    }
-   preparedParameters.setBytea(parameterIndex, value, (int) length);
+   if (((PgConnection) this.connection).isBlobMode()) {
+     preparedParameters.setBlob(parameterIndex, value, (int)length);
+   } else {
+     preparedParameters.setBytea(parameterIndex, value, (int) length);
+   }
  }
 
  public void setBinaryStream(int parameterIndex, InputStream value) throws SQLException {
-   preparedParameters.setBytea(parameterIndex, value);
+   checkClosed();
+   if (((PgConnection) this.connection).isBlobMode()) {
+     preparedParameters.setBlob(parameterIndex, value);
+   } else {
+     preparedParameters.setBytea(parameterIndex, value);
+   }
  }
 
  public void setAsciiStream(int parameterIndex, InputStream value, long length)
@@ -1503,30 +1497,32 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
 
  public void setBlob(int i, InputStream in) throws SQLException{
      checkClosed();
-
      if (in == null)
      {
          setNull(i, Types.BLOB);
          return;
      }
-     try {
-       preparedParameters.setBlob(i, in, in.available());
-   } catch (IOException e1) {
-       throw new SQLException(e1.getMessage());
-   }
+     preparedParameters.setBlob(i, in);
 }
  
  @Override
  public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
      checkClosed();
-
      if (inputStream == null)
      {
          setNull(parameterIndex, Types.BLOB);
          return;
      }
+     if (length > Integer.MAX_VALUE) {
+       throw new PSQLException(GT.tr("Object is too large to send over the protocol. {0}", length),
+               PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE);
+     }
+     if (length < 0) {
+       throw new PSQLException(
+               GT.tr("Invalid stream length {0}.", length),
+               PSQLState.INVALID_PARAMETER_VALUE);
+     }
      preparedParameters.setBlob(parameterIndex, inputStream, (int)length);
-   
  }
 
 

@@ -51,12 +51,7 @@ public class Utils {
     // for performance measurements.
     // In OracleJDK 6u65, 7u55, and 8u40 String.getBytes(Charset) is
     // 3 times faster than other JDK approaches.
-    Charset gbkCharset = Charset.forName("GBK");
-    if ("GBK".equals((ConnectionFactoryImpl.CLIENT_ENCODING).toUpperCase(Locale.ENGLISH)))
-    {
-        return str.getBytes(gbkCharset);
-    }
-    return str.getBytes(utf8Charset);
+    return str.getBytes(Charset.forName(ConnectionFactoryImpl.CLIENT_ENCODING));
   }
 
   /**

@@ -67,7 +67,12 @@ public class Oid {
   public static final int VOID = 2278;
   public static final int INTERVAL = 1186;
   public static final int INTERVAL_ARRAY = 1187;
-  public static final int CHAR = 18; // This is not char(N), this is "char" a single byte type.
+
+  /**
+   * This is not char(N), this is "char" a single byte type.
+   */
+
+  public static final int CHAR = 18;
   public static final int CHAR_ARRAY = 1002;
   public static final int VARBIT = 1562;
   public static final int VARBIT_ARRAY = 1563;
@@ -85,6 +90,18 @@ public class Oid {
   public static final int REF_CURSOR_ARRAY = 2201;
   public static final int BLOB = 88;
   public static final int CLOB = 90;
+
+  /**
+   * mapping database oid nvarchar2
+   */
+
+  public static final int NVARCHAR2 = 3969;
+
+  /**
+   * mapping database oid nvarchar2_array
+   */
+
+  public static final int NVARCHAR2_ARRAY = 3968;
 
   private static final Map<Integer, String> OID_TO_NAME = new HashMap<Integer, String>(100);
   private static final Map<String, Integer> NAME_TO_OID = new HashMap<String, Integer>(100);

@@ -15,7 +15,6 @@ import static org.junit.Assume.assumeTrue;
 import org.postgresql.core.ServerVersion;
 import org.postgresql.jdbc.PreferQueryMode;
 import org.postgresql.test.TestUtil;
-import org.postgresql.util.DataBaseCompatibility;
 import org.postgresql.util.PGobject;
 
 import org.junit.Test;

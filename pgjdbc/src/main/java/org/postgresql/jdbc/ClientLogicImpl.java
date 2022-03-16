@@ -8,22 +8,28 @@ import java.util.List;
 import org.postgresql.util.JdbcBlackHole;
 
 public class ClientLogicImpl {
-  static {
-      System.loadLibrary("gauss_cl_jni");
-  }
-  // Native methods:
-  private native Object[] linkClientLogicImpl(String databaseName);
-  private native Object[] runQueryPreProcessImpl(long handle, String originalQuery);
-  private native Object[] runQueryPostProcessImpl(long handle);
-  private native Object[] runClientLogicImpl(long handle, String processData, int dataType);
-  private native Object[] prepareQueryImpl(long handle, String query, String statement_name, int parameter_count);
-  private native Object[] replaceStatementParamsImpl(long handle, String statementName, String[] param_values);
-  private native Object[] replaceErrorMessageImpl(long handle, String originalMessage);
-  private native void destroy(long handle);
+    static {
+        System.loadLibrary("gauss_cl_jni");
+    }
+    // Native methods:
+    private native Object[] linkClientLogicImpl(String databaseName);
+    private native Object[] setKmsInfoImpl(long handle, String key, String value);
+    private native Object[] runQueryPreProcessImpl(long handle, String originalQuery);
+    private native Object[] runQueryPostProcessImpl(long handle);
+    private native Object[] runClientLogicImpl(long handle, String processData, int dataType);
 
-  private long m_handle = 0;
-  private PgConnection m_jdbcConn = null;
-  
+    private native Object[] getRecordIDsImpl(long mHandle, String dataTypeName, int oid);
+    private native Object[] runClientLogic4RecordImpl(long handle, String data2Process, int[] originalOids);
+
+    private native Object[] prepareQueryImpl(long handle, String query, String statement_name, int parameter_count);
+    private native Object[] replaceStatementParamsImpl(long handle, String statementName, String[] param_values);
+    private native Object[] replaceErrorMessageImpl(long handle, String originalMessage);
+    private native void reloadCacheImpl(long handle);
+    private native void reloadCacheIfNeededImpl(long handle);
+    private native void destroy(long handle);
+
+    private long m_handle = 0;
+    private PgConnection m_jdbcConn = null;
   /**
    * Link between the Java PgConnection and the PGConn Client logic object
    * @param databaseName the database name
@@ -41,8 +47,15 @@ public class ClientLogicImpl {
   	else {
   		//did not add much logic here, will handle it on the parent class
       return new Object[]{};
-  	}  	
+  	}
   }
+
+    /**
+    * Transfer all parameters that are used to establish a connection with HuaweiCloud IAM and KMS to 'gauss_cl_jni'.
+    */
+    public Object[] setKmsInfo(String key, String value) {
+        return setKmsInfoImpl(m_handle, key, value);
+    }
 
     /**
      * Run the pre query, to replace client logic field values with binary format before sending the query to the database server
@@ -56,9 +69,9 @@ public class ClientLogicImpl {
         return runQueryPreProcessImpl(m_handle, originalQuery);
     }
   /**
-   * Replace client logic field value with user input - used when receiving data in a resultset 
+   * Replace client logic field value with user input - used when receiving data in a resultset
    * @param processData the data in binary format (hexa)
-   * @param dataType the oid (modid) of the original field type 
+   * @param dataType the oid (modid) of the original field type
    * @return array of objects
    *[0][0] - int status code - zero for success
    *[0][1] - string status description
@@ -67,6 +80,38 @@ public class ClientLogicImpl {
   public Object[] runClientLogic(String processData, int dataType) {
   	return runClientLogicImpl(m_handle, processData, dataType);
   }
+
+    /**
+     * Gets the list of original oids, needed when returning a record from a function that has client logic fields
+     *
+     * @param dataTypeName the name of the data type of the oculmn in the resultset
+     * @param oid the fields oid
+     * @return array of object in the following format
+     * [0][0] - int status code - zero for success
+     * [0][1] - string status description
+     * [1][0...n] the original oids in the record if it contains any clint loigic fields, otherwise this part is omitted
+     */
+    public Object[] getRecordIDs(String dataTypeName, int oid) {
+        return getRecordIDsImpl(m_handle, dataTypeName, oid);
+    }
+
+    /**
+     * convert client records returned from function that contains client logic fields to user format
+     *
+     * @param data2Process the record with client logic fields
+     * @param originalOids the result from getRecordIDs method for that field
+     * @return array of object in the following format
+     * [0][0] - int status code - zero for success
+     * [0][1] - string status description
+     * [0][0] - int status code - zero for success
+     * [0][1] - string status description
+     * [1] - int 0 not client logic 1 - is client logic
+     * [2] - String - The data in user format
+     */
+    public Object[] runClientLogic4Record(String data2Process, int[] originalOids) {
+        return runClientLogic4RecordImpl(m_handle, data2Process, originalOids);
+    }
+
   /**
    * run post process on the backend, to free the client logic state machine when a query is done
    * @return array of objects
@@ -84,19 +129,22 @@ public class ClientLogicImpl {
    * @return array of objects
    *[0][0] - int status code - zero for success
    *[0][1] - string status description
-   *[1] - String - The modified query - to be used if the query had client logic fields in user format that have to be replaces with binary value 
+   *[1] - String - The modified query - to be used if the query had client logic fields in user format that have to be replaces with binary value
    */
   public Object[] prepareQuery(String query, String statement_name, int parameter_count){
   	return  prepareQueryImpl(m_handle, query, statement_name, parameter_count);
   }
   /**
-   * replace parameters values in prepared statement - to be called before binding the parameters and executing the statement  
+   * replace parameters values in prepared statement - to be called before binding the parameters and executing the statement
    * @param statementName the name of the statement
    * @param paramValues array of parameters in user format
    * @return array of objects
-   *[0][0] - int status code - zero for success
-   *[0][1] - string status description
-   *[1][0 ... parameter_count - 1] - array with the parameters value, if the parameter is not being replace a NULL apears otherwise the replaced value
+   * [0][0] - int status code - zero for success
+   * [0][1] - string status description
+   * [1][0 ... parameter_count - 1] - array with the parameters value, if the parameter is not
+   * being replace a NULL apears otherwise the replaced value
+   * [2][0 ... parameter_count - 1] - array with the parameters' type-oids,
+   * if the parameter is being replaced, otherwise 0
    */
   public Object[] replaceStatementParams(String statementName, String[] paramValues) {
   	return replaceStatementParamsImpl(m_handle, statementName, paramValues);
@@ -108,7 +156,7 @@ public class ClientLogicImpl {
    * 		... Key (name)=(\xa1d4....) already exists. ...
    * to:
    * 		... Key (name)=(John) already exists. ...
-   * @param originalMessage the error message received from the server 
+   * @param originalMessage the error message received from the server
    * @return array of objects
    *[0][0] - int status code - zero for success
    *[0][1] - string status description
@@ -134,7 +182,7 @@ public class ClientLogicImpl {
   }
 
   /**
-   * setter function to set the handle 
+   * setter function to set the handle
    * @param handle
    */
   public void setHandle(long handle) {
@@ -149,9 +197,9 @@ public class ClientLogicImpl {
   }
 
   /**
-   * This method is being invoked from the client logic c++ code  
-   * It is used to fetch data from the server regarding the client logic settings - cache manager   
-   * @param query the query to incoke 
+   * This method is being invoked from the client logic c++ code
+   * It is used to fetch data from the server regarding the client logic settings - cache manager
+   * @param query the query to incoke
    * @return array of results in the following format
    * [0] - array of column headers
    * [1...n] - array of results
@@ -184,7 +232,7 @@ public class ClientLogicImpl {
         data.add(record.toArray());
       }
       st.close();
-    } 
+    }
     catch (SQLException e) {
     	List<Object> errorResponse = new ArrayList<>();
     	errorResponse.add(e.getMessage());
@@ -194,4 +242,23 @@ public class ClientLogicImpl {
     }
 	  return data.toArray();
   }
+
+    /**
+     * Reloads the client logic cache, required when there is an error related to missing client logic cache
+     */
+    public void reloadCache() {
+        if (m_handle > 0) {
+            reloadCacheImpl(m_handle);
+        }
+    }
+
+    /**
+     * Reloads the client logic cache ONLY if the timestamp of the configuration fetched is earlier
+     * than the timestamp of the configuration on the server
+     */
+    public void reloadCacheIfNeeded() {
+        if (m_handle > 0) {
+            reloadCacheIfNeededImpl(m_handle);
+        }
+    }
 }

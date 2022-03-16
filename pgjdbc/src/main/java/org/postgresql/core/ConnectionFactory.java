@@ -27,6 +27,8 @@ import org.postgresql.log.Log;
  */
 public abstract class ConnectionFactory {
   private static Log LOGGER = Logger.getLogger(ConnectionFactory.class.getName());
+  private static final String PROTOCOL_VERSION_1_STR = "1";
+  private static final String PROTOCOL_VERSION_3_STR = "3";
   /**
    * <p>Establishes and initializes a new connection.</p>
    *
@@ -48,7 +50,9 @@ public abstract class ConnectionFactory {
       String database, Properties info) throws SQLException {
     String protoName = PGProperty.PROTOCOL_VERSION.get(info);
 
-    if (protoName == null || protoName.isEmpty() || "3".equals(protoName)) {
+    if (protoName == null || protoName.isEmpty() ||
+        PROTOCOL_VERSION_1_STR.equals(protoName) ||
+        PROTOCOL_VERSION_3_STR.equals(protoName)) {
       ConnectionFactory connectionFactory = new ConnectionFactoryImpl();
       QueryExecutor queryExecutor = connectionFactory.openConnectionImpl(
           hostSpecs, user, database, info);

@@ -183,6 +183,9 @@ public interface ParameterList {
    * @param stream a stream containing the parameter data.
    * @throws SQLException on error or if <code>index</code> is out of range
    */
+
+  void setBlob(int index, InputStream stream) throws SQLException;
+
   void setText(int index, InputStream stream) throws SQLException;
 
   /**
@@ -242,4 +245,6 @@ public interface ParameterList {
    * @return Object array containing the parameter values.
    */
   Object[] getValues();
+
+  void bindRegisterOutParameter(int index,int oid, boolean isOracleCompatibilityFunction) throws SQLException;
 }

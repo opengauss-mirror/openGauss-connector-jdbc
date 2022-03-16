@@ -31,6 +31,7 @@ import java.util.Map;
  */
 class SimpleQuery implements Query {
   private static Log LOGGER = Logger.getLogger(SimpleQuery.class.getName());
+  private String nodeName = null;
 
   SimpleQuery(SimpleQuery src) {
     this(src.nativeQuery, src.transferModeRegistry, src.sanitiserDisabled);
@@ -65,6 +66,16 @@ class SimpleQuery implements Query {
 
   public SimpleQuery[] getSubqueries() {
     return null;
+  }
+
+  @Override
+  public void setIsFunction(boolean isFunction) {
+    this.isFunction = isFunction;
+  }
+
+  @Override
+  public boolean getIsFunction() {
+    return this.isFunction;
   }
 
   /**
@@ -327,6 +338,14 @@ class SimpleQuery implements Query {
     return nativeQuery.bindPositions.length * getBatchSize();
   }
 
+  public String getNodeName() {
+    return this.nodeName;
+  }
+
+  public void setNodeName(String nodeName) {
+    this.nodeName = nodeName;
+  }
+
   private Map<String, Integer> resultSetColumnNameIndexMap;
 
   @Override
@@ -367,6 +386,7 @@ class SimpleQuery implements Query {
   private int[] preparedTypes;
   private BitSet unspecifiedParams;
   private short deallocateEpoch;
+  private boolean isFunction;
 
   private Integer cachedMaxResultRowSize;
 

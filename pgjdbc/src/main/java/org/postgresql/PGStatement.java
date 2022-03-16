@@ -80,4 +80,11 @@ public interface PGStatement {
    * @since build 302
    */
   int getPrepareThreshold();
+
+    /**
+     * Checks if the statement was created to get data for client logic cache Via JNI using executeQueryWithNoCL
+     *
+     * @return true if the statement was created to get data for client logic cache Via JNI using executeQueryWithNoCL
+     */
+    boolean getIsStatamentUsedForClientLogicCache();
 }

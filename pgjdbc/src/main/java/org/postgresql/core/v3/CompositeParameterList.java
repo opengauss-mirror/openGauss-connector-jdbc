@@ -47,6 +47,11 @@ class CompositeParameterList implements V3ParameterList {
 
   }
 
+  @Override
+  public void bindRegisterOutParameter(int index, int oid, boolean isOracleCompatibilityFunction) throws SQLException {
+
+  }
+
   public int getDirection(int i) {
     return 0;
   }
@@ -208,5 +213,8 @@ class CompositeParameterList implements V3ParameterList {
       int sub = findSubParam(index);
       subparams[sub].setBlob(index - offsets[sub], stream, length);
   }
-
+  public void setBlob(int index, InputStream stream) throws SQLException {
+    int sub = findSubParam(index);
+    subparams[sub].setBlob(index - offsets[sub], stream);
+  }
 }

@@ -11,7 +11,7 @@
   <url>https://github.com/pgjdbc/pgjdbc</url>
 
   <modules>
-    <module>jdbc</module>
+    <module>pgjdbc</module>
   </modules>
 
   <!-- If inherited from parent pom, maven tries to add artifactId to URLs -->

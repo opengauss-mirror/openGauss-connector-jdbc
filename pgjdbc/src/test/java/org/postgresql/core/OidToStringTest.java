@@ -5,8 +5,6 @@
 
 package org.postgresql.core;
 
-import org.postgresql.util.PSQLException;
-
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -16,22 +14,18 @@ import java.util.Arrays;
 
 @RunWith(Parameterized.class)
 public class OidToStringTest {
-  @Parameterized.Parameter(0)
-  public int value;
-  @Parameterized.Parameter(1)
-  public String expected;
+    @Parameterized.Parameter(0)
+    public int value;
+    @Parameterized.Parameter(1)
+    public String expected;
 
-  @Parameterized.Parameters(name = "expected={1}, value={0}")
-  public static Iterable<Object[]> data() {
-    return Arrays.asList(new Object[][]{
-        {142, "XML"},
-        {0, "UNSPECIFIED"},
-        {-235, "<unknown:-235>"},
-    });
-  }
+    @Parameterized.Parameters(name = "expected={1}, value={0}")
+    public static Iterable<Object[]> data() {
+        return Arrays.asList(OidValueOfTest.types);
+    }
 
-  @Test
-  public void run() throws PSQLException {
-    Assert.assertEquals(expected, Oid.toString(value));
-  }
+    @Test
+    public void run() {
+        Assert.assertEquals(expected, Oid.toString(value));
+    }
 }
