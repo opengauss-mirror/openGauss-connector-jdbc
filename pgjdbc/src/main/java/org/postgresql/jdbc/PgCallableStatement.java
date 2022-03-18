@@ -55,7 +55,7 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
   protected Object[] callResult;
   private int lastIndex = 0;
   private String compatibilityMode;
-  private boolean isOracleCompatibilityFunction;
+  private boolean isACompatibilityFunction;
   private boolean enableOutparamOveride;
   // cache the subscript of the current custom type in the statement and the struct of the custom type
   private ConcurrentHashMap<Integer, List<Object[]>> compositeTypeStructMap = new ConcurrentHashMap<>();
@@ -69,7 +69,7 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
       int rsHoldability) throws SQLException {
     super(connection, connection.borrowCallableQuery(sql), rsType, rsConcurrency, rsHoldability);
     this.isFunction = preparedQuery.isFunction;
-    this.isOracleCompatibilityFunction = preparedQuery.isOracleCompatibilityFunction;
+    this.isACompatibilityFunction = preparedQuery.isACompatibilityFunction;
     this.compatibilityMode = connection.getQueryExecutor().getCompatibilityMode();
     this.enableOutparamOveride = connection.getQueryExecutor().getEnableOutparamOveride();
     if (this.isFunction) {
@@ -290,14 +290,14 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
 
     // determine whether to overwrite the original VOID with the oid of the out parameter according to the
     // compatibility mode and the state of the guc parameter value
-    if (isOracleCompatibilityAndOverLoad()) {
+    if (isACompatibilityAndOverLoad()) {
       Integer oid;
       if (sqlTypeToOid.get(sqlType) == null) {
         oid = Integer.valueOf(0);
       } else {
         oid = sqlTypeToOid.get(sqlType);
       }
-      preparedParameters.bindRegisterOutParameter(parameterIndex, oid, isOracleCompatibilityFunction);
+      preparedParameters.bindRegisterOutParameter(parameterIndex, oid, isACompatibilityFunction);
     }
 
     // functionReturnType contains the user supplied value to check
@@ -749,8 +749,8 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
       // determine whether to overwrite the original VOID with the oid of the out parameter according to the
       // compatibility mode and the state of the guc parameter value
       preparedParameters.registerOutParameter(parameterIndex, Types.OTHER);
-      if (isOracleCompatibilityAndOverLoad()) {
-        preparedParameters.bindRegisterOutParameter(parameterIndex, connection.getTypeInfo().getPGType(typeName), isOracleCompatibilityFunction);
+      if (isACompatibilityAndOverLoad()) {
+        preparedParameters.bindRegisterOutParameter(parameterIndex, connection.getTypeInfo().getPGType(typeName), isACompatibilityFunction);
       }
       functionReturnType[parameterIndex - 1] = Types.OTHER;
       testReturn[parameterIndex - 1] = Types.OTHER;
@@ -765,7 +765,7 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
    * whether it is oracle compatibility mode and reload is turned on
    * @return true or false
    */
-  private boolean isOracleCompatibilityAndOverLoad() {
+  private boolean isACompatibilityAndOverLoad() {
     return enableOutparamOveride && ("A".equalsIgnoreCase(compatibilityMode) || "ORA".equalsIgnoreCase(compatibilityMode));
   }
 

@@ -1127,7 +1127,7 @@ public class Parser {
     String sql = jdbcSql;
     boolean isFunction = false;
     boolean outParamBeforeFunc = false;
-    boolean isOracleCompatibilityFunction = false;
+    boolean isACompatibilityFunction = false;
 
     int len = jdbcSql.length();
     int state = 1;
@@ -1158,7 +1158,7 @@ public class Parser {
           if (ch == '?') {
             outParamBeforeFunc =
                 isFunction = true;   // { ? = call ... }  -- function with one out parameter
-            isOracleCompatibilityFunction = true;
+            isACompatibilityFunction = true;
             ++i;
             ++state;
           } else if (ch == 'c' || ch == 'C') {  // { call ... }      -- proc with no out parameters
@@ -1314,7 +1314,7 @@ public class Parser {
     }
 
     sql = sb.append(suffix).toString();
-    return new JdbcCallParseInfo(sql, isFunction, isOracleCompatibilityFunction);
+    return new JdbcCallParseInfo(sql, isFunction, isACompatibilityFunction);
   }
 
   /**

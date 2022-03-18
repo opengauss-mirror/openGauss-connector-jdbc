@@ -50,7 +50,7 @@ class SimpleParameterList implements V3ParameterList {
     this.flags = new byte[paramCount];
     this.transferModeRegistry = transferModeRegistry;
     this.compatibilityModes = new String[paramCount];
-    this.isOracleCompatibilityFunctions = new boolean[paramCount];
+    this.isACompatibilityFunctions = new boolean[paramCount];
   }
 
   @Override
@@ -66,7 +66,7 @@ class SimpleParameterList implements V3ParameterList {
   }
 
   @Override
-  public void bindRegisterOutParameter(int index, int oid, boolean isOracleCompatibilityFunction) throws SQLException {
+  public void bindRegisterOutParameter(int index, int oid, boolean isACompatibilityFunction) throws SQLException {
     if (index < 1 || index > paramValues.length) {
       throw new PSQLException(
               GT.tr("The column index is out of range: {0}, number of columns: {1}.",
@@ -75,7 +75,7 @@ class SimpleParameterList implements V3ParameterList {
     }
     paramTypes[index - 1] = oid;
     compatibilityModes[index - 1] = "ORA";
-    isOracleCompatibilityFunctions[index - 1] = isOracleCompatibilityFunction;
+    isACompatibilityFunctions[index - 1] = isACompatibilityFunction;
   }
 
   private void bind(int index, Object value, int oid, byte binary) throws SQLException {
@@ -196,11 +196,18 @@ class SimpleParameterList implements V3ParameterList {
   }
   
   public void setBlob(int index, InputStream stream, int length) throws SQLException {
-    bind(index, new StreamWrapper(stream, length), Oid.BLOB, BINARY);
-  }
-
-  public void setBlob(int index, InputStream stream) throws SQLException {
-    bind(index, new StreamWrapper(stream), Oid.BLOB, BINARY);
+  	try {
+			int i = Math.min(stream.available(), length);
+			byte[] tmp =  new byte[i];
+			int len = stream.read(tmp);
+			// In the condition of empty Blob. Like byte[] b = {}; new ByteArrayInputStream(b);
+			if(len == -1){
+				LOGGER.trace("Failed to read the inputstream:", new SQLException("Failed to read the inputstream"));
+			}
+			setBlob(index, tmp, 0, tmp.length);
+		} catch (IOException e) {
+			throw new SQLException(e.getMessage());
+		}
   }
 
   @Override
@@ -324,7 +331,7 @@ class SimpleParameterList implements V3ParameterList {
       if (direction(i) == OUT) {
         if(compatibilityModes[i] != null && compatibilityModes[i].equalsIgnoreCase("ORA")){
           // function return value as void.
-          if (isOracleCompatibilityFunctions[i] == true && i == 0) {
+          if (isACompatibilityFunctions[i] == true && i == 0) {
             paramTypes[i] = Oid.VOID;
           }
           paramValues[i] = "null";
@@ -530,7 +537,7 @@ class SimpleParameterList implements V3ParameterList {
   private final byte[] flags;
   private final byte[][] encoded;
   private final TypeTransferModeRegistry transferModeRegistry;
-  private final boolean[] isOracleCompatibilityFunctions;
+  private final boolean[] isACompatibilityFunctions;
   private final String[] compatibilityModes;
 
   /**

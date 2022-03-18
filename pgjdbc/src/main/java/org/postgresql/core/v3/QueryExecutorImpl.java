@@ -43,8 +43,6 @@ import org.postgresql.util.PSQLWarning;
 import org.postgresql.util.ServerErrorMessage;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
-import org.postgresql.util.HintNodeName;
-
 import java.io.IOException;
 import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
@@ -126,8 +124,6 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   private String gaussdbVersion;
 
-  private String workingVersionNum;
-
   private String compatibilityMode;
 
   private boolean enableOutparamOveride;
@@ -170,16 +166,6 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   }
 
   @Override
-  public void setWorkingVersionNum(String workingVersionNum) {
-    this.workingVersionNum = workingVersionNum;
-  }
-
-  @Override
-  public String getWorkingVersionNum() {
-    return this.workingVersionNum;
-  }
-
-  @Override
   public String getCompatibilityMode() {
     return compatibilityMode;
   }
@@ -198,7 +184,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   }
 
   /**
-   * When database compatibility mode is oracle and the parameter overload function
+   * When database compatibility mode is A database and the parameter overload function
    * is turned on, add out parameter description message.
    *
    * @return true: describe, false: not describe.
@@ -1554,29 +1540,11 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     pendingDescribePortalQueue.add(sync);
   }
 
-  private void sendTraceId() throws IOException {
-    String traceId;
-    if ((traceId = Driver.getTracer()) == null) {
-      return;
-    }
-    if (LOGGER.isTraceEnabled()) {
-      LOGGER.trace("[" + socketAddress + "] " + "trace :" + traceId);
-    }
-    byte[] encodedTraceId = Utils.encodeUTF8(traceId);
-    int encodedSize = 4
-            + encodedTraceId.length + 1;
-    pgStream.sendChar('J');
-    pgStream.sendInteger4(encodedSize);
-    pgStream.send(encodedTraceId);
-    pgStream.sendChar(0);
-  }
-
   private void sendParse(SimpleQuery query, SimpleParameterList params, boolean oneShot)
           throws IOException {
     // Already parsed, or we have a Parse pending and the types are right?
     int[] typeOIDs = params.getTypeOIDs();
-    if ((query.getNodeName() == null || query.getNodeName().isEmpty())
-            && query.isPreparedFor(typeOIDs, deallocateEpoch)) {
+    if (query.isPreparedFor(typeOIDs, deallocateEpoch)) {
       return;
     }
 
@@ -1605,14 +1573,6 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     byte[] encodedStatementName = query.getEncodedStatementName();
     String nativeSql = query.getNativeSql();
-
-    if (query.getNodeName() != null && !query.getNodeName().isEmpty()) {
-      try {
-        nativeSql = HintNodeName.addNodeName(nativeSql, query.getNodeName(), this);
-      } catch (SQLException e) {
-        throw new IOException(e.getMessage());
-      }
-    }
 
     boolean sendFunctionParamType = isSendFunctionParamType(query);
     char[] paramFlags = new char[params.getFlags().length];
@@ -1675,7 +1635,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
             + (encodedStatementName == null ? 0 : encodedStatementName.length) + 1
             + queryUtf8.length + 1
             + 2 + 4 * params.getParameterCount()
-            + (this.isDescribeOutparam() ? 2 : 0)
+            + (this.getEnableOutparamOveride() ? 2 : 0)
             + (sendFunctionParamType ? params.getFlags().length : 0);
 
     pgStream.sendChar('P'); // Parse
@@ -1690,7 +1650,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     for (int i = 1; i <= params.getParameterCount(); ++i) {
       pgStream.sendInteger4(params.getTypeOID(i));
     }
-    if (this.isDescribeOutparam()) {
+    if (this.getEnableOutparamOveride()) {
       if (sendFunctionParamType) {
         pgStream.sendInteger2(params.getParameterCount());
         for (int i = 1; i <= paramFlags.length; ++i) {
@@ -2176,7 +2136,6 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       rows = fetchSize; // maxRows > fetchSize
     }
 
-    sendTraceId();
     sendParse(query, params, oneShot);
 
     // Must do this after sendParse to pick up any changes to the
@@ -2278,7 +2237,6 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     V3ParameterList parameters = (V3ParameterList) parameterLists[0];
     SimpleParameterList params = (SimpleParameterList) parameters;
 
-    sendTraceId();
     sendParse(query, params, oneShot);
 
     // Must do this after sendParse to pick up any changes to the

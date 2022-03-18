@@ -1,9 +1,3 @@
-/*$$$!!Warning: Huawei key information asset. No spread without permission.$$$*/
-/*CODEMARK:WQcKBKQLgyHkXlCLiGIlSvGdiRVlDYpIJLLeBa8CyrNJleUkOpTtwkJAoYct18IqCBpJnKNz
-xHjEu+uXc8LQFhsoI8WrCaQSzs7IbOufhA/Trab/bBrhL6CdcNh/R9gRt8WN0nikxwJmRwS3
-ilXKnoNfko5Zw3qFNnUc0ADHXFHeGX4P3ONBXnw0j6DKIdX8KaWsr2L7stjeVKz+oqR+Z8zf
-bshdEshqyIK6a6DPitClTLK1TsHgkvRGx14SlPiKTlFg6HsD0Ere3u78qZaAfA==#*/
-/*$$$!!Warning: Deleting or modifying the preceding information is prohibited.$$$*/
 /*
  * Copyright (c) 2004, PostgreSQL Global Development Group
  * See the LICENSE file in the project root for more information.
@@ -28,9 +22,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TimerTask;
-
-import org.postgresql.util.HintNodeName;
-
+import org.postgresql.core.v3.ConnectionFactoryImpl;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
@@ -144,20 +136,6 @@ public class PgStatement implements Statement, BaseStatement {
    */
   protected String statementName = "";
 
-    /**
-     * Flag to determine if client logic requires to reload the cache and try again,
-     * required when the cache is not in sync
-     */
-    protected Boolean shouldClientLogicRetry = false;
-
-  private Boolean didRunPreQuery = false;
-
-    /**
-     * if the statement was created to fetch data for client logic cache via JNI using the method executeQueryWithNoCL
-     * Important to set up, so the obtained resultset can ignore CL in that case
-     */
-    private boolean isStatamentUsedForClientLogicCache = false;
-
   PgStatement(PgConnection c, int rsType, int rsConcurrency, int rsHoldability)
       throws SQLException {
     this.connection = c;
@@ -255,9 +233,6 @@ public class PgStatement implements Statement, BaseStatement {
   }
 
   public java.sql.ResultSet executeQuery(String p_sql) throws SQLException {
-    p_sql = HintNodeName.addNodeName(p_sql, this.connection.getClientInfo("nodeName"),
-            this.connection.getQueryExecutor());
-
     ClientLogic clientLogic = this.connection.getClientLogic();
     String exception = "No results were returned by the query.";
     if (clientLogic != null) {
@@ -270,14 +245,6 @@ public class PgStatement implements Statement, BaseStatement {
     return getSingleResultSet();
   }
 
-    /*
-     * @return true if the statement was created to get data for client logic cache Via JNI using executeQueryWithNoCL
-     */
-    @Override
-    public boolean getIsStatamentUsedForClientLogicCache() {
-        return isStatamentUsedForClientLogicCache;
-    }
-
   /**
    * This method was added for supporting fetchDataFromQuery method in the ClientLogicImpl class
    * executes query and bypass client logic to get client logic data 
@@ -286,7 +253,6 @@ public class PgStatement implements Statement, BaseStatement {
    * @throws SQLException
    */
   java.sql.ResultSet executeQueryWithNoCL(String p_sql) throws SQLException {
-    isStatamentUsedForClientLogicCache = true;
 	  if (!executeWithFlags(p_sql, QueryExecutor.QUERY_EXECUTE_BYPASS_CLIENT_LOGIC)) {
 		  throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
 	  }
@@ -329,9 +295,6 @@ public class PgStatement implements Statement, BaseStatement {
   }
 
   public boolean execute(String p_sql) throws SQLException {
-    p_sql = HintNodeName.addNodeName(p_sql, this.connection.getClientInfo("nodeName"),
-            this.connection.getQueryExecutor());
-
     return executeWithFlags(p_sql, 0);
   }
 
@@ -474,7 +437,7 @@ public class PgStatement implements Statement, BaseStatement {
       ClientLogic clientLogic = this.connection.getClientLogic();
       if (clientLogic != null) {
         List<String> listParameterValuesBeeforeCL = new ArrayList<>();
-        // Getting the string values of all parameters
+        //Getting the string values of all parameters
         String[] arrParameterValuesBeforeCL = queryParameters.getLiteralValues();
         if (arrParameterValuesBeforeCL != null){
           for(int i = 0; i < queryParameters.getInParameterCount(); ++i) {
@@ -484,31 +447,23 @@ public class PgStatement implements Statement, BaseStatement {
             }
             listParameterValuesBeeforeCL.add(valueBeforCL);
           }
-          List<String> modifiedParameters = new ArrayList<>();
-          List<Integer> resultTypeOids = new ArrayList<>();
+          List<String> modifiedParameters;
           try {
-            // Getting the client logic binary value from the back-end
-            clientLogic.replaceStatementParams(statementName, listParameterValuesBeeforeCL, modifiedParameters,
-		      	    resultTypeOids);
+            //Getting the client logic binary value from the back-end
+            modifiedParameters = clientLogic.replaceStatementParams(statementName, listParameterValuesBeeforeCL);
           }
           catch (ClientLogicException e) {
             LOGGER.error("Errror: '" + e.getErrorText() + "' while running client logic to change parameters");
             throw new SQLException("Errror: '" + e.getErrorText() + "' while running client logic to change parameters");
           }
           int indexParam = 1;
-          for (String modifiedParam : modifiedParameters) {
-              int clientLogicTypeOid = resultTypeOids.get(indexParam-1);
-              if (modifiedParam != null) {
-                  // Convert the data to binary
-                  byte[] dataInBytes = PGbytea.toBytes(modifiedParam.getBytes());
-                  this.setClientLogicBytea(queryParameters, indexParam, dataInBytes, clientLogicTypeOid);
-              } else if (clientLogicTypeOid != 0) {
-                  // column with client logic, but empty input
-                  this.setClientLogicBytea(queryParameters, indexParam, null, clientLogicTypeOid);
-              } else {
-                // nothing here
-              }
-              ++indexParam;
+          for (String mnodifiedParam: modifiedParameters) {
+            if (mnodifiedParam != null) {
+              //Convert the data to binary
+              byte[] dataInBytes = PGbytea.toBytes(mnodifiedParam.getBytes());
+              this.setClientLogicBytea(queryParameters, indexParam, dataInBytes, 4402);
+            }
+            ++indexParam;
           }
         }
       }
@@ -556,7 +511,7 @@ public class PgStatement implements Statement, BaseStatement {
     if (queryToExecute.isEmpty()) {
       flags |= QueryExecutor.QUERY_SUPPRESS_BEGIN;
     }
-    shouldClientLogicRetry = false;
+
     if (!queryToExecute.isStatementDescribed() && forceBinaryTransfers
         && (flags & QueryExecutor.QUERY_EXECUTE_AS_SIMPLE) == 0) {
       // Simple 'Q' execution does not need to know parameter types
@@ -582,23 +537,13 @@ public class PgStatement implements Statement, BaseStatement {
       result = null;
     }
     runQueryExecutor(queryParameters, flags, clientLogic, queryToExecute, handler);
-    /* check if the resultset had any issues with handling client logic fields and issue a retry if it did */
-    retryClientLogicExtract(flags, clientLogic, handler);
-    if (shouldClientLogicRetry) {
-        LOGGER.debug("query failed due to missing client logic cache - reloading the cache and trying again...");
-        connection.getClientLogic().reloadCache();
-        // So it would not happen again and again ...
-        flags = flags | QueryExecutor.QUERY_RETRY_WITH_CLIENT_LOGIC_CACHE_RELOADS;
-        executeInternal(cachedQuery, queryParameters, flags);
-        return;
-      }
     updateGeneratedKeyStatus(clientLogic, handler);
     runQueryPostProcess(clientLogic);
   }
 
   private void runQueryPostProcess(ClientLogic clientLogic) {
     try {
-      if (clientLogic != null) {
+      if (clientLogic != null && !(this instanceof PgPreparedStatement)) {
         clientLogic.runQueryPostProcess();
       }
     }
@@ -643,14 +588,9 @@ public class PgStatement implements Statement, BaseStatement {
       connection.getQueryExecutor().execute(queryToExecute, queryParameters, handler2, i, i2,
               flags2);
     } catch (SQLException sqlException) {
-        if ((flags2 & QueryExecutor.QUERY_RETRY_WITH_CLIENT_LOGIC_CACHE_RELOADS) == 0 &&
-            ClientLogic.checkIfReloadCache(sqlException)) {
-            shouldClientLogicRetry = true;
-        } else {
-            // Client logic should be able to change the error message back to use user input
-            String updatedMessage = clientLogic.clientLogicMessage(sqlException.getMessage());
-            throw new SQLException(updatedMessage);
-        }
+      //Client logic should be able to change the error message back to use user input
+      String updatedMessage = clientLogic.clientLogicMessage(sqlException.getMessage());
+      throw new SQLException(updatedMessage);
     }
   }
 
@@ -668,10 +608,7 @@ public class PgStatement implements Statement, BaseStatement {
       String modifiedQuery = cachedQuery.query.getNativeSql();
       try {
         if (this instanceof PgPreparedStatement) {
-          if (!didRunPreQuery) {
-            modifiedQuery = clientLogic.prepareQuery(modifiedQuery, statementName);
-            didRunPreQuery = true;
-          }
+          modifiedQuery = clientLogic.prepareQuery(modifiedQuery, statementName);
           replaceClientLogicParameters(statementName, queryParameters);
         }
         else {
@@ -694,50 +631,6 @@ public class PgStatement implements Statement, BaseStatement {
     }
     return clientLogic;
   }
-
-    /**
-     * retry client logic value parsing when failed
-     *
-     * @param flags query flags
-     * @param clientLogic client logic object
-     * @param handler results handler
-     */
-    private void retryClientLogicExtract(int flags, ClientLogic clientLogic, StatementResultHandler handler) {
-        if (clientLogic == null) {
-            return;
-        }
-        if ((flags & QueryExecutor.QUERY_NO_RESULTS) != 0) {
-            // If no results flag is on, no need to check the result sets
-            return;
-        }
-        if ((flags & QueryExecutor.QUERY_EXECUTE_BYPASS_CLIENT_LOGIC) != 0) {
-            // If client logic flag is on, no need to check the result sets
-            return;
-        }
-
-        ResultWrapper resultWrapper = handler.getResults();
-        boolean isCacheReloaded = false;
-        while (resultWrapper != null) {
-            if (resultWrapper.getResultSet() != null) {
-                if (resultWrapper.getResultSet() instanceof PgResultSet) {
-                    PgResultSet pgRs = (PgResultSet) resultWrapper.getResultSet();
-                    if (pgRs.getDidClientLogicFail()) {
-                        LOGGER.debug("Failed to parse client logic value - reloading the cache and trying again...");
-                        if (!isCacheReloaded) {
-                            clientLogic.reloadCache();
-                            isCacheReloaded = true;
-                        }
-                        try {
-                            pgRs.clientLogicGetData(true);
-                        } catch (SQLException e) {
-                            LOGGER.error("Failed retryClientLogicExtract, error is: " + e.getMessage());
-                        }
-                    }
-                }
-            }
-            resultWrapper = resultWrapper.getNext();
-        }
-    }
 
   public void setCursorName(String name) throws SQLException {
     checkClosed();
@@ -1167,11 +1060,7 @@ public class PgStatement implements Statement, BaseStatement {
         String modifiedQuery = queries[queriesCounter].getNativeSql();
         try {
           if (this instanceof PgPreparedStatement) {
-            if (!didRunPreQuery) {
-              clientLogic.prepareQuery(modifiedQuery, statementName);
-              didRunPreQuery = true;
-            }
-
+            clientLogic.prepareQuery(modifiedQuery, statementName);
             if (parameterLists != null && parameterLists.length  > queriesCounter) {
               if (parameterLists[queriesCounter] != null) {
                 replaceClientLogicParameters(statementName, parameterLists[queriesCounter]);
@@ -1197,6 +1086,14 @@ public class PgStatement implements Statement, BaseStatement {
 
     if (batchStatements == null || batchStatements.isEmpty()) {
       return new int[0];
+    }
+    
+    if (this.connection instanceof PgConnection) {
+      PgConnection con = (PgConnection) this.connection;
+      if (con.isBatchInsert() && batchStatements.get(0).getSqlCommand().isBatchedReWriteCompatible()) {
+        throw new PSQLException(GT.tr("batchMode and reWriteBatchedInserts can not both set true!"),
+                PSQLState.NOT_IMPLEMENTED);
+      }
     }
 
     return internalExecuteBatch().getUpdateCount();

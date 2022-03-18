@@ -8,28 +8,22 @@ import java.util.List;
 import org.postgresql.util.JdbcBlackHole;
 
 public class ClientLogicImpl {
-    static {
-        System.loadLibrary("gauss_cl_jni");
-    }
-    // Native methods:
-    private native Object[] linkClientLogicImpl(String databaseName);
-    private native Object[] setKmsInfoImpl(long handle, String key, String value);
-    private native Object[] runQueryPreProcessImpl(long handle, String originalQuery);
-    private native Object[] runQueryPostProcessImpl(long handle);
-    private native Object[] runClientLogicImpl(long handle, String processData, int dataType);
+  static {
+      System.loadLibrary("gauss_cl_jni");
+  }
+  // Native methods:
+  private native Object[] linkClientLogicImpl(String databaseName);
+  private native Object[] runQueryPreProcessImpl(long handle, String originalQuery);
+  private native Object[] runQueryPostProcessImpl(long handle);
+  private native Object[] runClientLogicImpl(long handle, String processData, int dataType);
+  private native Object[] prepareQueryImpl(long handle, String query, String statement_name, int parameter_count);
+  private native Object[] replaceStatementParamsImpl(long handle, String statementName, String[] param_values);
+  private native Object[] replaceErrorMessageImpl(long handle, String originalMessage);
+  private native void destroy(long handle);
 
-    private native Object[] getRecordIDsImpl(long mHandle, String dataTypeName, int oid);
-    private native Object[] runClientLogic4RecordImpl(long handle, String data2Process, int[] originalOids);
-
-    private native Object[] prepareQueryImpl(long handle, String query, String statement_name, int parameter_count);
-    private native Object[] replaceStatementParamsImpl(long handle, String statementName, String[] param_values);
-    private native Object[] replaceErrorMessageImpl(long handle, String originalMessage);
-    private native void reloadCacheImpl(long handle);
-    private native void reloadCacheIfNeededImpl(long handle);
-    private native void destroy(long handle);
-
-    private long m_handle = 0;
-    private PgConnection m_jdbcConn = null;
+  private long m_handle = 0;
+  private PgConnection m_jdbcConn = null;
+  
   /**
    * Link between the Java PgConnection and the PGConn Client logic object
    * @param databaseName the database name
@@ -49,13 +43,6 @@ public class ClientLogicImpl {
       return new Object[]{};
   	}
   }
-
-    /**
-    * Transfer all parameters that are used to establish a connection with HuaweiCloud IAM and KMS to 'gauss_cl_jni'.
-    */
-    public Object[] setKmsInfo(String key, String value) {
-        return setKmsInfoImpl(m_handle, key, value);
-    }
 
     /**
      * Run the pre query, to replace client logic field values with binary format before sending the query to the database server
@@ -80,38 +67,6 @@ public class ClientLogicImpl {
   public Object[] runClientLogic(String processData, int dataType) {
   	return runClientLogicImpl(m_handle, processData, dataType);
   }
-
-    /**
-     * Gets the list of original oids, needed when returning a record from a function that has client logic fields
-     *
-     * @param dataTypeName the name of the data type of the oculmn in the resultset
-     * @param oid the fields oid
-     * @return array of object in the following format
-     * [0][0] - int status code - zero for success
-     * [0][1] - string status description
-     * [1][0...n] the original oids in the record if it contains any clint loigic fields, otherwise this part is omitted
-     */
-    public Object[] getRecordIDs(String dataTypeName, int oid) {
-        return getRecordIDsImpl(m_handle, dataTypeName, oid);
-    }
-
-    /**
-     * convert client records returned from function that contains client logic fields to user format
-     *
-     * @param data2Process the record with client logic fields
-     * @param originalOids the result from getRecordIDs method for that field
-     * @return array of object in the following format
-     * [0][0] - int status code - zero for success
-     * [0][1] - string status description
-     * [0][0] - int status code - zero for success
-     * [0][1] - string status description
-     * [1] - int 0 not client logic 1 - is client logic
-     * [2] - String - The data in user format
-     */
-    public Object[] runClientLogic4Record(String data2Process, int[] originalOids) {
-        return runClientLogic4RecordImpl(m_handle, data2Process, originalOids);
-    }
-
   /**
    * run post process on the backend, to free the client logic state machine when a query is done
    * @return array of objects
@@ -139,12 +94,9 @@ public class ClientLogicImpl {
    * @param statementName the name of the statement
    * @param paramValues array of parameters in user format
    * @return array of objects
-   * [0][0] - int status code - zero for success
-   * [0][1] - string status description
-   * [1][0 ... parameter_count - 1] - array with the parameters value, if the parameter is not
-   * being replace a NULL apears otherwise the replaced value
-   * [2][0 ... parameter_count - 1] - array with the parameters' type-oids,
-   * if the parameter is being replaced, otherwise 0
+   *[0][0] - int status code - zero for success
+   *[0][1] - string status description
+   *[1][0 ... parameter_count - 1] - array with the parameters value, if the parameter is not being replace a NULL apears otherwise the replaced value
    */
   public Object[] replaceStatementParams(String statementName, String[] paramValues) {
   	return replaceStatementParamsImpl(m_handle, statementName, paramValues);
@@ -242,23 +194,4 @@ public class ClientLogicImpl {
     }
 	  return data.toArray();
   }
-
-    /**
-     * Reloads the client logic cache, required when there is an error related to missing client logic cache
-     */
-    public void reloadCache() {
-        if (m_handle > 0) {
-            reloadCacheImpl(m_handle);
-        }
-    }
-
-    /**
-     * Reloads the client logic cache ONLY if the timestamp of the configuration fetched is earlier
-     * than the timestamp of the configuration on the server
-     */
-    public void reloadCacheIfNeeded() {
-        if (m_handle > 0) {
-            reloadCacheIfNeededImpl(m_handle);
-        }
-    }
 }

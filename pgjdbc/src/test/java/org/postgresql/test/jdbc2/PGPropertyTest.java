@@ -28,8 +28,10 @@ import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.sql.DriverPropertyInfo;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeMap;
 
 
@@ -126,6 +128,9 @@ public class PGPropertyTest {
     excluded.add("sslprivatekeyfactory");
     excluded.add("ApplicationType");
     excluded.add("TLSCiphersSupperted");
+    excluded.add("enable_ce");
+    excluded.add("priorityServers");
+    excluded.add("forceTargetServerSlave");
 
     // index PropertyDescriptors by name
     Map<String, PropertyDescriptor> propertyDescriptors =

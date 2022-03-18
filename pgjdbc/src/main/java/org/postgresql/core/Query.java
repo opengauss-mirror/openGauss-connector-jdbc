@@ -105,19 +105,4 @@ public interface Query {
    *
    */
   boolean getIsFunction();
-
-  /**
-   * Gets the value of nodeName
-   *
-   * @return String
-   */
-  String getNodeName();
-
-  /**
-   * Set the value of nodeName
-   *
-   * @param nodeName DN name
-   * @return null
-   */
-  void setNodeName(String nodeName);
 }

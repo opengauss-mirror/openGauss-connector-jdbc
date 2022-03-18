@@ -42,6 +42,18 @@ public class PgCallstatementTypeCompatibility {
         }
     };
 
+    private static TypeConvert smallint2Tinyint = input -> {
+        int bit;
+        int result = 0;
+        for (int i = 0; i < 8; i++) {
+            bit = ((int)input >> i) & 0x01;
+            if (bit == 1) {
+                result += 1 << i;
+            }
+        }
+        return result;
+    };
+
     private static Map<String, TypeConvert> typeConvertMap = new ConcurrentHashMap<>();
 
     static {
@@ -55,6 +67,7 @@ public class PgCallstatementTypeCompatibility {
         addConvert(Types.OTHER, Types.BLOB, noneConvert);
         addConvert(Types.BLOB, Types.OTHER, noneConvert);
         addConvert(Types.REF_CURSOR, Types.OTHER, noneConvert);
+        addConvert(Types.SMALLINT, Types.TINYINT, smallint2Tinyint);
     }
 
     private int actualType;

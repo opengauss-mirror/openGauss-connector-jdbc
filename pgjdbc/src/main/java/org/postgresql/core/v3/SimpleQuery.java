@@ -31,7 +31,6 @@ import java.util.Map;
  */
 class SimpleQuery implements Query {
   private static Log LOGGER = Logger.getLogger(SimpleQuery.class.getName());
-  private String nodeName = null;
 
   SimpleQuery(SimpleQuery src) {
     this(src.nativeQuery, src.transferModeRegistry, src.sanitiserDisabled);
@@ -336,14 +335,6 @@ class SimpleQuery implements Query {
 
   public final int getBindCount() {
     return nativeQuery.bindPositions.length * getBatchSize();
-  }
-
-  public String getNodeName() {
-    return this.nodeName;
-  }
-
-  public void setNodeName(String nodeName) {
-    this.nodeName = nodeName;
   }
 
   private Map<String, Integer> resultSetColumnNameIndexMap;

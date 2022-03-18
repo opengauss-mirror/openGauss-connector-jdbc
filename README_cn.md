@@ -67,7 +67,6 @@ openGauss JDBC 驱动的生成支持以下操作系统：
 | maven               | 3.6.1      |
 | java                | 1.8        |
 | Git Bash (Windows)  | 无推荐版本 |
-| zip/unzip (Windows) | 无推荐版本 |
 
 ### 下载openGauss-connector-jdbc源码
 
@@ -82,89 +81,42 @@ git clone https://gitee.com/opengauss/openGauss-connector-jdbc.git
 
 - /sda/openGauss-connector-jdbc
 
-### 编译第三方软件（可跳过）
-
-在构建openGauss-connector-jdbc之前，需要先编译openGauss依赖的开源及第三方软件。我们已经在openGauss-connector-jdbc目录下的open_source就提供了编译好的开源及第三方软件，直接使用我们提供的open_source可以跳过该部分。这些开源及第三方软件存储在openGauss-third_party代码仓库中，通常只需要构建一次。如果开源软件有更新，需要重新构建软件。
-
-用户也可以直接从**binarylibs**库中获取开源软件编译和构建的输出文件。
-
-如果你想自己编译第三方软件，请到openGauss-third_party仓库查看详情。 
-
-执行完上述脚本后，最终编译和构建的结果保存在与**openGauss-third_party**同级的**binarylibs**目录下。在编译**openGauss-connector-jdbc**时会用到这些文件。
-
 ### jar包生成
 
-#### 使用一键式脚本生成jar包（Linux）
+#### 使用一键式脚本生成jar包（Linux/windows）
 
 openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。该工具可快速进行代码编译和打包。
 
-参数说明请见以下表格。
-
-| 选项 | 缺省值                       | 参数              | 说明                                                         |
-| :--- | :--------------------------- | :---------------- | :----------------------------------------------------------- |
-| -3rd | ${Code directory}/binarylibs | [binarylibs path] | 指定binarylibs路径。建议将该路径指定为open_source/或者/sda/openGauss-connector-jdbc/open_source/。如果您有自己编译好openGauss依赖的的第三方库，也可以指定为编译好的三方库路径，如/sda/binarylibs。 |
-
-> **注意** 
->
-> - **-3rd [binarylibs path]**为**binarylibs**的路径。默认设置为当前代码文件夹下存在**binarylibs**，因此如果**binarylibs**被移至**openGauss-server**中，或者在**openGauss-server**中创建了到**binarylibs**的软链接，则不需要指定此参数。但请注意，这样做的话，该文件很容易被**git clean**命令删除。
-
-现在你已经知晓build.sh的用法，只需使用如下格式的命令即可编译openGauss-connector-jdbc。
+只需使用如下格式的命令即可编译openGauss-connector-jdbc。
 
 1. 执行如下命令进入到代码目录：
 
    ```
-   [user@linux sda]$ cd /sda/openGauss-connector-jdbc
+   [user@linux sda]$ cd /sda/openGauss-connector-jdbc/
    ```
 
 2. 执行如下命令使用build.sh进行打包：
 
    ```
-   [user@linux openGauss-connector-jdbc]$ sh build.sh -3rd open_source/ 
+   [user@linux openGauss-connector-jdbc]$ sh build.sh
    ```
 
    结束后会显示如下内容，表示打包成功：
 
    ```
    Successfully make postgresql.jar
-   opengauss-jdbc-${version}.jar
-   postgresql.jar
-   Successfully make jdbc jar package
+   Successfully make opengauss-jdbc-${version} jar package
+   packaging jdbc...
+   Successfully make jdbc jar package in openGauss-${version}-${platform}-${bit}-Jdbc.tar.gz
+   clean up temporary directory!
    now, all packages has finished!
    ```
 
    成功编译后会出现两个jar包，分别是opengauss-jdbc-${version}.jar与postgresql.jar。编译后的jar包路径为：**/sda/openGauss-connector-jdbc/output**。
 
-#### 使用一键式脚本生成jar包（Windows）
-
-1. 准备 Java 与 Maven环境, 以及可以在**Git Bash**中使用的 **zip/unzip** 命令。
-
-2. 执行如下命令进入到代码目录：
-
-   ```
-   [user@linux openGauss-connector-jdbc]$ cd /sda/openGauss-connector-jdbc
-   ```
-
-3. 运行脚本build_on_windows_git.sh：
-
-   ```
-   [user@linux openGauss-connector-jdbc]$ sh build_on_windows_git.sh
-   ```
-
-   脚本执行成功后，会显示如下结果：
-
-   ```
-   begin run
-   Successfully make postgresql.jar package in /sda/openGauss-connector-jdbc/output/postgresql.jar
-   Successfully make opengauss-jdbc jar package in /sda/openGauss-connector-jdbc/output/opengauss-jdbc-${version}.jar
-   Successfully make jdbc jar package in /sda/openGauss-connector-jdbc/openGauss-${version}-JDBC.tar.gz
-   ```
-   
-   成功编译后会出现两个jar包，分别是opengauss-jdbc-${version}.jar与postgresql.jar。编译后的jar包路径为：**/sda/openGauss-connector-jdbc/output/**。此外还会出现这两个jar包的压缩包openGauss-${version}-JDBC.tar.gz，压缩包路径为 **/sda/openGauss-connector-jdbc/**。
-   
-
 #### 使用mvn命令生成jar包（Windows 或 Linux）
 
-1. 准备 Java 与 Maven环境, 若在Windows环境下还需准备可以在**Git Bash**中使用的 **zip/unzip** 命令。
+1. 准备 Java 与 Maven环境。
 
 2. 执行如下命令进入到代码目录：
 
@@ -172,23 +124,7 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
    [user@linux sda]$ cd /sda/openGauss-connector-jdbc
    ```
 
-3. 使用demo准备脚本：
-
-   ```
-   [user@linux openGauss-connector-jdbc]$ sh prepare_demo.sh
-   ```
-
-4. 修改根目录下的pom.xml：
-
-   将modules部分的module由jdbc改为pgjdbc, 如下所示。
-
-   ```
-   <modules>
-     <module>pgjdbc</module>
-   </modules>
-   ```
-
-5. 执行mvn命令：
+3. 执行mvn命令：
 
    ```
    [user@linux openGauss-connector-jdbc]$ mvn clean install -Dmaven.test.skip=true
@@ -211,7 +147,7 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
    ```
 
    构建成功后会出现两个jar包，分别是opengauss-jdbc-${version}.jar与original-opengauss-jdbc-${version}.jar。jar包路径为/sda/openGauss-connector-jdbc/pgjdbc/target/。
-
+   **注意:默认的mvn编译出的jdbc包名为org.postgresql,它与maven中央仓库的包名org.opengauss不同,想打包此包名，请参考build.sh脚本**
 
 ## JDBC的使用
 

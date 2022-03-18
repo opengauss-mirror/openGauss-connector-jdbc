@@ -90,6 +90,8 @@ public class TypeInfoCache implements TypeInfo {
           Oid.TIMESTAMPTZ_ARRAY},
       {"json", Oid.JSON, Types.OTHER, "org.postgresql.util.PGobject", Oid.JSON_ARRAY},
       {"point", Oid.POINT, Types.OTHER, "org.postgresql.geometric.PGpoint", Oid.POINT_ARRAY},
+      {"blob", Oid.BLOB, Types.BLOB, "org.postgresql.util.PGobject", -1},
+      {"clob", Oid.CLOB, Types.CLOB, "org.postgresql.util.PGobject", -1},
       {"nvarchar2", Oid.NVARCHAR2, Types.VARCHAR, "java.lang.String", Oid.NVARCHAR2_ARRAY},
       {"refcursor", Oid.REF_CURSOR, Types.REF_CURSOR, "java.sql.ResultSet", Oid.REF_CURSOR_ARRAY}
   };
@@ -239,16 +241,11 @@ public class TypeInfoCache implements TypeInfo {
 
   private PreparedStatement getOidStatement(String pgTypeName) throws SQLException {
 	  if (_getOidStatementSimple == null) {
-          String sql = "select pt.oid as oid, pn.nspname || '.' || pt.typname as typname from pg_namespace pn" +
-                  " left join pg_type pt on pn.oid=pt.typnamespace where pn.nspname || '.' || pt.typname = ? " +
-                  " union " +
-                  "( select pt.oid as oid, pn.nspname || '.' || pt.typname as typname from pg_namespace pn " +
-                  "left join pg_type pt on pn.oid=pt.typnamespace where nspname in('pg_catalog', current_schema()) and typname = ? " +
-                  "order by current_schema()=pn.nspname desc limit 1 ) limit 1";
+		  String sql;
+          sql = "SELECT oid, typname FROM pg_catalog.pg_type WHERE typname = ?";
           _getOidStatementSimple = _conn.prepareStatement(sql);
 	  }
 	  _getOidStatementSimple.setString(1, pgTypeName);
-      _getOidStatementSimple.setString(2, pgTypeName);
 	  return _getOidStatementSimple;
 
   }

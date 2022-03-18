@@ -86,16 +86,6 @@ class CompositeQuery implements Query {
     return false;
   }
 
-  @Override
-  public String getNodeName() {
-    return "";
-  }
-
-  @Override
-  public void setNodeName(String nodeName) {
-
-  }
-
   public boolean isStatementDescribed() {
     for (SimpleQuery subquery : subqueries) {
       if (!subquery.isStatementDescribed()) {

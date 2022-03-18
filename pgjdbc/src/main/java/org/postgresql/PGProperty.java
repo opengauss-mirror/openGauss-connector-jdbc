@@ -25,12 +25,6 @@ public enum PGProperty {
   PG_CLIENT_LOGIC("enable_ce", null,
           "value of 1 is used to turn on the client logic driver feature", false),
 
-    /**
-     * whether to refresh the client encryption cache when invoke PgConnection.isValid method
-     */
-    REFRESH_CLIENT_ENCRYPTION("refreshClientEncryption", null,
-        "refresh the client encryption cache when invoke PgConnection.isValid method", true),
-
   /**
    * Database name to connect to (may be specified directly in the JDBC URL).
    */
@@ -388,21 +382,9 @@ public enum PGProperty {
       "any", "master", "slave", "secondary",  "preferSlave", "preferSecondary"),
 
   /**
-   * In providing a unified application for multiple CNs, the entrance of the requesting program in the client brings
-   * together similar CN services, so that all requests in the application are balanced.
-   */
-  AUTO_BALANCE("autoBalance", null, "Distribute connections evenly on CN"),
-
-  /**
-   * Specify the number of nodes to be connected first.
+   * Specify the number of nodes to be connected first
    */
   PRIORITY_SERVERS("priorityServers",null,"Specify the number of nodes to be connected first"),
-
-  /**
-   * Specifies the name of obtain trace id interface class that forms the interface class part of the link trace
-   * service.
-   */
-  TRACE_INTERFACE_CLASS("traceInterfaceClass", null, "Used to generate the trace id"),
 
   /**
    * When using the priority load balancing feature, if use the node_host field of the pgxc_node table
@@ -494,38 +476,6 @@ public enum PGProperty {
           "xmlFactoryFactory",
           "",
           "Factory class to instantiate factories for XML processing"),
-
-  /**
-   * Valid only when the client enables full encryption
-   * To access HuaweiCloud KMS, need to access HuaweiCloud IAM for identity authentication.
-   * This parameter is used to set the IAM user.
-   */
-  IAM_USER("iamUser", null,
-      "Username to connect to HuaweiCloud IAM and KMS as."),
-
-  /**
-   * To set the password of IAM user.
-   */  
-  IAM_PASSWORD("iamPassword", null,
-      "Password to use when authenticated by HuaweiCloud IAM and KMS."),
-
-  /* 
-   * Valid only when the client enables full encryption
-   */
-  KMS_DOMAIN("kmsDoamin", null,
-      "Domain of HuaweiCloud KMS."),
-
-  KMS_PROJECT_NAME("kmsProjectName", null,
-      "Place where the HuaweiCloud KMS server locates."),
-
-  KMS_PROJECT_ID("kmsProjectId", null,
-      "ID of HuaweiCloud KMS project."),
-
-  /**
-   * Convert metadata query results to uppercase.
-   */
-  UPPERCASE_ATTRIBUTE_NAME("uppercaseAttributeName", "false",
-          "Judge whether the uppercase function is on."),
 
   ;
 

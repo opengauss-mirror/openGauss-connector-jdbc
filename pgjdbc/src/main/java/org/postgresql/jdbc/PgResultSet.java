@@ -74,9 +74,6 @@ import java.util.concurrent.TimeUnit;
 
 public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultSet {
 
-  private final static int RECORDID_OID = 2249;
-  private final static int MIN_TABLE_OID = 16000;
-  
   // needed for updateable result set support
   private boolean updateable = false;
   private boolean doingUpdates = false;
@@ -90,21 +87,10 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   private PreparedStatement insertStatement = null;
   private PreparedStatement deleteStatement = null;
   private PreparedStatement selectStatement = null;
-  private ResultSetMetaData rsMetaData;
   private final int resultsettype;
   private final int resultsetconcurrency;
   private int fetchdirection = ResultSet.FETCH_UNKNOWN;
   private TimeZone defaultTimeZone;
-
-    // Flag that keeps if the client logic record data were loaded
-    private boolean isClientLogicRecordDataLoaded = false;
-
-    // flag that sets if any of the fields needs to be handled by client logic
-    private boolean isAnyColumnContainsClientLogic = false;
-
-    // Flag to indicate failure in converting client logic values back to user format:
-    private boolean didClientLogicFail = false;
-
   protected final BaseConnection connection; // the connection we belong to
   protected final BaseStatement statement; // the statement we belong to
   protected final Field[] fields; // Field metadata for this resultset.
@@ -133,18 +119,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
   private Map<String, Integer> columnNameIndexMap; // Speed up findColumn by caching lookups
 
-  /**
-   * Whether the result needs to return uppercase
-   */
-  protected boolean isUpperCase = false;
-
-  protected void setUppercase(boolean isUpperCase) {
-    this.isUpperCase = isUpperCase;
-  }
-
-  private String resultUppercase(String result) {
-    return isUpperCase && result != null && !result.isEmpty() ? result.toUpperCase(Locale.ENGLISH) : result;
-  }
+  private ResultSetMetaData rsMetaData;
 
   protected ResultSetMetaData createMetaData() throws SQLException {
     return new PgResultSetMetaData(connection, fields);
@@ -174,7 +149,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     this.statement = statement;
     this.fields = fields;
     this.rows = tuples;
-    clientLogicGetData(false);
+    clientLogicGetData();
     this.cursor = cursor;
     this.maxRows = maxRows;
     this.maxFieldSize = maxFieldSize;
@@ -198,69 +173,16 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     return new String(hexCharArray);
   }
 
-    /**
-     * This method is used to transform data that is client logic from record data back to user input format
-     *
-     * @param clientLogic client logic
-     * @param field the field which need to encode
-     * @param encoding the encoding of connection
-     * @param fieldIndex the index of field
-     * @return void
-     * @throws SQLException if something wrong happens
-     */
-    private void clientLogicGetDataFromRecord(ClientLogic clientLogic, Field field, Encoding encoding, int fieldIndex)
-    throws SQLException {
-        if (!ClientLogic.isClientLogicField(field.getOID()) && field.getClientLogicFieldOriginalIdS() != null &&
-            field.getClientLogicFieldOriginalIdS().size() > 0) {
-            try {
-                for (int rowIndex = 0; rowIndex < rows.size(); ++rowIndex) {
-                    byte[] fieldData = rows.get(rowIndex)[fieldIndex];
-                    if (fieldData == null) {
-                        continue;
-                    }
-                    String clientLogicValue = encoding.decode(fieldData);
-                    String userInputValue = "";
-                    try {
-                        userInputValue =
-                            clientLogic.runClientLogic4Record(clientLogicValue, field.getClientLogicFieldOriginalIdS());
-                        // Encode the data back the same way, so the field is now not binary
-                    } catch (ClientLogicException e) {
-                        connection.getLogger().error("client logic failed for field:" + field.getColumnLabel() +
-                            ", value: " + clientLogicValue + " Error:" + e.getErrorCode() + ":" + e.getErrorText());
-                        throw e;
-                    }
-                    rows.get(rowIndex)[fieldIndex] = encoding.encode(userInputValue);
-                }
-            } catch (IOException e) {
-                connection.getLogger().error("client logic failed encoding on IOException for field:" +
-                    field.getColumnLabel());
-                throw new SQLException(e.getMessage());
-            }
-        }
-        return;
-    }
-
-    boolean getDidClientLogicFail() {
-        return didClientLogicFail;
-    }
-
   /**
    * This method is used to transform data that is client logic from client logic back to user input format
-   *
-   * @param isOnRetry if calling this method when retrying after cache reload if failed on first time
-   * @throws SQLException if something wrong happens
    */
-  void clientLogicGetData(boolean isOnRetry) throws SQLException {
+  private void clientLogicGetData() {
     ClientLogic clientLogic = connection.getClientLogic();
     // if client logic is off, no need to progress
     if (clientLogic == null) {
       return;
     }
-    if (isClientLogicRecordDataLoaded && !isAnyColumnContainsClientLogic) {
-      return;
-    }
     Encoding encoding = null;
-
     try {
       encoding = connection.getEncoding();
     } catch (SQLException e1) {
@@ -272,14 +194,12 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     // Loop thru the list of fields
     for (Field field : this.fields) {
       if (ClientLogic.isClientLogicField(field.getOID())) {
-        isAnyColumnContainsClientLogic = true;
         for (int rowIndex = 0; rowIndex < rows.size(); ++rowIndex) {
           try {
             if (rows.get(rowIndex)[fieldIndex] != null) {
-                String clientLogicValue = "";
-                // The client logic fields may arrive as binary or as UTF-8.
-                // Need to find out what is it and act accordingly
-                boolean hasError = false;
+              String clientLogicValue = "";
+              // The client logic fields may arrive as binary or as UTF-8.
+              // Need to find out what is it and act accordingly
               if (field.getFormat() == Field.BINARY_FORMAT) {
                 clientLogicValue = "\\x" + bytesArrayToHexString(rows.get(rowIndex)[fieldIndex]);
               } else {
@@ -291,41 +211,18 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
                 // Encode the data back the same way, so the field is now not binary
               }
               catch (ClientLogicException e) {
-                hasError = true;
-                didClientLogicFail = true;
                 connection.getLogger().error("client logic failed for field:" + field.getColumnLabel() +
                         ", value: " + clientLogicValue + " Error:" +
                         e.getErrorCode() + ":" + e.getErrorText());
               }
-                boolean isKeepValue = !hasError || isOnRetry;
-                if (isKeepValue) {
-                    // If we still may do the re-try, keep the value as is for now
-                    rows.get(rowIndex)[fieldIndex] = encoding.encode(userInputValue);
-                }
+              rows.get(rowIndex)[fieldIndex] = encoding.encode(userInputValue);
             }
           }
           catch (IOException e) {
             connection.getLogger().error("client logic failed encoding on IOException for field:" + field.getColumnLabel());
           }
         }
-      } else {
-        try {
-          if (field.getOID() == RECORDID_OID || field.getOID() > MIN_TABLE_OID) {
-              List<Integer> oids = clientLogic.getRecordIDs(field.getColumnLabel(), field.getOID());
-              if (oids != null && oids.size() > 0) {
-                isAnyColumnContainsClientLogic = true;
-                field.setClientLogicFieldOriginalIdS(oids);
-              }
-          }
-        } catch (ClientLogicException e) {
-          connection.getLogger().error("client logic failed loading fields data Error:"
-              + e.getErrorCode() + ":" + e.getErrorText());
-          throw e;
-        }
       }
-
-      isClientLogicRecordDataLoaded = true;
-      clientLogicGetDataFromRecord(clientLogic, field, encoding, fieldIndex);
       ++fieldIndex;
     }
   }
@@ -1990,13 +1887,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     public void handleResultRows(Query fromQuery, Field[] fields, List<byte[][]> tuples,
         ResultCursor cursor) {
       PgResultSet.this.rows = tuples;
-
-        try {
-            PgResultSet.this.clientLogicGetData(true); // for client logic case. Cannot retry here, so pass true
-        } catch (SQLException e) {
-            handleError(new SQLException(e.getMessage()));
-        }
-
+      PgResultSet.this.clientLogicGetData();//for client logic case, need to run pre-process
       PgResultSet.this.cursor = cursor;
     }
 
@@ -2134,7 +2025,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
         if (obj == null) {
           return null;
         }
-        return resultUppercase(obj.toString());
+        return obj.toString();
       }
       // hack to be compatible with text protocol
       if (obj instanceof java.util.Date) {
@@ -2145,12 +2036,12 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       if ("hstore".equals(getPGType(columnIndex))) {
         return HStoreConverter.toString((Map<?, ?>) obj);
       }
-      return resultUppercase(trimString(columnIndex, obj.toString()));
+      return trimString(columnIndex, obj.toString());
     }
 
     Encoding encoding = connection.getEncoding();
     try {
-      return resultUppercase(trimString(columnIndex, encoding.decode(this_row[columnIndex - 1])));
+      return trimString(columnIndex, encoding.decode(this_row[columnIndex - 1]));
     } catch (IOException ioe) {
       throw new PSQLException(
           GT.tr(
@@ -2930,7 +2821,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       s = "-" + s.substring(2);
     }
 
-    return s;
+    return s.replace(",", "");
   }
 
   protected String getPGType(int column) throws SQLException {
@@ -2952,11 +2843,6 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     TypeInfo typeInfo = connection.getTypeInfo();
     int oid = field.getOID();
     String pgType = typeInfo.getPGType(oid);
-    if (connection.getClientLogic() != null && ClientLogic.isClientLogicField(oid)) {
-        if (field.getMod() > 0) {
-            pgType = typeInfo.getPGType(field.getMod());
-        }
-    }
     int sqlType = typeInfo.getSQLType(pgType);
     field.setSQLType(sqlType);
     field.setPGType(pgType);

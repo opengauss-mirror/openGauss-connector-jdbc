@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TimeZone;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import javax.net.SocketFactory;
 
@@ -63,17 +62,14 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   public static String USE_BOOLEAN = "false";
   private static final int AUTH_REQ_SHA256 = 10;
   private static final int AUTH_REQ_MD5_SHA256 = 11;
-    private static final int AUTH_REQ_SHA256_RFC = 12;
     private static final int AUTH_REQ_SM3 = 13;
   private static final int PLAIN_PASSWORD = 0;
   private static final int MD5_PASSWORD  = 1;
   private static final int SHA256_PASSWORD =  2;
     private static final int SM3_PASSWORD = 3;
     private static final int ERROR_PASSWORD = 4;
-    private static final int SHA256_PASSWORD_RFC = 6;
   private static final int PROTOCOL_VERSION_351 = 351;
   private static final int PROTOCOL_VERSION_350 = 350;
-    private static final int PROTOCOL_VERSION_1 = 1;
   private int protocolVerion = PROTOCOL_VERSION_351;
   private String connectInfo = "";
 
@@ -159,13 +155,9 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       }
     }
 
+    List<String[]> paramList = getParametersForStartup(user, database, info);
     String protocolProp = info.getProperty("protocolVersion");
     this.protocolVerion = (protocolProp != null && !protocolProp.isEmpty()) ? Integer.parseInt(protocolProp) : PROTOCOL_VERSION_351;
-    if (this.protocolVerion == PROTOCOL_VERSION_1) {
-        database = database.toUpperCase(Locale.ENGLISH);
-    }
-
-    List<String[]> paramList = getParametersForStartup(user, database, info);
     sendStartupPacket(newStream, paramList);
 
     // Do authentication (until AuthenticationOk).
@@ -330,13 +322,10 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
           // query and update statements cause logical replication to fail, temporarily evade
           if (info.getProperty("replication") == null) {
             runInitialQueries(queryExecutor, info);
-            String[] queryGaussdbVersionResult = queryGaussdbVersion(queryExecutor);
-            queryExecutor.setGaussdbVersion(queryGaussdbVersionResult[0]);
-            queryExecutor.setWorkingVersionNum(queryGaussdbVersionResult[1]);
-            if (this.protocolVerion != PROTOCOL_VERSION_1) {
-                // get database compatibility mode
-                queryExecutor.setCompatibilityMode(queryDataBaseDatcompatibility(queryExecutor, database));
-            }
+            String queryGaussdbVersionResult = queryGaussdbVersion(queryExecutor);
+            queryExecutor.setGaussdbVersion(queryGaussdbVersionResult);
+            // get database compatibility mode
+            queryExecutor.setCompatibilityMode(queryDataBaseDatcompatibility(queryExecutor, database));
           }
           if (MultiHostChooser.isUsingAutoLoadBalance(info)) {
             QueryCNListUtils.runRereshCNListQueryies(queryExecutor, info);
@@ -453,16 +442,6 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     if (PGProperty.PG_CLIENT_LOGIC.get(info) != null && PGProperty.PG_CLIENT_LOGIC.get(info).equals("1")) {
       paramList.add(new String[]{"enable_full_encryption", "1"});
     }
-
-    if (PGProperty.REFRESH_CLIENT_ENCRYPTION.get(info) != null &&
-            PGProperty.REFRESH_CLIENT_ENCRYPTION.get(info).equals("1")) {
-        paramList.add(new String[]{"refreshClientEncryption", "1"});
-    }
-
-    if (PGProperty.UPPERCASE_ATTRIBUTE_NAME.getBoolean(info)) {
-      paramList.add(new String[]{"uppercase_attribute_name", "true"});
-    }
-
     return paramList;
   }
 
@@ -704,7 +683,6 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                                 PSQLState.CONNECTION_REJECTED);
                     }
                 }
-              case AUTH_REQ_SHA256_RFC:
               case AUTH_REQ_SHA256: {
                   LOGGER.trace("[" + connectInfo + "] " + "AUTH_REQ_SHA256");
                   byte[] digest;
@@ -715,8 +693,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                                       "The server requested password-based authentication, but no password"
                                           + " was provided."),
                               PSQLState.CONNECTION_REJECTED);
-                  if (passwordStoredMethod == PLAIN_PASSWORD || passwordStoredMethod == SHA256_PASSWORD
-                     || passwordStoredMethod == SHA256_PASSWORD_RFC) {
+                  if (passwordStoredMethod == PLAIN_PASSWORD || passwordStoredMethod == SHA256_PASSWORD) {
                       String random64code = pgStream.receiveString(64);
                       String token = pgStream.receiveString(8);
                       byte[] result = null;
@@ -886,24 +863,17 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     String datcompatibility = queryExecutor.getEncoding().decode(result[0]);
     return datcompatibility == null ? "PG" : datcompatibility;
   }
-
-
-  private String[] queryGaussdbVersion(QueryExecutor queryExecutor) throws SQLException, IOException {
-    String workVersionNum = "0";
-    byte[][] result;
-    if (this.protocolVerion == PROTOCOL_VERSION_1) {
-      result = SetupQueryRunner.run(queryExecutor, "select version();", true);
-    } else {
-      result = SetupQueryRunner.run(queryExecutor, "select version(),working_version_num();", true);
-      workVersionNum = queryExecutor.getEncoding().decode(result[1]);
-    }
+  
+  
+  private String queryGaussdbVersion(QueryExecutor queryExecutor) throws SQLException, IOException {
+    byte[][] result = SetupQueryRunner.run(queryExecutor, "select version();", true);
     String version = queryExecutor.getEncoding().decode(result[0]);
     if (version != null && version.contains("GaussDB Kernel")) {
-      return new String[]{"GaussDBKernel", workVersionNum};
+      return "GaussDBKernel";
     } else if (version != null && version.contains("openGauss")) {
-      return new String[]{"openGauss", workVersionNum};
+      return "openGauss";
     } else {
-      return new String[]{"", workVersionNum};
+      return "";
     }
   }
 
@@ -916,5 +886,4 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       return ClusterStatus.MasterCluster;
     }
   }
-
 }

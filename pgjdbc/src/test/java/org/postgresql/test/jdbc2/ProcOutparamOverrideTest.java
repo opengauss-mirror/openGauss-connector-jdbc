@@ -1,6 +1,7 @@
 package org.postgresql.test.jdbc2;
 
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.postgresql.test.TestUtil;
@@ -15,6 +16,7 @@ import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Adaptation overload function use case set.
@@ -70,7 +72,7 @@ public class ProcOutparamOverrideTest extends BaseTest4 {
     /**
      * The sql of the create table.
      */
-    private static final String CREATE_TABLE_SQL = "CREATE TABLE test_1(id int,name varchar(20))";
+    private static final String CREATE_TABLE_SQL = "CREATE TABLE if not exists test_1(id int,name varchar(20))";
 
     /**
      * The sql of the set guc param behavior_compat_options
@@ -85,6 +87,15 @@ public class ProcOutparamOverrideTest extends BaseTest4 {
     @Before
     public void setUp() throws Exception {
         super.setUp();
+        String[] databases = {"ora_compatible_db", "mysql_compatible_db", "td_compatible_db", "pg_compatible_db"};
+        for (String database: databases) {
+            try {
+                TestUtil.execute(String.format("DROP DATABASE %s", database), con);
+            } catch (Exception exp) {
+            
+            }
+        }
+        TestUtil.execute("drop table if exists test_1", con);
         TestUtil.execute("CREATE DATABASE ora_compatible_db DBCOMPATIBILITY 'A'", con);
         TestUtil.execute("CREATE DATABASE mysql_compatible_db DBCOMPATIBILITY 'B';", con);
         TestUtil.execute("CREATE DATABASE td_compatible_db DBCOMPATIBILITY 'C';", con);
@@ -93,14 +104,18 @@ public class ProcOutparamOverrideTest extends BaseTest4 {
 
     @After
     public void tearDown() throws SQLException {
-        TestUtil.execute("DROP DATABASE ora_compatible_db", con);
-        TestUtil.execute("DROP DATABASE mysql_compatible_db", con);
-        TestUtil.execute("DROP DATABASE td_compatible_db", con);
-        TestUtil.execute("DROP DATABASE pg_compatible_db", con);
+        String[] databases = {"ora_compatible_db", "mysql_compatible_db", "td_compatible_db", "pg_compatible_db"};
+        for (String database: databases) {
+            try {
+                TestUtil.execute(String.format("DROP DATABASE %s", database), con);
+            } catch (Exception exp) {
+            
+            }
+        };
     }
 
     /*****************************************************************
-     * 描述：测试Oracle兼容模式，重载开启与关闭下，存储过程的调用
+     * 描述：测试A兼容模式，重载开启与关闭下，存储过程的调用
      * 被测对象：PgCallableStatement
      * 输入：存储过程名
      * 测试场景：开启重载，调用储存过程；关闭重载，调用存储过程
@@ -117,38 +132,6 @@ public class ProcOutparamOverrideTest extends BaseTest4 {
     }
 
     /*****************************************************************
-     * 描述：测试MySQL兼容模式，重载开启与关闭下，存储过程的调用
-     * 被测对象：PgCallableStatement
-     * 输入：存储过程名
-     * 测试场景：开启重载，调用储存过程；关闭重载，调用存储过程
-     * 期望输出：正确返回结果
-     ******************************************************************/
-    @Test
-    public void testMysqlCompatible() throws Exception {
-        Properties props = new Properties();
-        props.setProperty("PGDBNAME", "mysql_compatible_db");
-        con = TestUtil.openDB(props);
-        verifyOutparamOverride(con);
-        verifyNotOracleCompatibilityMode(con);
-    }
-
-    /*****************************************************************
-     * 描述：测试Teradata兼容模式，重载开启与关闭下，存储过程的调用
-     * 被测对象：PgCallableStatement
-     * 输入：存储过程名
-     * 测试场景：开启重载，调用储存过程；关闭重载，调用存储过程
-     * 期望输出：正确返回结果
-     ******************************************************************/
-    @Test
-    public void testTdCompatible() throws Exception {
-        Properties props = new Properties();
-        props.setProperty("PGDBNAME", "td_compatible_db");
-        con = TestUtil.openDB(props);
-        verifyOutparamOverride(con);
-        verifyNotOracleCompatibilityMode(con);
-    }
-
-    /*****************************************************************
      * 描述：测试PostgreSQL兼容模式，重载开启与关闭下，存储过程的调用
      * 被测对象：PgCallableStatement
      * 输入：存储过程名
@@ -161,7 +144,6 @@ public class ProcOutparamOverrideTest extends BaseTest4 {
         props.setProperty("PGDBNAME", "pg_compatible_db");
         con = TestUtil.openDB(props);
         verifyOutparamOverride(con);
-        verifyNotOracleCompatibilityMode(con);
     }
 
     /**
@@ -227,32 +209,25 @@ public class ProcOutparamOverrideTest extends BaseTest4 {
             assertEquals("2", cmt.getString(2));
 
             stmt.execute(TURN_OFF_OVERRIDE);
+;
             cmt = conn.prepareCall(callProc);
-            cmt.setInt(1, 6);
-            cmt.registerOutParameter(2, Types.INTEGER);
-            cmt.execute();
-            assertEquals(8, cmt.getInt(2));
-            cmt = conn.prepareCall(callProc);
-            cmt.setInt(1, 2);
+            cmt.setInt(1, 4);
             cmt.registerOutParameter(2, Types.VARCHAR);
             cmt.execute();
             assertEquals("4", cmt.getString(2));
+    
+            try {
+                cmt = conn.prepareCall(callProc);
+                cmt.setInt(1, 6);
+                cmt.registerOutParameter(2, Types.INTEGER);
+                cmt.execute();
+                assertEquals(8, cmt.getInt(2));
+                fail("can't run here!");
+            } catch (Exception exp) {
+            }
         } finally {
             TestUtil.closeQuietly(stmt);
             TestUtil.closeQuietly(cmt);
-        }
-    }
-
-    /**
-     * Stored procedure call in other database compatibility mode.
-     *
-     * @param conn Database connection of different compatibility modes.
-     */
-    private void verifyNotOracleCompatibilityMode(Connection conn) {
-        try {
-            verifyPackageReloadProc(conn);
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("ERROR: Package only allowed create in A compatibility"));
         }
     }
 

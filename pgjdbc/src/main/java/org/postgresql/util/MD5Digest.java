@@ -13,7 +13,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.Security;
 import java.io.UnsupportedEncodingException;
-import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.spec.InvalidKeySpecException;
 import java.sql.SQLException;

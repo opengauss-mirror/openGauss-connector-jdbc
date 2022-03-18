@@ -335,7 +335,7 @@ public class BeginEndTest extends BaseTest4 {
      * 期望输出：存储过程创建成功
      ******************************************************************/
     @Test
-    public void testCase10() throws SQLException {
+    public void testCase12() throws SQLException {
         Statement stmt = con.createStatement();
         CallableStatement cmt = null;
         try {

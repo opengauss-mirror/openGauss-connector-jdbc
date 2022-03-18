@@ -12,7 +12,6 @@ import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
 import org.postgresql.log.Tracer;
 import org.postgresql.util.DriverInfo;
-import org.postgresql.util.ExpressionProperties;
 import org.postgresql.util.GT;
 import org.postgresql.util.HostSpec;
 import org.postgresql.util.PSQLException;
@@ -350,20 +349,6 @@ public class Driver implements java.sql.Driver {
             LOGGER = Logger.getLogger("org.postgresql.Driver");
         }
 
-        if (PGProperty.TRACE_INTERFACE_CLASS.get(props) != null && tracer == null) {
-            String traceClass = PGProperty.TRACE_INTERFACE_CLASS.get(props);
-            try {
-                if (tracerInitialized.compareAndSet(false, true)) {
-                    tracer = Class.forName(traceClass).asSubclass(Tracer.class).newInstance();
-                }
-            } catch (ClassCastException ce1) {
-                tracerInitialized.set(false);
-                LOGGER.warn("The currently specified class " + traceClass + ", not implement Tracer class.");
-            } catch (ClassNotFoundException | InstantiationException | IllegalAccessException ce2) {
-                tracerInitialized.set(false);
-                LOGGER.warn("Failed to load tracer implementation class, error: ", ce2);
-            }
-        }
         Boolean parseStatus = true;
         if (PGProperty.PRIORITY_SERVERS.get(props) != null) {
             if (!GlobalClusterStatusTracker.isVaildPriorityServers(props)) {

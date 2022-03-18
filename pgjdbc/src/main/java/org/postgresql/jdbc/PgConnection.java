@@ -92,7 +92,6 @@ public class PgConnection implements BaseConnection {
   private static final SQLPermission SQL_PERMISSION_ABORT = new SQLPermission("callAbort");
   private static final SQLPermission SQL_PERMISSION_NETWORK_TIMEOUT = new SQLPermission("setNetworkTimeout");
   private static final Map<String,String> CONNECTION_INFO_REPORT_BLACK_LIST;
-  private static final int SUPPORT_SINGLE_SLICE_MIN_VERSION = 92367;
   static {
       CONNECTION_INFO_REPORT_BLACK_LIST = new HashMap<>();
       CONNECTION_INFO_REPORT_BLACK_LIST.put("user","");
@@ -127,9 +126,6 @@ public class PgConnection implements BaseConnection {
 
   private ClientLogic clientLogic = null;
 
-    /* reload client cache flag compared with timestamp */
-    private boolean reloadClientLogicCacehOnIsValid = true;
-  
   private final TypeInfo _typeCache;
 
   private boolean disableColumnSanitiser = false;
@@ -160,7 +156,8 @@ public class PgConnection implements BaseConnection {
   public boolean batchInsert = true;
 	
   public boolean blobmode = true;
-  // Default statement fetchsize
+  
+  //Default statement fetchsize
   private int fetchSize = -1;
 
   // Bind String to UNSPECIFIED or VARCHAR?
@@ -179,11 +176,6 @@ public class PgConnection implements BaseConnection {
    * commands.
    */
   private final boolean replicationConnection;
-
-  /**
-   * Connection's uppercase attribute name state.
-   */
-  private boolean isUpperCase = false;
 
   private final LruCache<FieldMetadata.Key, FieldMetadata> fieldMetadataCache;
 
@@ -250,11 +242,7 @@ public class PgConnection implements BaseConnection {
         LOGGER.trace("Catch Exception while compare allow and FALSE. ", e);
     }
 
-    if (PGProperty.UPPERCASE_ATTRIBUTE_NAME.getBoolean(info)) {
-        setIsUpperCase(true);
-    }
-
-      this.creatingURL = url;
+    this.creatingURL = url;
 
     setDefaultFetchSize(PGProperty.DEFAULT_ROW_FETCH_SIZE.getInt(info));
 
@@ -480,11 +468,6 @@ public class PgConnection implements BaseConnection {
       	clientLogic = new ClientLogic();
     		String databaseName = PGProperty.PG_DBNAME.get(info);
     		clientLogic.linkClientLogic(databaseName, this);
-
-            if (PGProperty.REFRESH_CLIENT_ENCRYPTION.get(info) != null &&
-                  !PGProperty.REFRESH_CLIENT_ENCRYPTION.get(info).equals("1")) {
-                reloadClientLogicCacehOnIsValid = false;
-            }
       } 
       catch (ClientLogicException e) {
       	clientLogic = null;
@@ -1280,18 +1263,18 @@ public class PgConnection implements BaseConnection {
     return (notifications.length == 0 ? null : notifications);
   }
 
-    /**
-     * Handler for transaction queries.
-     */
-    private class TransactionCommandHandler extends ResultHandlerBase {
-      public void handleCompletion() throws SQLException {
-        SQLWarning warning = getWarning();
-        if (warning != null) {
-          PgConnection.this.addWarning(warning);
-        }
-        super.handleCompletion();
+  /**
+   * Handler for transaction queries.
+   */
+  private class TransactionCommandHandler extends ResultHandlerBase {
+    public void handleCompletion() throws SQLException {
+      SQLWarning warning = getWarning();
+      if (warning != null) {
+        PgConnection.this.addWarning(warning);
       }
+      super.handleCompletion();
     }
+  }
 
   public int getPrepareThreshold() {
     return prepareThreshold;
@@ -1629,17 +1612,6 @@ public class PgConnection implements BaseConnection {
     return makeArray(oid, sb.toString());
   }
 
-    /**
-     * Use JNI to reload the client logic cache only if the cached configuration timestamp is
-     * earlier that the maximum configuration timestamp on the server
-     */
-    private void reloadClientLogicCacheIfNeeded() {
-        if (clientLogic == null || !reloadClientLogicCacehOnIsValid) {
-            return;
-        }
-        clientLogic.reloadCacheIfNeeded();
-    }
-
   @Override
   public boolean isValid(int timeout) throws SQLException {
     if (timeout < 0) {
@@ -1650,44 +1622,25 @@ public class PgConnection implements BaseConnection {
       return false;
     }
     try {
-        if (replicationConnection) {
-            Statement statement = createStatement();
-            statement.execute("IDENTIFY_SYSTEM");
-            statement.close();
-        } else {
-            if (checkConnectionQuery == null) {
-                checkConnectionQuery = prepareStatement("");
-            }
-            checkConnectionQuery.setQueryTimeout(timeout);
-            checkConnectionQuery.executeUpdate();
+      if (replicationConnection) {
+        Statement statement = createStatement();
+        statement.execute("IDENTIFY_SYSTEM");
+        statement.close();
+      } else {
+        if (checkConnectionQuery == null) {
+          checkConnectionQuery = prepareStatement("");
         }
-
-        reloadClientLogicCacheIfNeeded();
-        return true;
+        checkConnectionQuery.setQueryTimeout(timeout);
+        checkConnectionQuery.executeUpdate();
+      }
+      return true;
     } catch (SQLException e) {
       if (PSQLState.IN_FAILED_SQL_TRANSACTION.getState().equals(e.getSQLState())) {
-          // "current transaction aborted", assume the connection is up and running
-          reloadClientLogicCacheIfNeeded();
-          return true;
+        // "current transaction aborted", assume the connection is up and running
+        return true;
       }
       LOGGER.debug(GT.tr("Validating connection."), e);
     }
-    return false;
-  }
-
-  private static boolean isKmsInfo(String name) {
-    String[] kmsNames = {"iamUser", "iamPassword", "kmsDomain", "kmsProjectName", "kmsProjectId"};
-    
-    if (name == null || name.trim().length() == 0) {
-      return false;
-    }
-
-    for (String kmsName : kmsNames) {
-      if (name.trim().equals(kmsName)) {
-        return true;
-      }
-    }
-
     return false;
   }
 
@@ -1699,24 +1652,6 @@ public class PgConnection implements BaseConnection {
       Map<String, ClientInfoStatus> failures = new HashMap<String, ClientInfoStatus>();
       failures.put(name, ClientInfoStatus.REASON_UNKNOWN);
       throw new SQLClientInfoException(GT.tr("This connection has been closed."), failures, cause);
-    }
-
-    /* 
-     * if the client info related to Huawei KMS:
-     *     {iamUser, iamPassword, kmsDomain, kmsProjectName, kmsProjectId}
-     * we will pass them into "libgauss_cl_jni.so".
-     * then, when user executes SQL related to encryption and decryption,
-     * 'libgauss_cl_jni.so' will use the parameters to establish the connection.
-     */
-    if (isKmsInfo(name)) {
-      try {
-        clientLogic.setKmsInfo(name.trim(), value);
-      } catch (ClientLogicException cle) {
-        Map<String, ClientInfoStatus> failures = new HashMap<String, ClientInfoStatus>();
-        failures.put(name, ClientInfoStatus.REASON_UNKNOWN);
-        throw new SQLClientInfoException(
-            GT.tr("Failed to set ClientInfo property: " + name), failures, cle);
-      }
     }
 
     if (haveMinimumServerVersion(ServerVersion.v9_0) && "ApplicationName".equals(name) || "ApplicationType".equals(name)) {
@@ -1750,24 +1685,6 @@ public class PgConnection implements BaseConnection {
       _clientInfo.put(name, value);
       return;
     }
-
-      if ("nodeName".equals(name)) {
-          if (Integer.parseInt(this.getQueryExecutor().getWorkingVersionNum())
-                  >= SUPPORT_SINGLE_SLICE_MIN_VERSION) {
-              _clientInfo.put(name, value);
-              return;
-          } else {
-              Map<String, ClientInfoStatus> failures = new HashMap<String, ClientInfoStatus>();
-              failures.put(name, ClientInfoStatus.REASON_UNKNOWN_PROPERTY);
-              throw new SQLClientInfoException(
-                      GT.tr("Single slice query function is not available."
-                              + System.lineSeparator()
-                              + "The current version of the database is "
-                              + this.getQueryExecutor().getWorkingVersionNum()
-                              + "," + "but the database version that JDBC supports using this function is "
-                              + SUPPORT_SINGLE_SLICE_MIN_VERSION), failures);
-          }
-      }
 
     addWarning(new SQLWarning(GT.tr("ClientInfo property not supported."),
         PSQLState.NOT_IMPLEMENTED.getState()));
@@ -2138,12 +2055,5 @@ public class PgConnection implements BaseConnection {
         return this.socketAddress;
     }
 
-    private void setIsUpperCase(boolean isUpperCase) {
-        this.isUpperCase = isUpperCase;
-    }
-
-    protected boolean getIsUpperCase() {
-        return isUpperCase;
-    }
 
 }

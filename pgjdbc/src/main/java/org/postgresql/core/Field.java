@@ -7,8 +7,6 @@ package org.postgresql.core;
 
 import org.postgresql.jdbc.FieldMetadata;
 
-import java.util.List;
-
 /*
  */
 public class Field {
@@ -20,8 +18,6 @@ public class Field {
   private final int oid; // OID of the type
   private final int mod; // type modifier of this field
   private final String columnLabel; // Column label
-
-    private List<Integer> clientLogicFieldOriginalIds = null;
 
   private int format = TEXT_FORMAT; // In the V3 protocol each field has a format
   // 0 = text, 1 = binary
@@ -172,11 +168,4 @@ public class Field {
   public boolean isTypeInitialized() {
     return pgType != NOT_YET_LOADED;
   }
-
-    public List<Integer> getClientLogicFieldOriginalIdS() {
-        return clientLogicFieldOriginalIds;
-    }
-    public void setClientLogicFieldOriginalIdS(List<Integer> clientLogicFieldOriginalIds) {
-        this.clientLogicFieldOriginalIds = clientLogicFieldOriginalIds;
-    }
 }

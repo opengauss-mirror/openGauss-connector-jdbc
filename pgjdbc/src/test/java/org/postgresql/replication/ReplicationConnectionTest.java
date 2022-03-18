@@ -53,25 +53,6 @@ public class ReplicationConnectionTest {
   }
 
   @Test
-  public void testConnectionNotValidWhenSessionTerminated() throws Exception {
-    int backendId = ((PgConnection) replConnection).getQueryExecutor().getBackendPID();
-
-    Connection sqlConnection = TestUtil.openDB();
-
-    Statement terminateStatement = sqlConnection.createStatement();
-    terminateStatement.execute("SELECT pg_terminate_backend(" + backendId + ")");
-    terminateStatement.close();
-    sqlConnection.close();
-
-    boolean result = replConnection.isValid(3);
-
-    assertThat("When postgresql terminate session with replication connection, "
-            + "isValid methos should return false, because next query on this connection will fail",
-        result, equalTo(false)
-    );
-  }
-
-  @Test
   public void testReplicationCommandResultSetAccessByIndex() throws Exception {
     Statement statement = replConnection.createStatement();
     ResultSet resultSet = statement.executeQuery("IDENTIFY_SYSTEM");

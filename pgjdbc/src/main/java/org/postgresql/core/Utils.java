@@ -35,12 +35,6 @@ public class Utils {
   }
 
   /**
-   * Keep a local copy of the UTF-8 Charset so we can avoid synchronization overhead from looking up
-   * the Charset by name as String.getBytes(String) requires.
-   */
-  private static final Charset utf8Charset = Charset.forName("UTF-8");
-
-  /**
    * Encode a string as UTF-8.
    *
    * @param str the string to encode
