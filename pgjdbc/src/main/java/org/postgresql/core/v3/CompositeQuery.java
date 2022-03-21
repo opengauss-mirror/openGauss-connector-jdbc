@@ -76,6 +76,16 @@ class CompositeQuery implements Query {
     return subqueries;
   }
 
+  @Override
+  public void setIsFunction(boolean isFunction) {
+
+  }
+
+  @Override
+  public boolean getIsFunction() {
+    return false;
+  }
+
   public boolean isStatementDescribed() {
     for (SimpleQuery subquery : subqueries) {
       if (!subquery.isStatementDescribed()) {

@@ -41,7 +41,7 @@ public class ClientLogicImpl {
   	else {
   		//did not add much logic here, will handle it on the parent class
       return new Object[]{};
-  	}  	
+  	}
   }
 
     /**
@@ -56,9 +56,9 @@ public class ClientLogicImpl {
         return runQueryPreProcessImpl(m_handle, originalQuery);
     }
   /**
-   * Replace client logic field value with user input - used when receiving data in a resultset 
+   * Replace client logic field value with user input - used when receiving data in a resultset
    * @param processData the data in binary format (hexa)
-   * @param dataType the oid (modid) of the original field type 
+   * @param dataType the oid (modid) of the original field type
    * @return array of objects
    *[0][0] - int status code - zero for success
    *[0][1] - string status description
@@ -84,13 +84,13 @@ public class ClientLogicImpl {
    * @return array of objects
    *[0][0] - int status code - zero for success
    *[0][1] - string status description
-   *[1] - String - The modified query - to be used if the query had client logic fields in user format that have to be replaces with binary value 
+   *[1] - String - The modified query - to be used if the query had client logic fields in user format that have to be replaces with binary value
    */
   public Object[] prepareQuery(String query, String statement_name, int parameter_count){
   	return  prepareQueryImpl(m_handle, query, statement_name, parameter_count);
   }
   /**
-   * replace parameters values in prepared statement - to be called before binding the parameters and executing the statement  
+   * replace parameters values in prepared statement - to be called before binding the parameters and executing the statement
    * @param statementName the name of the statement
    * @param paramValues array of parameters in user format
    * @return array of objects
@@ -108,7 +108,7 @@ public class ClientLogicImpl {
    * 		... Key (name)=(\xa1d4....) already exists. ...
    * to:
    * 		... Key (name)=(John) already exists. ...
-   * @param originalMessage the error message received from the server 
+   * @param originalMessage the error message received from the server
    * @return array of objects
    *[0][0] - int status code - zero for success
    *[0][1] - string status description
@@ -134,7 +134,7 @@ public class ClientLogicImpl {
   }
 
   /**
-   * setter function to set the handle 
+   * setter function to set the handle
    * @param handle
    */
   public void setHandle(long handle) {
@@ -149,9 +149,9 @@ public class ClientLogicImpl {
   }
 
   /**
-   * This method is being invoked from the client logic c++ code  
-   * It is used to fetch data from the server regarding the client logic settings - cache manager   
-   * @param query the query to incoke 
+   * This method is being invoked from the client logic c++ code
+   * It is used to fetch data from the server regarding the client logic settings - cache manager
+   * @param query the query to incoke
    * @return array of results in the following format
    * [0] - array of column headers
    * [1...n] - array of results
@@ -184,7 +184,7 @@ public class ClientLogicImpl {
         data.add(record.toArray());
       }
       st.close();
-    } 
+    }
     catch (SQLException e) {
     	List<Object> errorResponse = new ArrayList<>();
     	errorResponse.add(e.getMessage());

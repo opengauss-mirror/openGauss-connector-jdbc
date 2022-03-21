@@ -30,8 +30,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RunWith(Parameterized.class)
 public class ResultSetMetaDataTest extends BaseTest4 {
@@ -145,12 +148,12 @@ public class ResultSetMetaDataTest extends BaseTest4 {
     assertEquals("text", rsmd.getColumnTypeName(2));
 
     assertEquals(10, rsmd.getPrecision(3));
-
     assertEquals(2, rsmd.getScale(3));
-
-    assertEquals("public", rsmd.getSchemaName(1));
+    
+    Set<String> schemas = Arrays.stream(new String[]{"public", con.getSchema()}).collect(Collectors.toSet());
+    assertTrue(schemas.contains(rsmd.getSchemaName(1)));
     assertEquals("", rsmd.getSchemaName(4));
-    assertEquals("public", pgrsmd.getBaseSchemaName(1));
+    assertTrue(schemas.contains(pgrsmd.getBaseSchemaName(1)));
     assertEquals("", pgrsmd.getBaseSchemaName(4));
 
     assertEquals("rsmd1", rsmd.getTableName(1));

@@ -65,6 +65,7 @@ public class PgCallstatementTypeCompatibility {
         addConvert(Types.INTEGER, Types.NUMERIC, noneConvert);
         addConvert(Types.OTHER, -10, noneConvert);
         addConvert(Types.OTHER, Types.BLOB, noneConvert);
+        addConvert(Types.BLOB, Types.OTHER, noneConvert);
         addConvert(Types.REF_CURSOR, Types.OTHER, noneConvert);
         addConvert(Types.SMALLINT, Types.TINYINT, smallint2Tinyint);
     }

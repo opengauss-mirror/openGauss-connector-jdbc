@@ -458,9 +458,13 @@ public enum PGProperty {
    * Supported TLS cipher suites
    */
   TLS_CIPHERS_SUPPERTED("TLSCiphersSupperted",
-      "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,"
-          + "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,",
-      "Supported TLS cipher suites"),
+          "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,"
+                  + "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,"
+                  + "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,"
+                  + "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,"
+                  + "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,"
+                  + "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+          "Supported TLS cipher suites"),
 
   /**
    * Factory class to instantiate factories for XML processing.
@@ -641,20 +645,20 @@ public enum PGProperty {
     return getSetString(properties) != null;
   }
 
-  /**
-   * Convert this connection parameter and the value read from the given {@code Properties} into a
-   * {@code DriverPropertyInfo}.
-   *
-   * @param properties properties to take actual value from
-   * @return a DriverPropertyInfo representing this connection parameter
-   */
-  public DriverPropertyInfo toDriverPropertyInfo(Properties properties) {
-    DriverPropertyInfo propertyInfo = new DriverPropertyInfo(_name, get(properties));
-    propertyInfo.required = _required;
-    propertyInfo.description = _description;
-    propertyInfo.choices = _choices;
-    return propertyInfo;
-  }
+    /**
+     * Convert this connection parameter and the value read from the given {@code Properties} into a
+     * {@code DriverPropertyInfo}.
+     *
+     * @param properties properties to take actual value from
+     * @return a DriverPropertyInfo representing this connection parameter
+     */
+    public DriverPropertyInfo toDriverPropertyInfo(Properties properties) {
+        DriverPropertyInfo propertyInfo = new DriverPropertyInfo(_name, get(properties));
+        propertyInfo.required = _required;
+        propertyInfo.description = _description;
+        propertyInfo.choices = _choices;
+        return propertyInfo;
+    }
 
   public static PGProperty forName(String name) {
     for (PGProperty property : PGProperty.values()) {

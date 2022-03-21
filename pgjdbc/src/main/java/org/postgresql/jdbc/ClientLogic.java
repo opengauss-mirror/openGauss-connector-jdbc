@@ -115,7 +115,7 @@ public class ClientLogic {
      */
     protected void finalize() {
  		close();
-	}	
+	}
 
     /**
      * Link the client logic JNI & C side to the PgConnection instance
@@ -142,11 +142,11 @@ public class ClientLogic {
 		if (handle == 0 || handle < 0) {
 			throw new ClientLogicException(ERROR_INVALID_HANDLE, ERROR_TEXT_INVALID_HANDLE);
 		}
-		impl.setHandle(handle);  	
+		impl.setHandle(handle);
     }
   
     /**
-     * Runs the pre-process function of the client logic 
+     * Runs the pre-process function of the client logic
      * to change the client logic fields from the user input to the client logic format
      * @param originalQuery query to modify with user input
      * @return the modified query with client logic fields changed

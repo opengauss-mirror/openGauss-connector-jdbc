@@ -85,7 +85,6 @@ Software dependency requirements are as follows:
 | maven                                 | 3.6.1               |
 | java                                  | 1.8                 |
 | Git Bash (Windows)                    | -                   |
-| zip/unzip (Windows)                   | -                   |
 
 ### Downloading openGauss-connector-jdbc
 
@@ -99,29 +98,13 @@ Now we have completed openGauss-connector-jdbc code. For example, we store it in
 
 - /sda/openGauss-connector-jdbc
 
-### Compiling Third-Party Software（optional）
-
-Before building openGauss-connector-jdbc, you need to compile the open source and third-party software that openGauss depends on. We already provide compiled open source and third-party software in open_source under the openGauss-connector-jdbc directory, so you can skip that part by using the open_source we provide directly. These open source and third party software are stored in the openGauss-third_party code repository and usually only need to be built once. If there are updates to the open source software, the software needs to be rebuilt.
-
-You can also get the output files of open source software compilations and builds directly from the **binarylibs** library.
-
-If you want to compile your own third-party software, please go to the openGauss-third_party repository for details. 
-
-After executing the above script, the final compile and build results are stored in the **binarylibs** directory at the same level as **openGauss-third_party**. These files will be used when compiling **openGauss-connector-jdbc**.
-
 ### Compiling
 
-#### Getting jar packages with one-click scripting (Linux)
+#### Getting jar packages with one-click scripting (Linux/Windows)
 
 The build.sh in the openGauss-connector-jdbc directory is an important scripting tool for the compilation process. This tool allows for quick code compilation and packaging.
 
-See the table below for a description of the parameters.
-
-| Option | Default Value                | Parameter         | Description                                                  |
-| :----- | :--------------------------- | :---------------- | :----------------------------------------------------------- |
-| -3rd   | ${Code directory}/binarylibs | [binarylibs path] | Specifies the path of binarylibs. It is recommended to specify the path as open_source/ or /sda/openGauss-connector-jdbc/open_source/. If you have your own compiled third-party libraries that openGauss depends on, you can also specify the path of compiled third-party libraries, such as /sda/binarylibs. |
-
-Now you know the usage of build.sh, so you can compile the openGauss-connector-jdbc by one command with build.sh. In build.sh, maven and java8 will be installed automatically and use to build target.
+so you can compile the openGauss-connector-jdbc by one command with build.sh. In build.sh, maven and java8 will be installed automatically and use to build target.
 
 1. Execute the following command to get to the code directory:
 
@@ -132,51 +115,25 @@ Now you know the usage of build.sh, so you can compile the openGauss-connector-j
 2. Execute the following command to package using build.sh:
 
    ```
-   [user@linux openGauss-connector-jdbc]$ sh build.sh -3rd open_source/ 
+   [user@linux openGauss-connector-jdbc]$ sh build.sh
    ```
 
    When finished, the following will be displayed to indicate successful packaging:
 
    ```
    Successfully make postgresql.jar
-   opengauss-jdbc-${version}.jar
-   postgresql.jar
-   Successfully make jdbc jar package
-   now, all packages has finished!
+   Successfully make opengauss-jdbc-${version} jar package
+   packaging jdbc...
+   Successfully make jdbc jar package in openGauss-${version}-${platform}-${bit}-Jdbc.tar.gz
+   clean up temporary directory!
+   now, all packages has finished!!
    ```
 
    After successful compilation, two jar packages will appear, opengauss-jdbc-${version}.jar and postgresql.jar. compiled jar package path is:**/sda/openGauss-connector-jdbc/output**.
 
-#### Getting jar packages with one-click scripting (Windows)
-
-1. Prepare the Java and Maven environments, and the **zip/unzip** commands that can be used in **Git Bash**.
-
-2. Execute the following command to get to the code directory:
-
-   ```
-   [user@linux openGauss-connector-jdbc]$ cd /sda/openGauss-connector-jdbc
-   ```
-
-3. Run the script build_on_windows_git.sh:
-
-   ```
-   [user@linux openGauss-connector-jdbc]$ sh build_on_windows_git.sh
-   ```
-
-   Run the script build_on_windows_git.sh:
-
-   ```
-   begin run
-   Successfully make postgresql.jar package in /sda/openGauss-connector-jdbc/output/postgresql.jar
-   Successfully make opengauss-jdbc jar package in /sda/openGauss-connector-jdbc/output/opengauss-jdbc-${version}.jar
-   Successfully make jdbc jar package in /sda/openGauss-connector-jdbc/openGauss-${version}-JDBC.tar.gz
-   ```
-   
-   After successful compilation, two jar packages will appear, opengauss-jdbc-${version}.jar and postgresql.jar. the compiled jar package path is **/sda/openGauss-connector-jdbc/output/**. There will also be a zip archive of these two jar packages, openGauss-${version}-JDBC.tar.gz, with the path **/sda/openGauss-connector-jdbc/**.
-
 #### Getting jar packages using the mvn command (Windows or Linux)
 
-1. Prepare the Java and Maven environments, and for Windows, the **zip/unzip** commands that can be used in **Git Bash**.
+1. Prepare the Java and Maven environments.
 
 2. Execute the following command to get to the code directory：
 
@@ -184,23 +141,7 @@ Now you know the usage of build.sh, so you can compile the openGauss-connector-j
    [user@linux sda]$ cd /sda/openGauss-connector-jdbc
    ```
 
-3. Preparing scripts with demos：
-
-   ```
-   [user@linux openGauss-connector-jdbc]$ sh prepare_demo.sh
-   ```
-
-4. Modify the pom.xml in the root directory：
-
-   Change the module from jdbc to pgjdbc, as shown below: 
-
-   ```
-   <modules>
-     <module>pgjdbc</module>
-   </modules>
-   ```
-
-5. Execute the mvn command:
+3. Execute the mvn command:
 
    ```
    [user@linux openGauss-connector-jdbc]$ mvn clean install -Dmaven.test.skip=true
@@ -223,6 +164,7 @@ Now you know the usage of build.sh, so you can compile the openGauss-connector-j
    ```
 
    Two jar packages will appear after a successful build, opengauss-jdbc-${version}.jar and original-opengauss-jdbc-${version}.jar. jar package path is /sda/openGauss-connector-jdbc/pgjdbc /target/.
+   **notice: this build artifact's package name is org.postgresql which different with maven central repository. if you want build package with org.opengauss, please refer to build.sh.**
 
 
 ## Using JDBC

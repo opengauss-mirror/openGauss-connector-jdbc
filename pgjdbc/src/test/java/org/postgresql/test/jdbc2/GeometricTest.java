@@ -55,7 +55,7 @@ public class GeometricTest extends BaseTest4 {
   public void setUp() throws Exception {
     super.setUp();
     TestUtil.createTable(con, "testgeometric",
-        "boxval box, circleval circle, lsegval lseg, pathval path, polygonval polygon, pointval point");
+        "boxval box, circleval circle, lsegval lseg, pathval path, polygonval polygon, pointval point, lineval line");
   }
 
   public void tearDown() throws SQLException {

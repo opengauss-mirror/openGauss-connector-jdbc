@@ -152,7 +152,7 @@ public class PgStatement implements Statement, BaseStatement {
 
     if (c.getClientLogic() != null) {
       this.statementName = c.getClientLogic().getStatementName();
-    }    
+    }
   }
 
   public ResultSet createResultSet(Query originalQuery, Field[] fields, List<byte[][]> tuples,
@@ -419,7 +419,7 @@ public class PgStatement implements Statement, BaseStatement {
     checkClosed();
 
     if (null == x) {
-      queryParameters.setNull(parameterIndex, Oid.BYTEA);
+      queryParameters.setNull(parameterIndex, customOid);
       return;
     }
     byte[] copy = new byte[x.length];
@@ -618,11 +618,11 @@ public class PgStatement implements Statement, BaseStatement {
       }
       catch(ClientLogicException e) {
         if (e.isParsingError()) {
-          /* 
+          /*
            * we should not block bad queries to be sent to the server
     	     * PgConnection.isValid is based on error that is not parsed correctly
     	     */
-    	    LOGGER.debug("pre query failed for parsing error, moving on"); 
+    	    LOGGER.debug("pre query failed for parsing error, moving on");
         } else {
           LOGGER.debug("Failed running runQueryPreProcess on executeInternal " + e.getErrorCode() + ":" + e.getErrorText());
           throw new SQLException(e.getErrorText());

@@ -923,4 +923,10 @@ public class TestUtil {
       throw new TimeoutException("Wait stop replication slot " + timeInWait + " timeout occurs");
     }
   }
+  
+  public static boolean execute(String sql, Connection conn) throws SQLException {
+    try (Statement st = conn.createStatement()) {
+      return st.execute(sql);
+    }
+  }
 }

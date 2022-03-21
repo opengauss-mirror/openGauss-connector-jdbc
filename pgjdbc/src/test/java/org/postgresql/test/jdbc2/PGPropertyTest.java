@@ -128,6 +128,9 @@ public class PGPropertyTest {
     excluded.add("sslprivatekeyfactory");
     excluded.add("ApplicationType");
     excluded.add("TLSCiphersSupperted");
+    excluded.add("enable_ce");
+    excluded.add("priorityServers");
+    excluded.add("forceTargetServerSlave");
 
     // index PropertyDescriptors by name
     Map<String, PropertyDescriptor> propertyDescriptors =

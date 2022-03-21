@@ -67,6 +67,16 @@ class SimpleQuery implements Query {
     return null;
   }
 
+  @Override
+  public void setIsFunction(boolean isFunction) {
+    this.isFunction = isFunction;
+  }
+
+  @Override
+  public boolean getIsFunction() {
+    return this.isFunction;
+  }
+
   /**
    * <p>Return maximum size in bytes that each result row from this query may return. Mainly used for
    * batches that return results.</p>
@@ -367,6 +377,7 @@ class SimpleQuery implements Query {
   private int[] preparedTypes;
   private BitSet unspecifiedParams;
   private short deallocateEpoch;
+  private boolean isFunction;
 
   private Integer cachedMaxResultRowSize;
 

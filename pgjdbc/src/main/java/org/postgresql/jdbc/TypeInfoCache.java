@@ -92,6 +92,7 @@ public class TypeInfoCache implements TypeInfo {
       {"point", Oid.POINT, Types.OTHER, "org.postgresql.geometric.PGpoint", Oid.POINT_ARRAY},
       {"blob", Oid.BLOB, Types.BLOB, "org.postgresql.util.PGobject", -1},
       {"clob", Oid.CLOB, Types.CLOB, "org.postgresql.util.PGobject", -1},
+      {"nvarchar2", Oid.NVARCHAR2, Types.VARCHAR, "java.lang.String", Oid.NVARCHAR2_ARRAY},
       {"refcursor", Oid.REF_CURSOR, Types.REF_CURSOR, "java.sql.ResultSet", Oid.REF_CURSOR_ARRAY}
   };
 

@@ -43,6 +43,7 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
   private static Log LOGGER = Logger.getLogger(BaseDataSource.class.getName());
 
   // Standard properties, defined in the JDBC 2.0 Optional Package spec
+  private String originUrl;
   private String serverName = "localhost";
   private String databaseName;
   private String user;
@@ -1116,6 +1117,9 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
    * @return {@link DriverManager} URL from the other properties supplied
    */
   public String getUrl() {
+    if (this.originUrl != null && this.originUrl.length() > 0 && this.databaseName == null) {
+      return this.originUrl;
+    }
     StringBuilder url = new StringBuilder(100);
     url.append("jdbc:postgresql://");
     url.append(serverName);
@@ -1163,7 +1167,7 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
  * @throws PSQLException 
    */
   public void setUrl(String url) throws PSQLException {
-
+    this.originUrl = url;
     Properties p = org.postgresql.Driver.parseURL(url, null);
 
     for (PGProperty property : PGProperty.values()) {

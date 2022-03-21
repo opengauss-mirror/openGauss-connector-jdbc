@@ -48,8 +48,6 @@ public class Parser {
       boolean isBatchedReWriteConfigured,
       String... returningColumnNames) throws SQLException {
       int numOfOverSymble = 0;
-      boolean haveProcedure = false;
-      boolean haveFunction = false;
       if(startWithComment(query)) {
           query = removeFirstComment(query);
       }
@@ -57,15 +55,7 @@ public class Parser {
       String queryTemp = query.trim();
       queryTemp = queryTemp.replaceAll(reg, "\0");
       String[] queryArr = queryTemp.split("\0");
-
-      for(int i = 0;i < queryArr.length; i++) {
-          if (queryArr[i] != null && (queryArr[i].toUpperCase(Locale.ENGLISH)).equals("PROCEDURE") ) {
-              haveProcedure = true;
-          }
-          if (queryArr[i] != null && (queryArr[i].toUpperCase(Locale.ENGLISH)).equals("FUNCTION") ) {
-              haveFunction = true;
-          }
-      }
+      boolean haveSpecialKeyword = isContainSpecialKeyword(queryArr);
       
     if (!withParameters && !splitStatements
         && returningColumnNames != null && returningColumnNames.length == 0) {
@@ -135,7 +125,11 @@ public class Parser {
           {
               break;
           }
-          if (i >1 && "\n".equals(String.valueOf(aChars[i - 1]))) {
+          if (!haveSpecialKeyword) {
+              break;
+          }
+
+          if (i > 1 && ("\n".equals(String.valueOf(aChars[i - 1])) || " ".equals(String.valueOf(aChars[i - 1])))) {
               numOfOverSymble++;
               if (inParen == 0) {
                   if (!whitespaceOnly) {
@@ -165,6 +159,7 @@ public class Parser {
                               valuesBraceClosePosition = -1;
                           }
 
+                          inBeginEnd = 0;
                           nativeQueries.add(
                                   new NativeQuery(
                                           nativeSql.toString(),
@@ -236,11 +231,7 @@ public class Parser {
           break;
 
         case ';':
-            if (haveProcedure || haveFunction)
-            {
-                break;
-            }
-            if (queryArr[0] !=null && ((queryArr[0].toUpperCase(Locale.ENGLISH)).equals("BEGIN") ||(queryArr[0].toUpperCase(Locale.ENGLISH)).equals("DECLARE")))
+            if (haveSpecialKeyword)
             {
                 break;
             }
@@ -268,7 +259,7 @@ public class Parser {
                   valuesBraceOpenPosition = -1;
                   valuesBraceClosePosition = -1;
                 }
-
+                inBeginEnd = 0;
                 nativeQueries.add(new NativeQuery(nativeSql.toString(),
                     toIntArray(bindPositions), false,
                     SqlCommand.createStatementTypeInfo(
@@ -304,7 +295,7 @@ public class Parser {
                    && "N".equalsIgnoreCase(String.valueOf(aChars[i + 4]))
                    && isSpecialCharacters(aChars[i - 1])
                    && isSpecialCharacters(aChars[i + 5])) {
-                    inBeginEnd ++;
+                    inBeginEnd++;
                 }
             }
             break;
@@ -315,7 +306,9 @@ public class Parser {
                 if ("N".equalsIgnoreCase(String.valueOf(aChars[i + 1])) 
                    && "D".equalsIgnoreCase(String.valueOf(aChars[i + 2])))
                 {
-                    inBeginEnd --;
+                    int[] result = parseEnd(i, aChars, inBeginEnd);
+                    i = result[0];
+                    inBeginEnd = result[1];
                 }
             }
 
@@ -614,6 +607,48 @@ public class Parser {
 
     return query.length;
   }
+
+    /**
+     * Judge whether the statement contains the keywords procedure, function, create, package and declare
+     *
+     * @param queryArr An array of strings consisting of SQL statements
+     * @return boolean
+     */
+    private static boolean isContainSpecialKeyword(final String[] queryArr) {
+        if (queryArr[0].toUpperCase(Locale.ENGLISH).equals("BEGIN")) {
+            return true;
+        }
+        boolean haveCreate = false;
+        boolean havePackage = false;
+        for (int i = 0; i < queryArr.length; i++) {
+            if (queryArr[i] == null) {
+                continue;
+            }
+            switch (queryArr[i].toUpperCase(Locale.ENGLISH)) {
+                case "PROCEDURE":
+                case "FUNCTION":
+                case "DECLARE":
+                    return true;
+                case "CREATE":
+                    if (i == 0) {
+                        haveCreate = true;
+                    }
+                    break;
+                case "PACKAGE":
+                    havePackage = true;
+                    break;
+                case "END":
+                    if (haveCreate && havePackage) {
+                        // Case : create package tn end is end tn;
+                        return true;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+        return false;
+    }
 
   /**
    * <p>Find the end of the double-quoted string starting at the given offset.</p>
@@ -1092,6 +1127,7 @@ public class Parser {
     String sql = jdbcSql;
     boolean isFunction = false;
     boolean outParamBeforeFunc = false;
+    boolean isACompatibilityFunction = false;
 
     int len = jdbcSql.length();
     int state = 1;
@@ -1122,6 +1158,7 @@ public class Parser {
           if (ch == '?') {
             outParamBeforeFunc =
                 isFunction = true;   // { ? = call ... }  -- function with one out parameter
+            isACompatibilityFunction = true;
             ++i;
             ++state;
           } else if (ch == 'c' || ch == 'C') {  // { call ... }      -- proc with no out parameters
@@ -1223,7 +1260,7 @@ public class Parser {
     if (i == len && !syntaxError) {
       if (state == 1) {
         // Not an escaped syntax.
-        return new JdbcCallParseInfo(sql, isFunction);
+        return new JdbcCallParseInfo(sql, isFunction, false);
       }
       if (state != 8) {
         syntaxError = true; // Ran out of query while still parsing
@@ -1277,7 +1314,7 @@ public class Parser {
     }
 
     sql = sb.append(suffix).toString();
-    return new JdbcCallParseInfo(sql, isFunction);
+    return new JdbcCallParseInfo(sql, isFunction, isACompatibilityFunction);
   }
 
   /**
@@ -1474,6 +1511,47 @@ public class Parser {
     }
     return i;
   }
+
+    /**
+     * Judge whether the current end is the end paired with begin
+     */
+    private static int[] parseEnd(final int offset, final char[] query, final int inBeginEnd) {
+        int tempOffset = offset;
+        int tempInBeginEnd = inBeginEnd;
+        tempOffset = tempOffset + 3;
+        while (tempOffset < query.length) {
+            if (isSpecialCharacters(query[tempOffset])) {
+                tempOffset++;
+            } else if ("-".equals(String.valueOf(query[tempOffset]))) {
+                int temp = tempOffset;
+                tempOffset = Parser.parseLineComment(query, tempOffset);
+                if (temp == tempOffset) {
+                    tempOffset++;
+                }
+            } else if ("/".equals(String.valueOf(query[tempOffset]))) {
+                int temp = tempOffset;
+                temp = Parser.parseBlockComment(query, temp);
+                if (tempOffset != temp) {
+                    tempOffset = temp + 1;
+                } else {
+                    // Not a slash for a comment
+                    tempOffset--;
+                    tempInBeginEnd--;
+                    break;
+                }
+            } else if (";".equals(String.valueOf(query[tempOffset]))
+                    || (tempOffset + 1 < query.length && "$$".equals(
+                            String.valueOf(query[tempOffset]) + query[tempOffset + 1]))) {
+                // This is the end paired with begin
+                tempInBeginEnd--;
+                break;
+            } else {
+                tempOffset--;
+                break;
+            }
+        }
+        return new int[]{tempOffset, tempInBeginEnd};
+    }
 
   /**
    * Generate sql for escaped functions.

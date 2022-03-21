@@ -90,7 +90,7 @@ public class GeneratedKeysTest extends BaseTest4 {
   @Override
   public void setUp() throws Exception {
     super.setUp();
-    TestUtil.createTable(con, "genkeys", "a serial, b varchar(5), c int");
+    TestUtil.createTempTable(con, "genkeys", "a serial, b varchar(5), c int");
   }
 
   @Override

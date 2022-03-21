@@ -496,4 +496,22 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
   void setGaussdbVersion(String gaussdbVersion);
 
   void setAvailability(boolean availability);
+  
+  String getCompatibilityMode();
+  
+  void setCompatibilityMode(String compatibilityMode);
+  
+  /**
+   * Get reload status
+   *
+   * @return state true or false
+   */
+  boolean getEnableOutparamOveride();
+  
+  /**
+   * Set reload status
+   *
+   * @param enableOutparamOveride true or false
+   */
+  void setEnableOutparamOveride(boolean enableOutparamOveride);
 }

@@ -2500,8 +2500,11 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       // If the data is already binary then just return it
       return this_row[columnIndex - 1];
     }
-    if (fields[columnIndex - 1].getOID() == Oid.BYTEA) {
+    int oid = fields[columnIndex - 1].getOID();
+    if (oid == Oid.BYTEA) {
       return trimBytes(columnIndex, PGbytea.toBytes(this_row[columnIndex - 1]));
+    } else if (oid == Oid.BLOB) {
+      return toBytes(getString(columnIndex));
     } else {
       return trimBytes(columnIndex, this_row[columnIndex - 1]);
     }

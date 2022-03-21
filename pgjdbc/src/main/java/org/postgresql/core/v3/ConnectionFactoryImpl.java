@@ -72,6 +72,18 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   private static final int PROTOCOL_VERSION_350 = 350;
   private int protocolVerion = PROTOCOL_VERSION_351;
   private String connectInfo = "";
+
+  /**
+   * Whitelist of supported client_encoding
+   */
+  public static final HashMap<String, String> CLIENT_ENCODING_WHITELIST = new HashMap<>();
+
+  static {
+    CLIENT_ENCODING_WHITELIST.put("UTF8", "UTF8");
+    CLIENT_ENCODING_WHITELIST.put("UTF-8", "UTF-8");
+    CLIENT_ENCODING_WHITELIST.put("GBK", "GBK");
+    CLIENT_ENCODING_WHITELIST.put("LATIN1", "LATIN1");
+  }
   public static void setStaticClientEncoding(String client) {
       ConnectionFactoryImpl.CLIENT_ENCODING = client;
   }
@@ -158,9 +170,12 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   public QueryExecutor openConnectionImpl(HostSpec[] hostSpecs, String user, String database,
                                           Properties info) throws SQLException {
     if (info.getProperty("characterEncoding") != null) {
-      if ("UTF8".equals((info.getProperty("characterEncoding")).toUpperCase(Locale.ENGLISH))
-              || "GBK".equals((info.getProperty("characterEncoding")).toUpperCase(Locale.ENGLISH))) {
-        setClientEncoding(info.getProperty("characterEncoding"));
+      if (CLIENT_ENCODING_WHITELIST.containsKey((info.getProperty("characterEncoding")).toUpperCase(Locale.ENGLISH))) {
+        setClientEncoding(info.getProperty("characterEncoding").toUpperCase(Locale.ENGLISH));
+      } else {
+        LOGGER.warn("unsupported client_encoding: " + info.getProperty(
+                "characterEncoding") + ", to ensure correct operation, please use the specified range " +
+                "of client_encoding.");
       }
     }
 
@@ -304,10 +319,13 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
             continue;
           }
 
-          //query and update statements cause logical replication to fail, temporarily evade
+          // query and update statements cause logical replication to fail, temporarily evade
           if (info.getProperty("replication") == null) {
             runInitialQueries(queryExecutor, info);
-            queryExecutor.setGaussdbVersion(queryGaussdbVersion(queryExecutor));
+            String queryGaussdbVersionResult = queryGaussdbVersion(queryExecutor);
+            queryExecutor.setGaussdbVersion(queryGaussdbVersionResult);
+            // get database compatibility mode
+            queryExecutor.setCompatibilityMode(queryDataBaseDatcompatibility(queryExecutor, database));
           }
           if (MultiHostChooser.isUsingAutoLoadBalance(info)) {
             QueryCNListUtils.runRereshCNListQueryies(queryExecutor, info);
@@ -715,7 +733,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                   } else {
                       throw new PSQLException(
                               GT.tr(
-                                      "The  password-stored method is not supported, must be md5, "
+                                      "The password-stored method is not supported, must be md5, "
                                           + "sha256 or sm3."),
                               PSQLState.CONNECTION_REJECTED);
                   }
@@ -838,6 +856,15 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     return localRole.equalsIgnoreCase("Primary") && dbState.equalsIgnoreCase("Normal");
   }
 
+  private String queryDataBaseDatcompatibility(QueryExecutor queryExecutor, String database) throws SQLException,
+          IOException {
+    byte[][] result = SetupQueryRunner.run(queryExecutor, "select datcompatibility from pg_database where " +
+            "datname='" + database + "';", true);
+    String datcompatibility = queryExecutor.getEncoding().decode(result[0]);
+    return datcompatibility == null ? "PG" : datcompatibility;
+  }
+  
+  
   private String queryGaussdbVersion(QueryExecutor queryExecutor) throws SQLException, IOException {
     byte[][] result = SetupQueryRunner.run(queryExecutor, "select version();", true);
     String version = queryExecutor.getEncoding().decode(result[0]);

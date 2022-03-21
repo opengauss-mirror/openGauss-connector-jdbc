@@ -18,16 +18,18 @@ public class CachedQuery implements CanEstimateSize {
   public final Object key;
   public final Query query;
   public final boolean isFunction;
-
+  public final boolean isACompatibilityFunction;
   private int executeCount;
 
-  public CachedQuery(Object key, Query query, boolean isFunction) {
+  public CachedQuery(Object key, Query query, boolean isFunction, boolean isACompatibilityFunction) {
     assert key instanceof String || key instanceof CanEstimateSize
         : "CachedQuery.key should either be String or implement CanEstimateSize."
         + " Actual class is " + key.getClass();
     this.key = key;
     this.query = query;
     this.isFunction = isFunction;
+    this.isACompatibilityFunction = isACompatibilityFunction;
+    this.query.setIsFunction(isFunction);
   }
 
   public void increaseExecuteCount() {

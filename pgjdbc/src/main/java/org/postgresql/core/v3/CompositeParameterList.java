@@ -47,6 +47,11 @@ class CompositeParameterList implements V3ParameterList {
 
   }
 
+  @Override
+  public void bindRegisterOutParameter(int index, int oid, boolean isACompatibilityFunction) throws SQLException {
+
+  }
+
   public int getDirection(int i) {
     return 0;
   }

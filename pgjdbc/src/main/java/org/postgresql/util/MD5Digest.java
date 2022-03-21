@@ -299,7 +299,7 @@ public class MD5Digest {
             if (isSha256) {
                 storedKey = sha256(clientKey);
             } else {
-                storedKey = sm3(clientKey);	
+                storedKey = sm3(clientKey);
             }
             byte[] tokenbyte = hexStringToBytes(token);
             byte[] client_signature = getKeyFromHmac(server_key, tokenbyte);

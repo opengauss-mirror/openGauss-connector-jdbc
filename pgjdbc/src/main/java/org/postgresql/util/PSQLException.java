@@ -32,7 +32,8 @@ public class PSQLException extends SQLException {
   }
 
   public PSQLException(ServerErrorMessage serverError) {
-    super(serverError.toString(), serverError.getSQLState(), Integer.parseInt(serverError.getERRORCODE()));
+    super(serverError.toString(), serverError.getSQLState(),
+        (serverError.getERRORCODE() == null) ? 0 : Integer.parseInt(serverError.getERRORCODE()));
     _serverError = serverError;
   }
 

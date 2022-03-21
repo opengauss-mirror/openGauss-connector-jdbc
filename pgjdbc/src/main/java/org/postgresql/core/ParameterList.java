@@ -242,4 +242,6 @@ public interface ParameterList {
    * @return Object array containing the parameter values.
    */
   Object[] getValues();
+
+  void bindRegisterOutParameter(int index,int oid, boolean isACompatibilityFunction) throws SQLException;
 }

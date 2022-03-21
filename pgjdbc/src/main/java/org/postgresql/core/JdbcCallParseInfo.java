@@ -11,10 +11,12 @@ package org.postgresql.core;
 public class JdbcCallParseInfo {
   private final String sql;
   private final boolean isFunction;
+  private final boolean isACompatibilityFunction;
 
-  public JdbcCallParseInfo(String sql, boolean isFunction) {
+  public JdbcCallParseInfo(String sql, boolean isFunction, boolean isACompatibilityFunction) {
     this.sql = sql;
     this.isFunction = isFunction;
+    this.isACompatibilityFunction = isACompatibilityFunction;
   }
 
   /**
@@ -33,6 +35,10 @@ public class JdbcCallParseInfo {
    */
   public boolean isFunction() {
     return isFunction;
+  }
+
+  public boolean isACompatibilityFunction() {
+    return isACompatibilityFunction;
   }
 
 }

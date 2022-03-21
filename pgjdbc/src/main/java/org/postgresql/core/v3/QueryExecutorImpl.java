@@ -5,6 +5,7 @@
 // Copyright (c) 2004, Open Cloud Limited.
 
 package org.postgresql.core.v3;
+import org.postgresql.Driver;
 import org.postgresql.PGProperty;
 import org.postgresql.copy.CopyIn;
 import org.postgresql.copy.CopyOperation;
@@ -51,7 +52,6 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
-import java.sql.Statement;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -123,6 +123,11 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   private String socketAddress;
 
   private String gaussdbVersion;
+
+  private String compatibilityMode;
+
+  private boolean enableOutparamOveride;
+
   /**
    * {@code CommandComplete(B)} messages are quite common, so we reuse instance to parse those
    */
@@ -158,6 +163,34 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   public void setGaussdbVersion(String gaussdbVersion) {
     this.gaussdbVersion = gaussdbVersion;
+  }
+
+  @Override
+  public String getCompatibilityMode() {
+    return compatibilityMode;
+  }
+
+  public void setCompatibilityMode(String compatibilityMode) {
+    this.compatibilityMode = compatibilityMode;
+  }
+
+  @Override
+  public boolean getEnableOutparamOveride() {
+    return enableOutparamOveride;
+  }
+
+  public void setEnableOutparamOveride(boolean enableOutparamOveride) {
+    this.enableOutparamOveride = enableOutparamOveride;
+  }
+
+  /**
+   * When database compatibility mode is A database and the parameter overload function
+   * is turned on, add out parameter description message.
+   *
+   * @return true: describe, false: not describe.
+   */
+  private boolean isDescribeOutparam() {
+    return enableOutparamOveride && ("A".equals(compatibilityMode) || "ORA".equals(compatibilityMode));
   }
 
   /**
@@ -1541,6 +1574,27 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     byte[] encodedStatementName = query.getEncodedStatementName();
     String nativeSql = query.getNativeSql();
 
+    boolean sendFunctionParamType = isSendFunctionParamType(query);
+    char[] paramFlags = new char[params.getFlags().length];
+
+    if (sendFunctionParamType) {
+      byte[] flags = params.getFlags();
+      for (int j = 0; j < flags.length; j++) {
+        switch (flags[j]) {
+          case 1:
+            paramFlags[j] = 'i';
+            break;
+          case 2:
+            paramFlags[j] = 'o';
+            break;
+          case 3:
+            paramFlags[j] = 'b';
+            break;
+          default:
+            paramFlags[j] = 'i';
+        }
+      }
+    }
     if (LOGGER.isTraceEnabled()) {
       StringBuilder sbuf = new StringBuilder(" FE=> Parse(stmt=" + statementName + ",query=\"");
       sbuf.append(nativeSql);
@@ -1550,6 +1604,15 @@ public class QueryExecutorImpl extends QueryExecutorBase {
           sbuf.append(",");
         }
         sbuf.append(params.getTypeOID(i));
+      }
+      if (sendFunctionParamType) {
+        sbuf.append("}\",flags={");
+        for (int i = 1; i <= paramFlags.length; ++i) {
+          if (i != 1) {
+            sbuf.append(",");
+          }
+          sbuf.append(paramFlags[i - 1]);
+        }
       }
       sbuf.append("})");
       LOGGER.trace("[" + socketAddress + "] " + sbuf.toString());
@@ -1565,10 +1628,15 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     // + N + 1 (statement name, zero-terminated)
     // + N + 1 (query, zero terminated)
     // + 2 (parameter count) + N * 4 (parameter types)
+    // + 2 or 0 (if overload + 2 else + 0)
+    // + params.getFlags().length or 0 (if oracle compatibilityMode & overload & sql is function or procedure send
+    // length else nosend)
     int encodedSize = 4
             + (encodedStatementName == null ? 0 : encodedStatementName.length) + 1
             + queryUtf8.length + 1
-            + 2 + 4 * params.getParameterCount();
+            + 2 + 4 * params.getParameterCount()
+            + (this.getEnableOutparamOveride() ? 2 : 0)
+            + (sendFunctionParamType ? params.getFlags().length : 0);
 
     pgStream.sendChar('P'); // Parse
     pgStream.sendInteger4(encodedSize);
@@ -1582,7 +1650,16 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     for (int i = 1; i <= params.getParameterCount(); ++i) {
       pgStream.sendInteger4(params.getTypeOID(i));
     }
-
+    if (this.getEnableOutparamOveride()) {
+      if (sendFunctionParamType) {
+        pgStream.sendInteger2(params.getParameterCount());
+        for (int i = 1; i <= paramFlags.length; ++i) {
+          pgStream.sendChar(paramFlags[i - 1]);
+        }
+      } else {
+        pgStream.sendInteger2(0);
+      }
+    }
     pendingParseQueue.add(query);
   }
 
@@ -3039,6 +3116,12 @@ public class QueryExecutorImpl extends QueryExecutorBase {
         throw new PSQLException(GT.tr("Protocol error.  Session setup failed."),
                 PSQLState.PROTOCOL_VIOLATION);
       }
+    } else if ("behavior_compat_options".equals(name)) {
+      if (value != null && value.contains("proc_outparam_override")) {
+        setEnableOutparamOveride(true);
+      } else {
+        setEnableOutparamOveride(false);
+      }
     }
   }
 
@@ -3097,6 +3180,23 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   public void setBinarySendOids(Set<Integer> oids) {
     useBinarySendForOids.clear();
     useBinarySendForOids.addAll(oids);
+  }
+
+  /**
+   * In oracle compatibility mode, turn on output parameter overload (enable_outparam_overide=true) and
+   * sql is a function or a stored procedure. At this time, need to send the type of function and stored
+   * procedure parameters (in or out)
+   *
+   * @param query Current SQL
+   * @return true or false
+   */
+  private boolean isSendFunctionParamType(Query query) {
+    if (("ORA".equals(this.getCompatibilityMode()) || "A".equals(this.getCompatibilityMode()))
+            && this.getEnableOutparamOveride() && query.getIsFunction()) {
+      return true;
+    } else {
+      return false;
+    }
   }
 
   private void setIntegerDateTimes(boolean state) {

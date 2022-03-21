@@ -90,4 +90,19 @@ public interface Query {
    *         single-statement query.
    */
   Query[] getSubqueries();
+
+  /**
+   * Set the current statement state
+   *
+   * @param isFunction true or false
+   */
+  void setIsFunction(boolean isFunction);
+
+  /**
+   * Returns whether the current statement is a function
+   *
+   * @return true or false
+   *
+   */
+  boolean getIsFunction();
 }

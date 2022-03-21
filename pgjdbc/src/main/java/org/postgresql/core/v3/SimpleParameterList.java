@@ -49,6 +49,8 @@ class SimpleParameterList implements V3ParameterList {
     this.encoded = new byte[paramCount][];
     this.flags = new byte[paramCount];
     this.transferModeRegistry = transferModeRegistry;
+    this.compatibilityModes = new String[paramCount];
+    this.isACompatibilityFunctions = new boolean[paramCount];
   }
 
   @Override
@@ -61,6 +63,19 @@ class SimpleParameterList implements V3ParameterList {
     }
 
     flags[index - 1] |= OUT;
+  }
+
+  @Override
+  public void bindRegisterOutParameter(int index, int oid, boolean isACompatibilityFunction) throws SQLException {
+    if (index < 1 || index > paramValues.length) {
+      throw new PSQLException(
+              GT.tr("The column index is out of range: {0}, number of columns: {1}.",
+                      index, paramValues.length),
+              PSQLState.INVALID_PARAMETER_VALUE);
+    }
+    paramTypes[index - 1] = oid;
+    compatibilityModes[index - 1] = "ORA";
+    isACompatibilityFunctions[index - 1] = isACompatibilityFunction;
   }
 
   private void bind(int index, Object value, int oid, byte binary) throws SQLException {
@@ -314,8 +329,16 @@ class SimpleParameterList implements V3ParameterList {
   public void convertFunctionOutParameters() {
     for (int i = 0; i < paramTypes.length; ++i) {
       if (direction(i) == OUT) {
-        paramTypes[i] = Oid.VOID;
-        paramValues[i] = "null";
+        if(compatibilityModes[i] != null && compatibilityModes[i].equalsIgnoreCase("ORA")){
+          // function return value as void.
+          if (isACompatibilityFunctions[i] == true && i == 0) {
+            paramTypes[i] = Oid.VOID;
+          }
+          paramValues[i] = "null";
+        }else{
+          paramTypes[i] = Oid.VOID;
+          paramValues[i] = "null";
+        }
       }
     }
   }
@@ -514,6 +537,8 @@ class SimpleParameterList implements V3ParameterList {
   private final byte[] flags;
   private final byte[][] encoded;
   private final TypeTransferModeRegistry transferModeRegistry;
+  private final boolean[] isACompatibilityFunctions;
+  private final String[] compatibilityModes;
 
   /**
    * Marker object representing NULL; this distinguishes "parameter never set" from "parameter set
