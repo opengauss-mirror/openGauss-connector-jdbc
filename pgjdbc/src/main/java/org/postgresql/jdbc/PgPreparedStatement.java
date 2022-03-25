@@ -202,7 +202,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       sqlTypeToOid.put(Types.VARBINARY, Oid.BYTEA);
       sqlTypeToOid.put(Types.LONGVARBINARY, Oid.BYTEA);
       sqlTypeToOid.put(Types.BLOB, Oid.BLOB);
-      sqlTypeToOid.put(Types.CLOB, Oid.OID);
+      sqlTypeToOid.put(Types.CLOB, Oid.CLOB);
       sqlTypeToOid.put(Types.ARRAY, Oid.UNSPECIFIED);
       sqlTypeToOid.put(Types.DISTINCT, Oid.UNSPECIFIED);
       sqlTypeToOid.put(Types.STRUCT, Oid.UNSPECIFIED);
