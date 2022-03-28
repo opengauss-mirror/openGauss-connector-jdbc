@@ -127,7 +127,7 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
 3. 执行mvn命令：
 
    ```
-   [user@linux openGauss-connector-jdbc]$ mvn clean install -Dmaven.test.skip=true
+   [user@linux openGauss-connector-jdbc]$ mvn clean install -Dgpg.skip -Dmaven.test.skip=true
    ```
 
    Linux系统下构建成功后会显示如下结果：

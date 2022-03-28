@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-<groupId>com.huawei</groupId> 
+  <groupId>com.huawei</groupId>
 
   <artifactId>pgjdbc-aggregate</artifactId>
   <packaging>pom</packaging>
@@ -13,14 +13,24 @@
   <modules>
     <module>pgjdbc</module>
   </modules>
-
+  
   <!-- If inherited from parent pom, maven tries to add artifactId to URLs -->
   <scm>
-    <url>https://github.com/pgjdbc/pgjdbc</url>
-    <connection>scm:git:https://github.com/pgjdbc/pgjdbc.git</connection>
-    <developerConnection>scm:git:git@github.com:pgjdbc/pgjdbc.git</developerConnection>
-    <tag>REL42.2.5</tag>
+      <url>https://gitee.com/opengauss/openGauss-connector-jdbc</url>
+      <connection>scm:git:https://gitee.com/opengauss/openGauss-connector-jdbc.git</connection>
+      <developerConnection>scm:git:git@gitee.com:opengauss/openGauss-connector-jdbc.git</developerConnection>
+      <tag>REL42.2.5</tag>
   </scm>
+  <distributionManagement>
+      <snapshotRepository>
+          <id>sonatype-nexus-snapshots</id>
+          <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+      </snapshotRepository>
+      <repository>
+          <id>sonatype-nexus-staging</id>
+          <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+      </repository>
+  </distributionManagement>
   <build>
         <plugins>
             <plugin>

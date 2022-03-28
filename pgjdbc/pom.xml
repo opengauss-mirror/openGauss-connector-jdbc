@@ -14,7 +14,11 @@
       <url>https://jdbc.postgresql.org/about/license.html</url>
     </license>
   </licenses>
-
+  <parent>
+    <groupId>org.sonatype.oss</groupId>
+    <artifactId>oss-parent</artifactId>
+    <version>7</version>
+  </parent>
   <organization>
     <name>openGauss</name>
     <url>https://opengauss.org/</url>
@@ -245,6 +249,33 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.sonatype.plugins</groupId>
+        <artifactId>nexus-staging-maven-plugin</artifactId>
+        <version>1.6.8</version>
+        <extensions>true</extensions>
+        <configuration>
+          <!-- 与 setting.xml 的 server 配置中的 sonatype-release 对应-->
+          <serverId>sonatype-nexus-staging</serverId>
+          <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+          <autoReleaseAfterClose>true</autoReleaseAfterClose>
+        </configuration>
+      </plugin>
+      <!--Maven GPG插件用于使用以下配置对组件进行签名-->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-gpg-plugin</artifactId>
+        <version>1.5</version>
+        <executions>
+          <execution>
+            <id>sign-artifacts</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>sign</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-site-plugin</artifactId>
         <configuration>
@@ -298,7 +329,7 @@
         </executions>
       </plugin>
     </plugins>
-
+  
     <pluginManagement>
       <plugins>
         <plugin>
@@ -328,9 +359,11 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
           <configuration>
-            <failOnWarnings>true</failOnWarnings>
+            <failOnWarnings>false</failOnWarnings>
+            <failOnError>false</failOnError>
           </configuration>
         </plugin>
+
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.1</version>
@@ -346,16 +379,6 @@
       </plugins>
     </pluginManagement>
   </build>
-  <distributionManagement>
-    <repository>
-      <id>ClouldArtifact-central</id>
-      <url>http://cmc.centralrepo.rnd.huawei.com/maven/</url>
-    </repository>
-    <snapshotRepository>
-      <id>ClouldArtifact-central</id>
-      <url>http://cmc.centralrepo.rnd.huawei.com/maven/</url>
-    </snapshotRepository>
-  </distributionManagement>
   <scm>
     <tag>REL42.2.5</tag>
   </scm>
