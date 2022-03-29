@@ -144,7 +144,7 @@ so you can compile the openGauss-connector-jdbc by one command with build.sh. In
 3. Execute the mvn command:
 
    ```
-   [user@linux openGauss-connector-jdbc]$ mvn clean install -Dmaven.test.skip=true
+   [user@linux openGauss-connector-jdbc]$ mvn clean install -Dgpg.skip -Dmaven.test.skip=true
    ```
 
    A successful build on a Linux system will display the following result: 

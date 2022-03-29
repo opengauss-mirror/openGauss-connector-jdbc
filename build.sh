@@ -112,7 +112,7 @@ function install_jdbc()
     cp "${JDBC_DIR}/pgjdbc" "${JDBC_DIR}/jdbc" -r
     cd "${JDBC_DIR}/jdbc"
     find . -name 'Driver.java' | xargs sed -i "s/@GSVERSION@/${GS_VERSION}/g"
-    mvn clean install -Dmaven.test.skip=true >> "$LOG_FILE" 2>&1
+    mvn clean install -Dgpg.skip -Dmaven.test.skip=true >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
         die "mvn install driver failed."
     fi
@@ -141,7 +141,7 @@ function install_jdbc()
       die "fail to replace url name in BaseDataSource"
     fi
 
-    mvn clean install -Dmaven.test.skip=true -U >> "$LOG_FILE" 2>&1
+    mvn clean install -Dgpg.skip -Dmaven.test.skip=true -U >> "$LOG_FILE" 2>&1
     cp ${JDBC_DIR}/jdbc/target/opengauss-jdbc-${version}.jar ${OUTPUT_DIR}/
     echo "Successfully make opengauss-jdbc-${version} jar package"
 }
