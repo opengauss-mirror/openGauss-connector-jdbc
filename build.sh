@@ -58,8 +58,12 @@ elif [ X"$kernel" == X"kylin" ]; then
     dist_version="KYLIN"
 elif [ X"$kernel" = X"suse" ]; then
     dist_version="SUSE"
+elif [ X"$kernel" = X"redflag" ]; then
+    dist_version="Asianux"
+elif [ X"$kernel" = X"asianux" ]; then
+    dist_version="Asianux" 
 else
-    echo "WARN:Only EulerOS, OPENEULER(aarch64), SUSE, and CentOS platform support, there will set to UNKNOWN"
+    echo "WARN:Only EulerOS, OPENEULER(aarch64), SUSE, CentOS and Asianux platform support, there will set to UNKNOWN"
     dist_version="UNKNOWN"
 fi
 
