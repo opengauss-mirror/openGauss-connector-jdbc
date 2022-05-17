@@ -30,6 +30,12 @@ public interface BaseConnection extends PGConnection, Connection {
   ClientLogic getClientLogic();
 
   /**
+   * True if bit convert to string type else to boolean type, default is false.
+   * @return
+   */
+  boolean getBitToString();
+
+  /**
    * Cancel the current query executing on this connection.
    *
    * @throws SQLException if something goes wrong.

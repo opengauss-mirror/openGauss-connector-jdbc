@@ -11,6 +11,10 @@ import org.postgresql.util.PSQLState;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
 
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 
 /**
  * <p>Helper class to handle boolean type of PostgreSQL.</p>
@@ -21,6 +25,8 @@ import org.postgresql.log.Log;
 class BooleanTypeUtil {
 
   private static Log LOGGER = Logger.getLogger(BooleanTypeUtil.class.getName());
+  private static final Set<String> TRUE_SETS = Arrays.stream(new String[]{"1", "true", "t", "yes", "y", "on"}).collect(Collectors.toSet());
+  private static final Set<String> FALSE_SETS = Arrays.stream(new String[]{"0", "false", "f", "no", "n", "off"}).collect(Collectors.toSet());
 
   private BooleanTypeUtil() {
   }
@@ -54,18 +60,23 @@ class BooleanTypeUtil {
   private static boolean fromString(final String strval) throws PSQLException {
     // Leading or trailing whitespace is ignored, and case does not matter.
     final String val = strval.trim();
-    if ("1".equals(val) || "true".equalsIgnoreCase(val)
-        || "t".equalsIgnoreCase(val) || "yes".equalsIgnoreCase(val)
-        || "y".equalsIgnoreCase(val) || "on".equalsIgnoreCase(val)) {
+    if (isTrueStr(val)) {
       return true;
     }
-    if ("0".equals(val) || "false".equalsIgnoreCase(val)
-        || "f".equalsIgnoreCase(val) || "no".equalsIgnoreCase(val)
-        || "n".equalsIgnoreCase(val) || "off".equalsIgnoreCase(val)) {
+    if (isFalseStr(val)) {
       return false;
     }
     throw cannotCoerceException(strval);
   }
+
+  private static boolean isTrueStr(final String strval) {
+    return TRUE_SETS.contains(strval.toLowerCase());
+  }
+
+  private static boolean isFalseStr(final String strval) {
+    return FALSE_SETS.contains(strval.toLowerCase());
+  }
+
 
   private static boolean fromCharacter(final Character charval) throws PSQLException {
     if ('1' == charval || 't' == charval || 'T' == charval
