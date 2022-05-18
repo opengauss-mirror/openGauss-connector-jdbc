@@ -13,6 +13,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
@@ -57,14 +58,11 @@ public class ResultSetBitNTest extends BaseTest4 {
 
   @Test
   public void testInsertByPreparedStatementObj() throws SQLException {
-    String insertSql = "insert into test_bit (id, id1, id2) values (?::bit, ?::bit, ?)";
+    String insertSql = "insert into test_bit (id, id1, id2) values (?::bit, ?, ?)";
     try (PreparedStatement ps = con.prepareStatement(insertSql)) {
       ps.setObject(1, "1");
-      ps.setObject(2, "0");
-      PGobject pObj = new PGobject();
-      pObj.setType("bit");
-      pObj.setValue("1010111111");
-      ps.setObject(3, pObj);
+      ps.setObject(2, "0", Types.BIT);
+      ps.setObject(3, "0000011111", Types.BIT);
       boolean success = ps.execute();
       assertFalse(success);
       int num = ps.getUpdateCount();
