@@ -27,8 +27,6 @@ import org.postgresql.util.PGobject;
 import org.postgresql.util.PGtokenizer;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
-import org.postgresql.log.Logger;
-import org.postgresql.log.Log;
 
 import java.io.ByteArrayInputStream;
 import java.io.CharArrayReader;
@@ -241,8 +239,9 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   protected Object internalGetObject(int columnIndex, Field field) throws SQLException {
     switch (getSQLType(columnIndex)) {
       case Types.BOOLEAN:
-      case Types.BIT:
         return getBoolean(columnIndex);
+      case Types.BIT:
+        return getBit(columnIndex);
       case Types.SQLXML:
         return getSQLXML(columnIndex);
       case Types.TINYINT:
@@ -2091,6 +2090,20 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     }
 
     return BooleanTypeUtil.castToBoolean(getString(columnIndex));
+  }
+
+  public Object getBit(int columnIndex) throws SQLException {
+    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getBit columnIndex: " + columnIndex);
+    checkResultSet(columnIndex);
+    if (wasNullFlag) {
+      return null; // SQL NULL
+    }
+
+    String val = getString(columnIndex);
+    if (connection.getBitToString()) {
+      return val;
+    }
+    return BooleanTypeUtil.castToBoolean(val);
   }
 
   private static final BigInteger BYTEMAX = new BigInteger(Byte.toString(Byte.MAX_VALUE));

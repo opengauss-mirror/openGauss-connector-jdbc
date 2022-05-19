@@ -234,6 +234,11 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
         }
     }
 
+  public void setBit(int parameterIndex, String x) throws SQLException {
+    checkClosed();
+    bindString(parameterIndex, x, Oid.BIT);
+  }
+
   public void setByte(int parameterIndex, byte x) throws SQLException {
     setShort(parameterIndex, x);
   }
@@ -632,9 +637,11 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
         }
         break;
       case Types.BOOLEAN:
-      case Types.BIT:
         setBoolean(parameterIndex, BooleanTypeUtil.castToBoolean(in));
         break;
+      case Types.BIT:
+        setBit(parameterIndex, in.toString());
+          break;
       case Types.BINARY:
       case Types.VARBINARY:
       case Types.LONGVARBINARY:

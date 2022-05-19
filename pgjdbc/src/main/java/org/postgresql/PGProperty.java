@@ -131,6 +131,12 @@ public enum PGProperty {
   /**
    * Use binary format for sending and receiving data if possible.
    */
+  BIT_TO_STRING("bitToString", "false",
+      "Auto Convert bit or bit(n) to String type in ResultSet.getObject"),
+
+  /**
+   * Use binary format for sending and receiving data if possible.
+   */
   BINARY_TRANSFER("binaryTransfer", "false",
       "Use binary format for sending and receiving data if possible"),
 

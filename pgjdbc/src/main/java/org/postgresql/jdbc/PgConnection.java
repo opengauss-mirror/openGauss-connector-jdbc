@@ -77,10 +77,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Executor;
 import java.io.File;
-import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.util.jar.Attributes;
-import java.util.jar.Manifest;
 import org.postgresql.core.types.PGClob;
 import org.postgresql.core.types.PGBlob;
 
@@ -166,6 +163,9 @@ public class PgConnection implements BaseConnection {
   // Current warnings; there might be more on queryExecutor too.
   private SQLWarning firstWarning = null;
 
+  // True if bit to string else bit to boolean.
+  private boolean bitToString = false;
+
   // Timer for scheduling TimerTasks for this connection.
   // Only instantiated if a task is actually scheduled.
   private volatile Timer cancelTimer = null;
@@ -244,6 +244,7 @@ public class PgConnection implements BaseConnection {
 
     this.creatingURL = url;
 
+    bitToString = PGProperty.BIT_TO_STRING.getBoolean(info);
     setDefaultFetchSize(PGProperty.DEFAULT_ROW_FETCH_SIZE.getInt(info));
 
     setPrepareThreshold(PGProperty.PREPARE_THRESHOLD.getInt(info));
@@ -1274,6 +1275,11 @@ public class PgConnection implements BaseConnection {
       }
       super.handleCompletion();
     }
+  }
+
+  @Override
+  public boolean getBitToString() {
+      return bitToString;
   }
 
   public int getPrepareThreshold() {
