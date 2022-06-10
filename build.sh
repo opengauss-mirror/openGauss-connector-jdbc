@@ -44,8 +44,12 @@ elif [ -f "/etc/kylin-release" ]; then
     kernel=$(cat /etc/kylin-release | awk -F ' ' '{print $1}' | tr A-Z a-z)
     version=$(cat /etc/kylin-release | awk '{print $6}' | tr A-Z a-z)
 else
-    kernel=$(lsb_release -d | awk -F ' ' '{print $2}'| tr A-Z a-z)
-    version=$(lsb_release -r | awk -F ' ' '{print $2}')
+    if [ "Darwin" == `uname -s` ]; then
+        kernel="Darwin"
+    else
+        kernel=$(lsb_release -d | awk -F ' ' '{print $2}'| tr A-Z a-z)
+        version=$(lsb_release -r | awk -F ' ' '{print $2}')
+    fi
 fi
 
 if [ X"$kernel" == X"euleros" ]; then
@@ -61,7 +65,9 @@ elif [ X"$kernel" = X"suse" ]; then
 elif [ X"$kernel" = X"redflag" ]; then
     dist_version="Asianux"
 elif [ X"$kernel" = X"asianux" ]; then
-    dist_version="Asianux" 
+    dist_version="Asianux"
+elif [ X"$kernel" = X"Darwin" ]; then
+    dist_version="Darwin"
 else
     echo "WARN:Only EulerOS, OPENEULER(aarch64), SUSE, CentOS and Asianux platform support, there will set to UNKNOWN"
     dist_version="UNKNOWN"
@@ -113,7 +119,7 @@ function install_jdbc()
     export CLASSPATH=".:${JAVA_HOME}/lib/dt.jar:${JAVA_HOME}/lib/tools.jar"
     echo ${JDBC_DIR}
     rm -rf "${JDBC_DIR}/jdbc"
-    cp "${JDBC_DIR}/pgjdbc" "${JDBC_DIR}/jdbc" -r
+    cp -r "${JDBC_DIR}/pgjdbc" "${JDBC_DIR}/jdbc"
     cd "${JDBC_DIR}/jdbc"
     find . -name 'Driver.java' | xargs sed -i "s/@GSVERSION@/${GS_VERSION}/g"
     mvn clean install -Dgpg.skip -Dmaven.test.skip=true >> "$LOG_FILE" 2>&1
