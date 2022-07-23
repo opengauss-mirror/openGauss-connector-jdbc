@@ -216,4 +216,33 @@ public class ParserTest {
     Assert.assertEquals(34, command.getBatchRewriteValuesBraceOpenPosition());
     Assert.assertEquals(56, command.getBatchRewriteValuesBraceClosePosition());
   }
+  
+  @Test
+  public void testPackage() throws SQLException {
+    String sql = "create or replace package test_pkg_end as\n" +
+            "aa int:=1;\n" +
+            "end;";
+    String sql1 = "create or replace package test_pkg_end as\n" +
+            "aa int:=1;\n" +
+            "end ;";
+    String sql2 = "create or replace package test_pkg_end as\n" +
+            "aa int:=1;\n" +
+            "end;\n/";
+    String sql3 = "create or replace package test_pkg_end as\n" +
+            "aa int:=1;" +
+            "end;\n/";
+    String sql4 = "create or replace package test_pkg_end as\n" +
+            "aa int:=1;" +
+            "end;";
+    String sql5 = "create or replace package test_pkg_end as\n" +
+            "aa int:=1;" +
+            "end ;";
+    String sqlTests[] = new String[] {sql, sql1, sql2, sql3, sql4, sql5};
+    for (String mySql: sqlTests) {
+      List<NativeQuery> queries = Parser.parseJdbcSql(mySql,
+              false,false,
+              true, false, new String[0]);
+      assertEquals(1, queries.size());
+    }
+  }
 }

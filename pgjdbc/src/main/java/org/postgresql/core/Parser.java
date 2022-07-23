@@ -607,6 +607,31 @@ public class Parser {
 
     return query.length;
   }
+    
+    /**
+     * Judge if keyword contains END str. like END or END; or *;END;*
+     * @param keyword upperCase string
+     * @return true if contains END str.
+     */
+    private static boolean isPackageEnd(String keyword) {
+      final String search = "END";
+      final char compareChar = ';';
+      if (search.equals(keyword)) {
+          return true;
+      }
+      int position = keyword.indexOf(search);
+      if (position == -1) {
+          return false;
+      }
+      if (position != 0 && keyword.charAt(position - 1) != compareChar) {
+          return false;
+      }
+      int lastPos = position + search.length();
+      if (lastPos != keyword.length() && keyword.charAt(lastPos) != compareChar) {
+          return false;
+      }
+      return true;
+    }
 
     /**
      * Judge whether the statement contains the keywords procedure, function, create, package and declare
@@ -624,7 +649,8 @@ public class Parser {
             if (queryArr[i] == null) {
                 continue;
             }
-            switch (queryArr[i].toUpperCase(Locale.ENGLISH)) {
+            String upperQuery = queryArr[i].toUpperCase(Locale.ENGLISH);
+            switch (upperQuery) {
                 case "PROCEDURE":
                 case "FUNCTION":
                 case "DECLARE":
@@ -644,6 +670,11 @@ public class Parser {
                     }
                     break;
                 default:
+                    if (haveCreate && havePackage) {
+                        if (isPackageEnd(upperQuery)) {
+                            return true;
+                        }
+                    }
                     break;
             }
         }
