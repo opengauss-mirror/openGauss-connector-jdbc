@@ -282,6 +282,14 @@ public enum PGProperty {
    * value of zero means that it is disabled.
    */
   SOCKET_TIMEOUT("socketTimeout", "0", "The timeout value used for socket read operations."),
+  
+  /**
+   * The timeout value used for socket read operations when jdbc connecting. If reading from the server takes longer than
+   * this value, the connection is closed. This can be used as both a brute force global query
+   * timeout and a method of detecting network problems. The timeout is specified in seconds and a
+   * value of zero means that it is disabled.
+   */
+  SOCKET_TIMEOUT_IN_CONNECTING("socketTimeoutInConnecting", "5", "The timeout value used for socket read operations when jdbc connecting."),
 
   /**
    * Cancel command is sent out of band over its own connection, so cancel message can itself get
