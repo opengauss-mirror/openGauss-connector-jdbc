@@ -97,6 +97,19 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       setStaticUseBoolean(useBoolean);
   }
 
+  
+  private void setSocketTimeout(PGStream stream, Properties info, PGProperty propKey) throws SQLException, IOException {
+    // Set the socket timeout if the "socketTimeout" property has been set.
+    int socketTimeout = Integer.parseInt(propKey.getDefaultValue());
+    if (propKey.getInt(info) <= Integer.MAX_VALUE / 1000) {
+      socketTimeout = propKey.getInt(info);
+    } else {
+      LOGGER.debug("integer socketTimeout is too large, it will occur error after multiply by 1000.");
+    }
+    if (socketTimeout >= 0) {
+      stream.getSocket().setSoTimeout(socketTimeout * 1000);
+    }
+  }
 
   private PGStream tryConnect(String user, String database,
       Properties info, SocketFactory socketFactory, HostSpec hostSpec,
@@ -115,15 +128,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     newStream = enableSSL(newStream, sslMode, info, connectTimeout);
 
     // Set the socket timeout if the "socketTimeout" property has been set.
-    int socketTimeout = Integer.parseInt(PGProperty.SOCKET_TIMEOUT.getDefaultValue());
-    if (PGProperty.SOCKET_TIMEOUT.getInt(info) <= Integer.MAX_VALUE / 1000) {
-        socketTimeout = PGProperty.SOCKET_TIMEOUT.getInt(info);
-    } else {
-        LOGGER.debug("integer socketTimeout is too large, it will occur error after multiply by 1000.");
-    }
-    if (socketTimeout > 0) {
-      newStream.getSocket().setSoTimeout(socketTimeout * 1000);
-    }
+    setSocketTimeout(newStream, info, PGProperty.SOCKET_TIMEOUT_IN_CONNECTING);
 
     // Enable TCP keep-alive probe if required.
     boolean requireTCPKeepAlive = PGProperty.TCP_KEEP_ALIVE.getBoolean(info);
@@ -162,6 +167,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
 
     // Do authentication (until AuthenticationOk).
     doAuthentication(newStream, hostSpec.getHost(), user, info);
+    setSocketTimeout(newStream, info, PGProperty.SOCKET_TIMEOUT);
 
     return newStream;
   }
