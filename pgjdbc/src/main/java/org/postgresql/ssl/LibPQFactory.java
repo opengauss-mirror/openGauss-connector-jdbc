@@ -52,7 +52,11 @@ public class LibPQFactory extends WrappedFactory {
    */
   public LibPQFactory(Properties info) throws PSQLException {
     try {
-      SSLContext ctx = SSLContext.getInstance("TLS"); // or "SSL" ?
+      String contextConfig = PGProperty.SSL_CONTEXT.get(info);
+      if (contextConfig == null || "".equals(contextConfig.trim())) {
+        contextConfig = "TLS";
+      }
+      SSLContext ctx = SSLContext.getInstance(contextConfig); // or "SSL" ?
 
       // Determining the default file location
       String pathsep = System.getProperty("file.separator");
