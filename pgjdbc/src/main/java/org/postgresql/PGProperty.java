@@ -198,7 +198,12 @@ public enum PGProperty {
    */
   SSL_MODE("sslmode", null, "Parameter governing the use of SSL", false,
       "disable", "allow", "prefer", "require", "verify-ca", "verify-full"),
-
+  
+  /**
+   * Context of SSL(SSLContext.getInstance("@code")): empty for TLS,valid values{SSL/SSLv2/SSLv3/TLS/TLSv1/TLSv1.1/TLSv1.2}
+   */
+  SSL_CONTEXT("sslcontext", null, "Control use of SSL Context(SSL, TLS, TLSv1.2, etc)"),
+  
   /**
    * Classname of the SSL Factory to use (instance of {@code javax.net.ssl.SSLSocketFactory}).
    */
