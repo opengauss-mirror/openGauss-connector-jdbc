@@ -1,0 +1,11 @@
+junit: 
+  cpeName: junit
+  groupId: junit
+  url:
+  version: 4.12
+slf4j-api: 
+  cpeName: slf4j-api
+  groupId: org.slf4j
+  url:
+  version: 1.7.30
+
