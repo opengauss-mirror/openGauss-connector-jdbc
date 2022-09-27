@@ -31,6 +31,7 @@ public class DefaultPGXmlFactoryFactory implements PGXmlFactoryFactory {
 
     private DocumentBuilderFactory getDocumentBuilderFactory() {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setValidating(true);
         setFactoryProperties(factory);
         factory.setXIncludeAware(false);
         factory.setExpandEntityReferences(false);
