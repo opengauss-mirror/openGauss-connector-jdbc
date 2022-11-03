@@ -23,6 +23,7 @@ import java.sql.Types;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -52,7 +53,10 @@ public class TypeInfoCache implements TypeInfo {
   private BaseConnection _conn;
   private final int _unknownLength;
   private PreparedStatement _getOidStatementSimple;
+  private PreparedStatement getOidStatementComplexNonArray;
+  private PreparedStatement getOidStatementComplexArray;
   private PreparedStatement _getNameStatement;
+  
   private PreparedStatement _getArrayElementOidStatement;
   private PreparedStatement _getArrayDelimiterStatement;
   private PreparedStatement _getTypeInfoStatement;
@@ -240,16 +244,111 @@ public class TypeInfoCache implements TypeInfo {
   }
 
   private PreparedStatement getOidStatement(String pgTypeName) throws SQLException {
-	  if (_getOidStatementSimple == null) {
-		  String sql;
-          sql = "SELECT oid, typname FROM pg_catalog.pg_type WHERE typname = ?";
-          _getOidStatementSimple = _conn.prepareStatement(sql);
-	  }
-	  _getOidStatementSimple.setString(1, pgTypeName);
-	  return _getOidStatementSimple;
-
+    boolean isArray = pgTypeName.endsWith("[]");
+    boolean hasQuote = pgTypeName.contains("\"");
+    int dotIndex = pgTypeName.indexOf('.');
+  
+    if (dotIndex == -1 && !hasQuote && !isArray) {
+      if (_getNameStatement == null) {
+        String sql;
+        // see comments in @getSQLType()
+        // -- go with older way of unnesting array to be compatible with 8.0
+        sql = "SELECT pg_type.oid, typname "
+                + "  FROM pg_catalog.pg_type "
+                + "  LEFT "
+                + "  JOIN (select ns.oid as nspoid, ns.nspname, r.r "
+                + "          from pg_namespace as ns "
+                + "          join ( select s.r, (current_schemas(false))[s.r] as nspname"
+                + "                   from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r "
+                + "         using ( nspname ) "
+                + "       ) as sp "
+                + "    ON sp.nspoid = typnamespace "
+                + " WHERE typname = ? "
+                + " ORDER BY sp.r, pg_type.oid DESC LIMIT 1;";
+        _getNameStatement = _conn.prepareStatement(sql);
+      }
+      // coerce to lower case to handle upper case type names
+      String lcName = pgTypeName.toLowerCase(Locale.ROOT);
+      // default arrays are represented with _ as prefix ... this dont even work for public schema
+      // fully
+      _getNameStatement.setString(1, lcName);
+      return _getNameStatement;
+    }
+    PreparedStatement oidStatementComplex;
+    if (isArray) {
+      if (getOidStatementComplexArray == null) {
+        String sql;
+        if ( _conn.haveMinimumServerVersion(ServerVersion.v8_3)) {
+          sql = "SELECT t.typarray, arr.typname "
+                  + "  FROM pg_catalog.pg_type t"
+                  + "  JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid"
+                  + "  JOIN pg_catalog.pg_type arr ON arr.oid = t.typarray"
+                  + " WHERE t.typname = ? AND (n.nspname = ? OR ? AND n.nspname = ANY (current_schemas(true)))"
+                  + " ORDER BY t.oid DESC LIMIT 1";
+        } else {
+          sql = "SELECT t.oid, t.typname "
+                  + "  FROM pg_catalog.pg_type t"
+                  + "  JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid"
+                  + " WHERE t.typelem = (SELECT oid FROM pg_catalog.pg_type WHERE typname = ?)"
+                  + " AND substring(t.typname, 1, 1) = '_' AND t.typlen = -1"
+                  + " AND (n.nspname = ? OR ? AND n.nspname = ANY (current_schemas(true)))"
+                  + " ORDER BY t.typelem DESC LIMIT 1";
+        }
+        getOidStatementComplexArray =  _conn.prepareStatement(sql);
+      }
+      oidStatementComplex = getOidStatementComplexArray;
+    } else {
+      if (getOidStatementComplexNonArray == null) {
+        String sql = "SELECT t.oid, t.typname "
+                + "  FROM pg_catalog.pg_type t"
+                + "  JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid"
+                + " WHERE t.typname = ? AND (n.nspname = ? OR ? AND n.nspname = ANY (current_schemas(true)))"
+                + " ORDER BY t.oid DESC LIMIT 1";
+        getOidStatementComplexNonArray =  _conn.prepareStatement(sql);
+      }
+      oidStatementComplex = getOidStatementComplexNonArray;
+    }
+    //type name requested may be schema specific, of the form "{schema}"."typeName",
+    //or may check across all schemas where a schema is not specified.
+    String fullName = isArray ? pgTypeName.substring(0, pgTypeName.length() - 2) : pgTypeName;
+    String schema;
+    String name;
+    // simple use case
+    if (dotIndex == -1) {
+      schema = null;
+      name = fullName;
+    } else {
+      if (fullName.startsWith("\"")) {
+        if (fullName.endsWith("\"")) {
+          String[] parts = fullName.split("\"\\.\"");
+          schema = parts.length == 2 ? parts[0] + "\"" : null;
+          name = parts.length == 2 ? "\"" + parts[1] : parts[0];
+        } else {
+          int lastDotIndex = fullName.lastIndexOf('.');
+          name = fullName.substring(lastDotIndex + 1);
+          schema = fullName.substring(0, lastDotIndex);
+        }
+      } else {
+        schema = fullName.substring(0, dotIndex);
+        name = fullName.substring(dotIndex + 1);
+      }
+    }
+    if (schema != null && schema.startsWith("\"") && schema.endsWith("\"")) {
+      schema = schema.substring(1, schema.length() - 1);
+    } else if (schema != null) {
+      schema = schema.toLowerCase(Locale.ROOT);
+    }
+    if (name.startsWith("\"") && name.endsWith("\"")) {
+      name = name.substring(1, name.length() - 1);
+    } else {
+      name = name.toLowerCase(Locale.ROOT);
+    }
+    oidStatementComplex.setString(1, name);
+    oidStatementComplex.setString(2, schema);
+    oidStatementComplex.setBoolean(3, schema == null);
+    return oidStatementComplex;
   }
-
+  
   public synchronized int getPGType(String pgTypeName) throws SQLException {
     Integer oid = _pgNameToOid.get(pgTypeName);
     if (oid != null) {
