@@ -32,6 +32,7 @@ import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -1463,6 +1464,19 @@ public class PreparedStatementTest extends BaseTest4 {
       TestUtil.closeQuietly(ps);
       log.removeHandler(handler);
       log.setLevel(prevLevel);
+    }
+  }
+  
+  @Test
+  public void testNewObjectInterface() throws SQLException {
+    //TestUtil.createTable(con, "inttable", "a int");
+    String sql = "insert into inttable values (?)";
+    Integer insertVal = new Integer(1);
+    try (PreparedStatement ps = con.prepareStatement(sql)) {
+      ps.setObject(1, insertVal, JDBCType.INTEGER);
+      ps.execute();
+    } catch (SQLException sqlExp) {
+      Assert.fail("can't run here! err=" + sqlExp.toString());
     }
   }
 }
