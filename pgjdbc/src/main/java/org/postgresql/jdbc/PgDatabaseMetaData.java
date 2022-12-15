@@ -2106,7 +2106,7 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
       sql += " AND ct.relname = " + escapeQuotes(table);
     }
 
-    sql += " AND i.indisprimary "
+    sql += " AND (i.keys).x >= 0 AND i.indisprimary "
         + " ORDER BY table_name, pk_name, key_seq";
 
     return createMetaDataStatement().executeQuery(sql);
@@ -2376,7 +2376,7 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
             + "  JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid) "
             + "  JOIN pg_catalog.pg_am am ON (ci.relam = am.oid) "
             + "WHERE true ";
-
+      sql+= " AND (i.keys).x >= 0";
       if (schema != null && !schema.isEmpty()) {
         sql += " AND n.nspname = " + escapeQuotes(schema);
       }
