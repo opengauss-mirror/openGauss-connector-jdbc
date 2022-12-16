@@ -56,6 +56,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.RowId;
 import java.sql.SQLException;
+import java.sql.SQLType;
 import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -910,7 +911,12 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
         GT.tr("Cannot convert an instance of {0} to type {1}", fromType, toType),
         PSQLState.INVALID_PARAMETER_TYPE, cause);
   }
-
+  
+  @Override
+  public void setObject(final int parameterIndex, final Object x, final SQLType targetSqlType) throws SQLException {
+      setObject(parameterIndex, x, targetSqlType.getVendorTypeNumber());
+  }
+  
   public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
     setObject(parameterIndex, x, targetSqlType, -1);
   }
