@@ -4,7 +4,7 @@
   <groupId>org.opengauss</groupId>
   <artifactId>opengauss-jdbc</artifactId>
   <name>openGauss JDBC Driver</name>
-  <version>3.1.0</version>
+  <version>5.0.0</version>
   <description>Java JDBC driver for openGauss</description>
   <url>https://gitee.com/opengauss/openGauss-connector-jdbc</url>
 
@@ -287,7 +287,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.1.0</version>
+        <version>5.0.0</version>
         <configuration>
           <minimizeJar>false</minimizeJar>
           <filters>
