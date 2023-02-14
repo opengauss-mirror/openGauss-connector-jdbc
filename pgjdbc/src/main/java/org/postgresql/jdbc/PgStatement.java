@@ -7,6 +7,8 @@ package org.postgresql.jdbc;
 
 import org.postgresql.Driver;
 import org.postgresql.core.*;
+import org.postgresql.quickautobalance.ConnectionManager;
+import org.postgresql.quickautobalance.LoadBalanceHeartBeating;
 import org.postgresql.util.GT;
 import org.postgresql.util.PGbytea;
 import org.postgresql.util.PSQLException;
@@ -22,7 +24,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TimerTask;
-import org.postgresql.core.v3.ConnectionFactoryImpl;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
@@ -301,7 +302,7 @@ public class PgStatement implements Statement, BaseStatement {
   public boolean executeWithFlags(String sql, int flags) throws SQLException {
     return executeCachedSql(sql, flags, NO_RETURNING_COLUMNS);
   }
-
+  
   private boolean executeCachedSql(String sql, int flags, String[] columnNames) throws SQLException {
     PreferQueryMode preferQueryMode = connection.getPreferQueryMode();
     // Simple statements should not replace ?, ? with $1, $2
@@ -1117,12 +1118,14 @@ public class PgStatement implements Statement, BaseStatement {
       // Not in query, there's nothing to cancel
       return;
     }
+    setConnectionState(StatementCancelState.CANCELING);
     // Synchronize on connection to avoid spinning in killTimerTask
     synchronized (connection) {
       try {
         connection.cancelQuery();
       } finally {
         STATE_UPDATER.set(this, StatementCancelState.CANCELLED);
+        setConnectionState(StatementCancelState.CANCELLED);
         connection.notifyAll(); // wake-up killTimerTask
       }
     }
@@ -1166,14 +1169,14 @@ public class PgStatement implements Statement, BaseStatement {
     fetchSize = rows;
   }
 
-  private void startTimer() {
+  private void startTimer() throws SQLException {
     /*
      * there shouldn't be any previous timer active, but better safe than sorry.
      */
     cleanupTimer();
 
     STATE_UPDATER.set(this, StatementCancelState.IN_QUERY);
-
+    setConnectionState(StatementCancelState.IN_QUERY);
     if (timeout == 0) {
       return;
     }
@@ -1218,13 +1221,20 @@ public class PgStatement implements Statement, BaseStatement {
     return true;
   }
 
-  private void killTimerTask() {
+  private void setConnectionState(StatementCancelState state) throws SQLException {
+    if (LoadBalanceHeartBeating.isLoadBalanceHeartBeatingStarted() && this.connection instanceof PgConnection) {
+      ConnectionManager.getInstance().setConnectionState(this.connection.unwrap(PgConnection.class), state);
+    }
+  }
+
+  private void killTimerTask() throws SQLException {
     boolean timerTaskIsClear = cleanupTimer();
     // The order is important here: in case we need to wait for the cancel task, the state must be
     // kept StatementCancelState.IN_QUERY, so cancelTask would be able to cancel the query.
     // It is believed that this case is very rare, so "additional cancel and wait below" would not
     // harm it.
     if (timerTaskIsClear && STATE_UPDATER.compareAndSet(this, StatementCancelState.IN_QUERY, StatementCancelState.IDLE)) {
+      setConnectionState(StatementCancelState.IDLE);
       return;
     }
 
@@ -1245,6 +1255,7 @@ public class PgStatement implements Statement, BaseStatement {
           interrupted = true;
         }
       }
+      setConnectionState(StatementCancelState.IDLE);
     }
     if (interrupted) {
       Thread.currentThread().interrupt();
