@@ -5,7 +5,9 @@ import org.postgresql.jdbc.PgConnection;
 import org.postgresql.log.Log;
 import org.postgresql.log.Logger;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -26,6 +28,16 @@ public class GlobalConnectionTracker {
         return PGProperty.FORCE_TARGET_SERVER_SLAVE.getBoolean(props) &&
                 ("slave".equals(PGProperty.TARGET_SERVER_TYPE.get(props)) || "secondary".equals(PGProperty.TARGET_SERVER_TYPE.get(props)));
     }
+
+    /**
+     *
+     * @param props the parsed/defaulted connection properties
+     * @return
+     */
+    private static boolean isTargetServerMaster(Properties props) {
+        return "master".equals(PGProperty.TARGET_SERVER_TYPE.get(props));
+    }
+
     /**
      * Store the actual query executor and connection host spec.
      *
@@ -33,7 +45,9 @@ public class GlobalConnectionTracker {
      * @param queryExecutor
      */
     public static void possessConnectionReference(QueryExecutor queryExecutor, Properties props) {
-        if(!isForceTargetServerSlave(props)) return;
+        if (!isForceTargetServerSlave(props) || !isTargetServerMaster(props)) {
+            return;
+        }
         int identityQueryExecute = System.identityHashCode(queryExecutor);
         String hostSpec = queryExecutor.getHostSpec().toString();
         synchronized (connectionManager) {
@@ -53,7 +67,9 @@ public class GlobalConnectionTracker {
      * @param queryExecutor
      */
     public static void releaseConnectionReference(QueryExecutor queryExecutor, Properties props) {
-        if(!isForceTargetServerSlave(props)) return;
+        if (!isForceTargetServerSlave(props)) {
+            return;
+        }
         String hostSpec = queryExecutor.getHostSpec().toString();
         int identityQueryExecute = System.identityHashCode(queryExecutor);
         synchronized (connectionManager) {
@@ -92,5 +108,47 @@ public class GlobalConnectionTracker {
             }
         }
     }
+
+    /**
+     * Close all existing connections under the specified host.
+     *
+     * @param hostSpec ip and port.
+     */
+    public static void closeConnectionOfCrash(String hostSpec) {
+        synchronized (connectionManager) {
+            HashMap<Integer, QueryExecutor> hostConnection = connectionManager.getOrDefault(hostSpec, null);
+            if (hostConnection != null) {
+                LOGGER.debug("[CRASH] The hostSpec: " + hostSpec + " fails, start to close the original connection.");
+                for (QueryExecutor queryExecutor : hostConnection.values()) {
+                    if (queryExecutor != null && !queryExecutor.isClosed()) {
+                        queryExecutor.close();
+                        queryExecutor.setAvailability(false);
+                    }
+                }
+                hostConnection.clear();
+                LOGGER.debug("[CRASH] The hostSpec: " + hostSpec + " fails, end to close the original connection.");
+            }
+        }
+    }
+
+    /**
+     * get all existing connections under the specified host.
+     *
+     * @param hostSpec ip and port.
+     */
+    public static List<QueryExecutor> getConnections(String hostSpec) {
+        synchronized (connectionManager) {
+            List<QueryExecutor> ret = new ArrayList<>();
+            HashMap<Integer, QueryExecutor> hostConnection = connectionManager.getOrDefault(hostSpec, null);
+            if (hostConnection != null) {
+                for (Map.Entry<Integer, QueryExecutor> queryExecutorEntry : hostConnection.entrySet()) {
+                    ret.add(queryExecutorEntry.getValue());
+                }
+            }
+            return ret;
+        }
+    }
+
+
 
 }
