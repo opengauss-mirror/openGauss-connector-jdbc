@@ -78,6 +78,8 @@ import java.util.TimerTask;
 import java.util.concurrent.Executor;
 import java.io.File;
 import java.net.URISyntaxException;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+
 import org.postgresql.core.types.PGClob;
 import org.postgresql.core.types.PGBlob;
 
@@ -102,6 +104,16 @@ public class PgConnection implements BaseConnection {
       CONNECTION_INFO_REPORT_BLACK_LIST.put("PGHOST","");
       CONNECTION_INFO_REPORT_BLACK_LIST.put("PGDBNAME","");
   }
+
+    /**set
+     * Protects current statement from cancelTask starting, waiting for a bit, and waking up exactly
+     * on subsequent query execution. The idea is to atomically compare and swap the reference to the
+     * task, so the task can detect that statement executes different query than the one the
+     * cancelTask was created. Note: the field must be set/get/compareAndSet via
+     * {@link #CANCEL_TIMER_UPDATER} as per {@link AtomicReferenceFieldUpdater} javadoc.
+     */
+  private AtomicReferenceFieldUpdater<PgStatement, TimerTask> CANCEL_TIMER_UPDATER =
+            AtomicReferenceFieldUpdater.newUpdater(PgStatement.class, TimerTask.class, "cancelTimerTask");
 
   //
   // Data initialized on construction:
@@ -2059,6 +2071,10 @@ public class PgConnection implements BaseConnection {
 
     public String getSocketAddress() {
         return this.socketAddress;
+    }
+
+    public AtomicReferenceFieldUpdater<PgStatement, TimerTask> getTimerUpdater() {
+        return CANCEL_TIMER_UPDATER;
     }
 
 

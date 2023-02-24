@@ -8,6 +8,7 @@ package org.postgresql.core;
 import org.postgresql.PGConnection;
 import org.postgresql.jdbc.ClientLogic;
 import org.postgresql.jdbc.FieldMetadata;
+import org.postgresql.jdbc.PgStatement;
 import org.postgresql.jdbc.TimestampUtils;
 import org.postgresql.log.Log;
 import org.postgresql.util.LruCache;
@@ -17,6 +18,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
  * Driver-internal connection interface. Application code should not use this interface.
@@ -228,4 +230,10 @@ public interface BaseConnection extends PGConnection, Connection {
   PGXmlFactoryFactory getXmlFactoryFactory() throws SQLException;
 
   public String getSocketAddress();
+
+  /**
+   * Gets the timertask atomic updater for a statement
+   * @return AtomicReferenceFieldUpdater<PgStatement, TimerTask>
+   */
+  AtomicReferenceFieldUpdater<PgStatement, TimerTask> getTimerUpdater();
 }
