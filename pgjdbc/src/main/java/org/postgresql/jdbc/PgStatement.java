@@ -52,11 +52,9 @@ public class PgStatement implements Statement, BaseStatement {
    * on subsequent query execution. The idea is to atomically compare and swap the reference to the
    * task, so the task can detect that statement executes different query than the one the
    * cancelTask was created. Note: the field must be set/get/compareAndSet via
-   * {@link #CANCEL_TIMER_UPDATER} as per {@link AtomicReferenceFieldUpdater} javadoc.
+   * {@link PgConnection CANCEL_TIMER_UPDATER} as per {@link AtomicReferenceFieldUpdater} javadoc.
    */
-  private volatile TimerTask cancelTimerTask = null;
-  private static final AtomicReferenceFieldUpdater<PgStatement, TimerTask> CANCEL_TIMER_UPDATER =
-      AtomicReferenceFieldUpdater.newUpdater(PgStatement.class, TimerTask.class, "cancelTimerTask");
+  public volatile TimerTask cancelTimerTask = null;
 
   /**
    * Protects statement from out-of-order cancels. It protects from both
@@ -1181,7 +1179,7 @@ public class PgStatement implements Statement, BaseStatement {
     TimerTask cancelTask = new TimerTask() {
       public void run() {
         try {
-          if (!CANCEL_TIMER_UPDATER.compareAndSet(PgStatement.this, this, null)) {
+          if (!connection.getTimerUpdater().compareAndSet(PgStatement.this, this, null)) {
             // Nothing to do here, statement has already finished and cleared
             // cancelTimerTask reference
             return;
@@ -1193,7 +1191,7 @@ public class PgStatement implements Statement, BaseStatement {
       }
     };
 
-    CANCEL_TIMER_UPDATER.set(this, cancelTask);
+    connection.getTimerUpdater().set(this, cancelTask);
     connection.addTimerTask(cancelTask, timeout);
   }
 
@@ -1202,12 +1200,12 @@ public class PgStatement implements Statement, BaseStatement {
    * never invoke {@link #cancel()}.
    */
   private boolean cleanupTimer() {
-    TimerTask timerTask = CANCEL_TIMER_UPDATER.get(this);
+    TimerTask timerTask = connection.getTimerUpdater().get(this);
     if (timerTask == null) {
       // If timeout is zero, then timer task did not exist, so we safely report "all clear"
       return timeout == 0;
     }
-    if (!CANCEL_TIMER_UPDATER.compareAndSet(this, timerTask, null)) {
+    if (!connection.getTimerUpdater().compareAndSet(this, timerTask, null)) {
       // Failed to update reference -> timer has just fired, so we must wait for the query state to
       // become "cancelling".
       return false;
