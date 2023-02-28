@@ -11,6 +11,8 @@ import org.postgresql.jdbc.PgConnection;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
 import org.postgresql.log.Tracer;
+import org.postgresql.quickautobalance.ConnectionManager;
+import org.postgresql.quickautobalance.LoadBalanceHeartBeating;
 import org.postgresql.util.DriverInfo;
 import org.postgresql.util.GT;
 import org.postgresql.util.HostSpec;
@@ -558,8 +560,12 @@ public class Driver implements java.sql.Driver {
      * @throws SQLException if the connection could not be made
      */
     private static Connection makeConnection(String url, Properties props) throws SQLException {
+        ConnectionManager.getInstance().setCluster(props);
         PgConnection pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props, url);
         GlobalConnectionTracker.possessConnectionReference(pgConnection.getQueryExecutor(), props);
+        if (ConnectionManager.getInstance().setConnection(pgConnection, props)) {
+            LoadBalanceHeartBeating.startScheduledExecutorService(props);
+        }
         return pgConnection;
     }
 

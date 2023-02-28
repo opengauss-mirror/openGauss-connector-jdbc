@@ -108,14 +108,42 @@ public class TestUtil {
   public static String getServer() {
     return System.getProperty("server", "localhost");
   }
-
+  
+  /*
+   * Returns the Secondary Test server
+   */
+  public static String getSecondaryServer() {
+    return System.getProperty("secondaryServer", "localhost");
+  }
+  
+  /*
+   * Returns the third Test server
+   */
+  public static String getSecondaryServer2() {
+    return System.getProperty("secondaryServer2", "localhost");
+  }
+  
   /*
    * Returns the Test port
    */
   public static int getPort() {
     return Integer.parseInt(System.getProperty("port", System.getProperty("def_pgport")));
   }
-
+  
+  /*
+   * Returns the Secondary Test port
+   */
+  public static int getSecondaryPort() {
+    return Integer.parseInt(System.getProperty("secondaryPort", System.getProperty("def_pgport")));
+  }
+  
+  /*
+   * Returns the Third Test port
+   */
+  public static int getSecondaryServerPort2() {
+    return Integer.parseInt(System.getProperty("secondaryServerPort2", System.getProperty("def_pgport")));
+  }
+  
   /*
    * Returns the server side prepared statement threshold.
    */

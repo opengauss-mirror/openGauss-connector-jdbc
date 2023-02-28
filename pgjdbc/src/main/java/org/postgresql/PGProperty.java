@@ -472,7 +472,43 @@ public enum PGProperty {
           + "which will allow the connection to be used for logical replication "
           + "from that database. "
           + "(backend >= 9.4)"),
-
+  
+  /**
+   * Enable quick auto balancing.
+   *
+   */
+  ENABLE_QUICK_AUTO_BALANCE("enableQuickAutoBalance", "false",
+      "If the connection enable quickAutoBalance, this parameter only takes effect when autoBalance=leastconn."
+          + "value: true or false.",
+      false, "true", "false"),
+  
+  /**
+   * Idle time threshold of connections when quick auto balancing filters connections.
+   */
+  MAX_IDLE_TIME_BEFORE_TERMINAL("maxIdleTimeBeforeTerminal", "30",
+      "During quick load balancing, if the connection is idle for more than maxIdleTimeBeforeTerminal seconds, "
+          + "the connection may be closed to achieve load balancing for each data node."
+          + "Value range: long && [0, Long.MAX_VALUE / 1000]."
+          + "This parameter only takes effect when autoBalance=leastconn and enableQuickAutoBalance=true"),
+  
+  /**
+   * Percentage of min reserved connections pre cluster when executing quick auto balancing.
+   */
+  MIN_RESERVED_CON_PER_CLUSTER("minReservedConPerCluster", null,
+      "Percentage of min reserved connections pre cluster when executing quick auto balancing,  "
+          + "jdbc will retain minReservedConPerCluster percent of the connections per cluster that meet the closing conditions during quick auto balancing."
+          + "Value range: int && [0, 100]."
+          + "This parameter only takes effect when autoBalance=leastconn and enableQuickAutoBalance=true"),
+  
+  /**
+   * Percentage of min reserved connections pre data node when executing quick auto balancing.
+   */
+  MIN_RESERVED_CON_PER_DATANODE("minReservedConPerDatanode", null,
+      "Percentage of min reserved connections pre data node when executing quick auto balancing,  "
+          + "jdbc will retain minReservedConPerCluster percent of the connections pre data node that meet the closing conditions during quick auto balancing."
+          + "Value range: int && [0, 100]."
+          + "This parameter only takes effect when autoBalance=leastconn and enableQuickAutoBalance=true"),
+  
   /**
    * Supported TLS cipher suites
    */

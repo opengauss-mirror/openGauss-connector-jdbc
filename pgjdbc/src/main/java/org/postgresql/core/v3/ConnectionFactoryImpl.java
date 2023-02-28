@@ -20,6 +20,7 @@ import org.postgresql.core.Version;
 import org.postgresql.hostchooser.*;
 import org.postgresql.jdbc.SslMode;
 import org.postgresql.QueryCNListUtils;
+import org.postgresql.quickautobalance.ConnectionManager;
 import org.postgresql.util.*;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
@@ -214,6 +215,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
               HostChooserFactory.createHostChooser(currentHostSpecs, targetServerType, info);
       Iterator<CandidateHost> hostIter = hostChooser.iterator();
       boolean isMasterCluster = false;
+      boolean isFirstIter = true;
       while (hostIter.hasNext()) {
         CandidateHost candidateHost = hostIter.next();
         HostSpec hostSpec = candidateHost.hostSpec;
@@ -223,13 +225,19 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         // In that case, the system tries to connect to each host in order, thus it should not look into
         // GlobalHostStatusTracker
         HostStatus knownStatus = knownStates.get(hostSpec);
+        if (isFirstIter) {
+          isFirstIter = false;
+        } else {
+          ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpec, info);
+        }
         if (knownStatus != null && !candidateHost.targetServerType.allowConnectingTo(knownStatus)) {
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Known status of host " + hostSpec + " is " + knownStatus + ", and required status was " + candidateHost.targetServerType + ". Will try next host");
           }
+          ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpec, info);
           continue;
         }
-
+        
         //
         // Establish a connection.
         //
@@ -308,6 +316,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
               GlobalClusterStatusTracker.reportMasterCluster(info, clusterSpec);
             } else {
               queryExecutor.close();
+              ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpec, info);
               break;
             }
           }
@@ -322,6 +331,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
           knownStates.put(hostSpec, hostStatus);
           if (!candidateHost.targetServerType.allowConnectingTo(hostStatus)) {
             queryExecutor.close();
+            ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpec, info);
             continue;
           }
 
@@ -349,12 +359,14 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
           if (hostIter.hasNext() || clusterIter.hasNext()) {
             LOGGER.info("ConnectException occured while connecting to {0}" + hostSpec, cex);
             exception.addSuppressed(cex);
+            ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpec, info);
             // still more addresses to try
             continue;
           }
           if (exception.getSuppressed().length > 0) {
             cex.addSuppressed(exception);
           }
+          ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpec, info);
           throw new PSQLException(GT.tr(
                   "Connection to {0} refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.",
                   hostSpec), PSQLState.CONNECTION_UNABLE_TO_CONNECT, cex);
@@ -365,12 +377,14 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
           if (hostIter.hasNext() || clusterIter.hasNext()) {
             LOGGER.info("IOException occured while connecting to " + hostSpec, ioe);
             exception.addSuppressed(ioe);
+            ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpec, info);
             // still more addresses to try
             continue;
           }
           if (exception.getSuppressed().length > 0) {
             ioe.addSuppressed(exception);
           }
+          ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpec, info);
           throw new PSQLException(GT.tr("The connection attempt failed."),
                   PSQLState.CONNECTION_UNABLE_TO_CONNECT, ioe);
         } catch (SQLException se) {
@@ -381,11 +395,13 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
             LOGGER.info("SQLException occured while connecting to " + hostSpec, se);
             exception.addSuppressed(se);
             // still more addresses to try
+            ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpec, info);
             continue;
           }
           if (exception.getSuppressed().length > 0) {
             se.addSuppressed(exception);
           }
+          ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpec, info);
           throw se;
         }
       }

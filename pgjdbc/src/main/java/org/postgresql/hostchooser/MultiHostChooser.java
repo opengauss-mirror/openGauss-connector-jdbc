@@ -12,6 +12,8 @@ import org.postgresql.PGProperty;
 import org.postgresql.log.Log;
 import org.postgresql.log.Logger;
 import org.postgresql.QueryCNListUtils;
+import org.postgresql.quickautobalance.ConnectionManager;
+import org.postgresql.quickautobalance.Cluster;
 import org.postgresql.util.HostSpec;
 import org.postgresql.util.PSQLException;
 
@@ -95,6 +97,7 @@ public class MultiHostChooser implements HostChooser {
         allHosts = priorityRoundRobin(allHosts);
         break;
       case LeastConn:
+        allHosts = leastConn(allHosts);
         break;
       default:
         isOutPutLog = false;
@@ -108,6 +111,7 @@ public class MultiHostChooser implements HostChooser {
     }
     return allHosts;
   }
+  
   // Returns a counter and increments it by one.
   // Because it is possible to use it in multiple instances,  use synchronized (MultiHostChooser.class).
   private int getRRIndex() {
@@ -136,6 +140,17 @@ public class MultiHostChooser implements HostChooser {
     }
     Collections.shuffle(result.subList(1, result.size()));
     return result;
+  }
+  
+  private List<HostSpec> leastConn(List<HostSpec> hostSpecs) {
+    if (hostSpecs.size() <= 1) {
+      return hostSpecs;
+    }
+    Cluster cluster = ConnectionManager.getInstance().getCluster(URLIdentifier);
+    if (cluster == null) {
+      return hostSpecs;
+    }
+    return cluster.sortDnsByLeastConn(hostSpecs);
   }
 
   /*

@@ -8,7 +8,7 @@ package org.postgresql.jdbc;
 /**
  * Represents {@link PgStatement#cancel()} state.
  */
-enum StatementCancelState {
+public enum StatementCancelState {
     IDLE,
     IN_QUERY,
     CANCELING,
