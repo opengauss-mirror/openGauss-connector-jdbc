@@ -198,12 +198,12 @@ public enum PGProperty {
    */
   SSL_MODE("sslmode", null, "Parameter governing the use of SSL", false,
       "disable", "allow", "prefer", "require", "verify-ca", "verify-full"),
-  
+
   /**
    * Context of SSL(SSLContext.getInstance("@code")): empty for TLS,valid values{SSL/SSLv2/SSLv3/TLS/TLSv1/TLSv1.1/TLSv1.2}
    */
   SSL_CONTEXT("sslcontext", null, "Control use of SSL Context(SSL, TLS, TLSv1.2, etc)"),
-  
+
   /**
    * Classname of the SSL Factory to use (instance of {@code javax.net.ssl.SSLSocketFactory}).
    */
@@ -252,7 +252,7 @@ public enum PGProperty {
 
   SSL_PRIVATEKEY_FACTORY("sslprivatekeyfactory", null,
           "The privatekey factory for the client's ssl"),
-  
+
   /**
    * The classname instantiating {@code javax.security.auth.callback.CallbackHandler} to use.
    */
@@ -287,7 +287,7 @@ public enum PGProperty {
    * value of zero means that it is disabled.
    */
   SOCKET_TIMEOUT("socketTimeout", "0", "The timeout value used for socket read operations."),
-  
+
   /**
    * The timeout value used for socket read operations when jdbc connecting. If reading from the server takes longer than
    * this value, the connection is closed. This can be used as both a brute force global query
@@ -339,7 +339,7 @@ public enum PGProperty {
    * The application name (require server version &gt;= 9.0).
    */
   APPLICATION_NAME("ApplicationName", DriverInfo.DRIVER_NAME, "Name of the Application (backend >= 9.0)"),
-  
+
   APPLICATION_TYPE("ApplicationType", null, "Application Type"),
 
   /**
@@ -531,6 +531,11 @@ public enum PGProperty {
           "xmlFactoryFactory",
           "",
           "Factory class to instantiate factories for XML processing"),
+
+  /**
+   * It is used to detect the thread interval of the survival task on the primary node in the high availability scenario.
+   */
+  HEARTBEAT_PERIOD("heartbeatPeriod", "0", "heartbeat interval time")
 
   ;
 

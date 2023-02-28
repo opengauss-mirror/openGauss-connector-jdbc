@@ -9,6 +9,7 @@ package org.postgresql.core.v3;
 import org.postgresql.PGProperty;
 import org.postgresql.clusterchooser.ClusterStatus;
 import org.postgresql.clusterchooser.GlobalClusterStatusTracker;
+import org.postgresql.clusterhealthy.ClusterNodeCache;
 import org.postgresql.core.ConnectionFactory;
 import org.postgresql.core.PGStream;
 import org.postgresql.core.QueryExecutor;
@@ -58,7 +59,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   private static final int AUTH_REQ_GSS = 7;
   private static final int AUTH_REQ_GSS_CONTINUE = 8;
   private static final int AUTH_REQ_SSPI = 9;
-  
+
   public static String CLIENT_ENCODING = "UTF8";
   public static String USE_BOOLEAN = "false";
   private static final int AUTH_REQ_SHA256 = 10;
@@ -98,7 +99,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       setStaticUseBoolean(useBoolean);
   }
 
-  
+
   private void setSocketTimeout(PGStream stream, Properties info, PGProperty propKey) throws SQLException, IOException {
     // Set the socket timeout if the "socketTimeout" property has been set.
     int socketTimeout = Integer.parseInt(propKey.getDefaultValue());
@@ -112,14 +113,14 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     }
   }
 
-  private PGStream tryConnect(String user, String database,
+  public PGStream tryConnect(String user, String database,
       Properties info, SocketFactory socketFactory, HostSpec hostSpec,
       SslMode sslMode)
       throws SQLException, IOException {
     int connectTimeout = Integer.parseInt(PGProperty.CONNECT_TIMEOUT.getDefaultValue());
     if (PGProperty.CONNECT_TIMEOUT.getInt(info) <= Integer.MAX_VALUE / 1000) {
         connectTimeout = PGProperty.CONNECT_TIMEOUT.getInt(info) * 1000;
-    } else {  
+    } else {
         LOGGER.debug("integer connectTimeout is too large, it will occur error after multiply by 1000.");
     }
 
@@ -211,6 +212,9 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       ClusterSpec clusterSpec = clusterIter.next();
       HostSpec[] currentHostSpecs = clusterSpec.getHostSpecs();
 
+      if (currentHostSpecs.length > 1 && targetServerType == HostRequirement.master) {
+        ClusterNodeCache.checkHostSpecs(currentHostSpecs, info);
+      }
       HostChooser hostChooser =
               HostChooserFactory.createHostChooser(currentHostSpecs, targetServerType, info);
       Iterator<CandidateHost> hostIter = hostChooser.iterator();
@@ -326,6 +330,9 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
           if (candidateHost.targetServerType != HostRequirement.any) {
             hostStatus = isMaster(queryExecutor) ? HostStatus.Master : HostStatus.Secondary;
             LOGGER.info("Known status of host " + hostSpec + " is " + hostStatus);
+            if (hostStatus == HostStatus.Master) {
+              ClusterNodeCache.pushHostSpecs(hostSpec, currentHostSpecs, info);
+            }
           }
           GlobalHostStatusTracker.reportHostStatus(hostSpec, hostStatus, info);
           knownStates.put(hostSpec, hostStatus);
@@ -588,7 +595,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     else if(this.protocolVerion == PROTOCOL_VERSION_350)
         pgStream.sendInteger2(50); // protocol minor
 	else if(this.protocolVerion == PROTOCOL_VERSION_351)
-		pgStream.sendInteger2(51); // protocol minor 
+		pgStream.sendInteger2(51); // protocol minor
     for (byte[] encodedParam : encodedParams) {
       pgStream.send(encodedParam);
       pgStream.sendChar(0);
@@ -855,8 +862,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       Utils.escapeLiteral(sql, appName, queryExecutor.getStandardConformingStrings());
       sql.append("'");
       SetupQueryRunner.run(queryExecutor, sql.toString(), false);
-    } 
-    
+    }
+
     String appType = PGProperty.APPLICATION_TYPE.get(info);
     if (appType !=null && !appType.equals(queryExecutor.getApplicationType())) {
       StringBuilder sql = new StringBuilder();
@@ -867,7 +874,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     }
   }
 
-  private boolean isMaster(QueryExecutor queryExecutor) throws SQLException, IOException {
+  public boolean isMaster(QueryExecutor queryExecutor) throws SQLException, IOException {
     String localRole = "";
     String dbState = "";
     List<byte[][]> results = SetupQueryRunner.runForList(queryExecutor, "select local_role, db_state from pg_stat_get_stream_replications();", true);
@@ -885,8 +892,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     String datcompatibility = queryExecutor.getEncoding().decode(result[0]);
     return datcompatibility == null ? "PG" : datcompatibility;
   }
-  
-  
+
+
   private String queryGaussdbVersion(QueryExecutor queryExecutor) throws SQLException, IOException {
     byte[][] result = SetupQueryRunner.run(queryExecutor, "select version();", true);
     String version = queryExecutor.getEncoding().decode(result[0]);
