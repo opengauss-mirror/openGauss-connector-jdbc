@@ -82,10 +82,7 @@ public class ConnectionManager {
             return false;
         }
         HostSpec[] hostSpecs = Driver.getURLHostSpecs(properties);
-        if (hostSpecs.length <= 1) {
-            return false;
-        }
-        return true;
+        return hostSpecs.length > 1;
     }
 
     private static class Holder {
@@ -106,6 +103,7 @@ public class ConnectionManager {
         if (!checkEnableLeastConn(properties)) {
             return false;
         }
+        checkQuickAutoBalanceParams(properties);
         String urlIdentifier = QueryCNListUtils.keyFromURL(properties);
         // create a cluster if it doesn't exist in cachedClusters.
         if (!cachedClusters.containsKey(urlIdentifier)) {
@@ -121,6 +119,13 @@ public class ConnectionManager {
         } else {
             return false;
         }
+    }
+
+    private void checkQuickAutoBalanceParams(Properties properties) throws PSQLException {
+        ConnectionInfo.parseEnableQuickAutoBalance(properties);
+        ConnectionInfo.parseMaxIdleTimeBeforeTerminal(properties);
+        Cluster.parseMinReservedConPerCluster(properties);
+        Cluster.parseMinReservedConPerDatanode(properties);
     }
 
     /**

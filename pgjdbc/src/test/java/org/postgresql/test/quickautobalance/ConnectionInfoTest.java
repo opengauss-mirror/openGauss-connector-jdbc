@@ -101,15 +101,33 @@ public class ConnectionInfoTest {
 
     @Test
     public void createConnectionInfoSuccessTest() throws SQLException {
+        String requestMaxIdleTimeBeforeTerminal = "9223372036854774";
+        long exceptMaxIdleTimeBeforeTerminal = 9223372036854774L;
         Properties properties = initProperties();
         HostSpec hostSpec = initHost();
-        properties.setProperty("maxIdleTimeBeforeTerminal", "66");
+        properties.setProperty("maxIdleTimeBeforeTerminal", requestMaxIdleTimeBeforeTerminal);
         properties.setProperty("autoBalance", "leastconn");
         properties.setProperty("enableQuickAutoBalance", "true");
         PgConnection pgConnection = DriverManager.getConnection(TestUtil.getURL(), properties)
             .unwrap(PgConnection.class);
         ConnectionInfo connectionInfo = new ConnectionInfo(pgConnection, properties, hostSpec);
-        assertEquals(connectionInfo.getMaxIdleTimeBeforeTerminal(), 66);
+        assertEquals(connectionInfo.getMaxIdleTimeBeforeTerminal(), exceptMaxIdleTimeBeforeTerminal);
+        assertTrue(connectionInfo.isEnableQuickAutoBalance());
+        assertEquals("leastconn", connectionInfo.getAutoBalance());
+        pgConnection.close();
+    }
+
+    @Test
+    public void createConnectionInfoEqualTo0Test() throws SQLException {
+        Properties properties = initProperties();
+        HostSpec hostSpec = initHost();
+        properties.setProperty("maxIdleTimeBeforeTerminal", "0");
+        properties.setProperty("autoBalance", "leastconn");
+        properties.setProperty("enableQuickAutoBalance", "true");
+        PgConnection pgConnection = DriverManager.getConnection(TestUtil.getURL(), properties)
+            .unwrap(PgConnection.class);
+        ConnectionInfo connectionInfo = new ConnectionInfo(pgConnection, properties, hostSpec);
+        assertEquals(connectionInfo.getMaxIdleTimeBeforeTerminal(), 0);
         assertTrue(connectionInfo.isEnableQuickAutoBalance());
         assertEquals("leastconn", connectionInfo.getAutoBalance());
         pgConnection.close();
@@ -133,9 +151,10 @@ public class ConnectionInfoTest {
 
     @Test(expected = SQLException.class)
     public void createConnectionInfoMaxIdleTimeBeforeTerminalTooBigTest() throws SQLException {
+        String maxIdleTimeBeforeTerminalMaxThreshold = "9223372036854775";
         Properties properties = initProperties();
         HostSpec hostSpec = initHost();
-        properties.setProperty("maxIdleTimeBeforeTerminal", String.valueOf(Long.MAX_VALUE));
+        properties.setProperty("maxIdleTimeBeforeTerminal", maxIdleTimeBeforeTerminalMaxThreshold);
         properties.setProperty("enableQuickAutoBalance", "false");
         try (PgConnection pgConnection = DriverManager.getConnection(TestUtil.getURL(), properties)
             .unwrap(PgConnection.class)) {
@@ -151,7 +170,7 @@ public class ConnectionInfoTest {
     public void createConnectionInfoMaxIdleTimeBeforeTerminalTooSmallTest() throws SQLException {
         Properties properties = initProperties();
         HostSpec hostSpec = initHost();
-        properties.setProperty("maxIdleTimeBeforeTerminal", String.valueOf(-100));
+        properties.setProperty("maxIdleTimeBeforeTerminal", String.valueOf(-1));
         properties.setProperty("enableQuickAutoBalance", "false");
         try (PgConnection pgConnection = DriverManager.getConnection(TestUtil.getURL(), properties)
             .unwrap(PgConnection.class)) {

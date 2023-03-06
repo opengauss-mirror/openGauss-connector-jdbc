@@ -53,6 +53,8 @@ public class Cluster {
 
     private static final double CLOSE_CONNECTION_PERCENTAGE_EACH_TIME = 0.2d;
 
+    private static final int MIN_RESERVED_CON_UNSET_PARAMS = -1;
+
     private final String urlIdentifier;
 
     private final Set<HostSpec> dns;
@@ -124,7 +126,6 @@ public class Cluster {
         } else {
             return null;
         }
-
     }
 
     /**
@@ -191,10 +192,44 @@ public class Cluster {
     }
 
     private void updateMinReservedConPerCluster(Properties properties) throws PSQLException {
+        int perCluster = parseMinReservedConPerCluster(properties);
+        if (perCluster == MIN_RESERVED_CON_UNSET_PARAMS) {
+            return;
+        }
+        if (this.enableMinReservedConPerCluster) {
+            this.minReservedConPerCluster = Math.min(this.minReservedConPerCluster, perCluster);
+        } else {
+            this.enableMinReservedConPerCluster = true;
+            this.minReservedConPerCluster = perCluster;
+        }
+    }
+
+    private void updateMinReservedConPerDatanode(Properties properties) throws PSQLException {
+        int perDatanode = parseMinReservedConPerDatanode(properties);
+        if (perDatanode == MIN_RESERVED_CON_UNSET_PARAMS) {
+            return;
+        }
+        if (this.enableMinReservedConPerDatanode) {
+            this.minReservedConPerDatanode = Math.min(this.minReservedConPerDatanode, perDatanode);
+        } else {
+            this.enableMinReservedConPerDatanode = true;
+            this.minReservedConPerDatanode = perDatanode;
+        }
+    }
+
+    /**
+     * Parse minReservedConPerCluster, value range: [0, 100].
+     * return -1 if minReservedConPerCluster isn't configured.
+     *
+     * @param properties properties
+     * @return minReservedConPerCluster
+     * @throws PSQLException minReservedConPerCluster parse failed
+     */
+    public static int parseMinReservedConPerCluster(Properties properties) throws PSQLException {
         int perCluster = 0;
         String param = PGProperty.MIN_RESERVED_CON_PER_CLUSTER.get(properties);
         if (param == null) {
-            return;
+            return MIN_RESERVED_CON_UNSET_PARAMS;
         }
         try {
             perCluster = Integer.parseInt(param);
@@ -206,20 +241,23 @@ public class Cluster {
             throw new PSQLException(GT.tr("Parameter minReservedConPerCluster={0} parsed failed, value range: int && [0, 100]."
                 , perCluster), PSQLState.INVALID_PARAMETER_VALUE);
         } else {
-            if (!this.enableMinReservedConPerCluster) {
-                this.enableMinReservedConPerCluster = true;
-                this.minReservedConPerCluster = perCluster;
-            } else {
-                this.minReservedConPerCluster = Math.min(this.minReservedConPerCluster, perCluster);
-            }
+            return perCluster;
         }
     }
 
-    private void updateMinReservedConPerDatanode(Properties properties) throws PSQLException {
+    /**
+     * Parse minReservedConPerDatanode, value range: [0, 100].
+     * return -1 if minReservedConPerDatanode isn't configured.
+     *
+     * @param properties properties
+     * @return minReservedConPerDatanode
+     * @throws PSQLException minReservedConPerDatanode parse failed
+     */
+    public static int parseMinReservedConPerDatanode(Properties properties) throws  PSQLException {
         int perDatanode = 0;
         String param = PGProperty.MIN_RESERVED_CON_PER_DATANODE.get(properties);
         if (param == null) {
-            return;
+            return MIN_RESERVED_CON_UNSET_PARAMS;
         }
         try {
             perDatanode = Integer.parseInt(param);
@@ -229,14 +267,10 @@ public class Cluster {
         }
 
         if (perDatanode < 0 || perDatanode > 100) {
-            throw new PSQLException(GT.tr("Parameter minReservedConPerDatanode={0} parsed failed, value range: int && [0, 100].", perDatanode), PSQLState.INVALID_PARAMETER_VALUE);
+            throw new PSQLException(GT.tr("Parameter minReservedConPerDatanode={0} parsed failed, value range: " +
+                "int && [0, 100].", perDatanode), PSQLState.INVALID_PARAMETER_VALUE);
         } else {
-            if (!this.enableMinReservedConPerDatanode) {
-                this.enableMinReservedConPerDatanode = true;
-                this.minReservedConPerDatanode = perDatanode;
-            } else {
-                this.minReservedConPerDatanode = Math.min(this.minReservedConPerDatanode, perDatanode);
-            }
+            return perDatanode;
         }
     }
 
