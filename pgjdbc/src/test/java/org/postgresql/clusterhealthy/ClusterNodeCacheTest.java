@@ -120,7 +120,7 @@ public class ClusterNodeCacheTest {
     public void testCheckReplacement() {
         HostSpec master = new HostSpec(System.getProperty("server"),
                 Integer.parseInt(System.getProperty("port")));
-        Map<HostSpec, HostSpec> failureMap = ClusterHeartBeatFailureMaster.failureMap;
+        Map<HostSpec, HostSpec> failureMap = ClusterHeartBeatFailureMaster.getInstance().failureMap;;
         HostSpec node = new HostSpec("10.10.0.1", 2525);
         failureMap.put(master, node);
         List<HostSpec> hostSpecList = getHostSpecs();
@@ -145,7 +145,7 @@ public class ClusterNodeCacheTest {
 
         List<HostSpec> hostSpecs = getHostSpecs();
         Properties info = getProperties(hostSpecs);
-        checkHostSpecs(hostSpecs.toArray(new HostSpec[0]), info);
+        checkHostSpecs(hostSpecs.toArray(new HostSpec[0]));
         System.out.println(ClusterNodeCache.isOpen());
         Thread.sleep(30000);
     }

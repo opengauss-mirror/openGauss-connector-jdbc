@@ -212,7 +212,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       HostSpec[] currentHostSpecs = clusterSpec.getHostSpecs();
 
       if (currentHostSpecs.length > 1 && targetServerType == HostRequirement.master) {
-        ClusterNodeCache.checkHostSpecs(currentHostSpecs, info);
+        ClusterNodeCache.checkHostSpecs(currentHostSpecs);
       }
       HostChooser hostChooser =
               HostChooserFactory.createHostChooser(currentHostSpecs, targetServerType, info);

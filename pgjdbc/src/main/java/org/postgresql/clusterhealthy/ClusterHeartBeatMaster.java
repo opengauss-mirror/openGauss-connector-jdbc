@@ -24,13 +24,10 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
-import static org.postgresql.GlobalConnectionTracker.getConnections;
 
 /**
  * Maintain the primary node of the cluster. When the primary node breaks down,
@@ -39,9 +36,11 @@ import static org.postgresql.GlobalConnectionTracker.getConnections;
  */
 public class ClusterHeartBeatMaster extends ClusterHeartBeat {
 
-    public static final Map<HostSpec, Set<HostSpec>> CLUSTER_NODE_RELATIONSHIP = new ConcurrentHashMap<>();
+    public final Map<HostSpec, Set<HostSpec>> CLUSTER_NODE_RELATIONSHIP = new ConcurrentHashMap<>();
     private volatile static ClusterHeartBeatMaster ClusterHeartBeatMaster;
     private static Log LOGGER = Logger.getLogger(ClusterHeartBeatMaster.class.getName());
+
+    private final Object NODE_LOCK = new Object();
 
     private ClusterHeartBeatMaster() {
 
@@ -58,31 +57,22 @@ public class ClusterHeartBeatMaster extends ClusterHeartBeat {
      * the primary node is active and added to the failure set after failure
      */
     public void run() {
-        Iterator<Map.Entry<HostSpec, Set<HostSpec>>> iterator = CLUSTER_NODE_RELATIONSHIP.entrySet().iterator();
-        LOGGER.debug("master nodes " + CLUSTER_NODE_RELATIONSHIP);
+        Map<HostSpec, Set<HostSpec>> clusterRelationship = getClusterRelationship();
+        Iterator<Map.Entry<HostSpec, Set<HostSpec>>> iterator = clusterRelationship.entrySet().iterator();
+        LOGGER.debug("master nodes " + clusterRelationship);
         while (iterator.hasNext()) {
             Map.Entry<HostSpec, Set<HostSpec>> nodeMap = iterator.next();
             HostSpec master = nodeMap.getKey();
             Set<HostSpec> slaves = nodeMap.getValue();
             LOGGER.debug("Current node " + master + " Standby node " + slaves);
             QueryExecutor queryExecutor = null;
-            List<QueryExecutor> queryExecutorList = getConnections(master.toString());
-            for (QueryExecutor executor : queryExecutorList) {
-                if (!executor.isClosed()) {
-                    queryExecutor = executor;
-                    break;
-                }
-            }
-
             Set<Properties> propertiesSet = getProperties(master);
-            if (queryExecutor == null) {
-                try {
-                    queryExecutor = super.getQueryExecutor(master, propertiesSet);
-                } catch (SQLException e) {
-                    LOGGER.debug("acquire QueryExecutor failure");
-                    super.cacheProcess(master, slaves, propertiesSet);
-                    continue;
-                }
+            try {
+                queryExecutor = super.getQueryExecutor(master, propertiesSet);
+            } catch (SQLException e) {
+                LOGGER.debug("acquire QueryExecutor failure");
+                super.cacheProcess(master, slaves, propertiesSet);
+                continue;
             }
             LOGGER.debug("Information about the current connected node " + queryExecutor.getSocketAddress());
             if (!super.nodeRoleIsMaster(queryExecutor)) {
@@ -97,7 +87,7 @@ public class ClusterHeartBeatMaster extends ClusterHeartBeat {
     }
 
     public void addClusterNode(HostSpec hostSpecs, HostSpec... value) {
-        synchronized (CLUSTER_NODE_RELATIONSHIP) {
+        synchronized (NODE_LOCK) {
             Set<HostSpec> hostSpecSet = CLUSTER_NODE_RELATIONSHIP.computeIfAbsent(hostSpecs, k -> new HashSet<>());
             Arrays.stream(value)
                     .filter(host -> !host.equals(hostSpecs))
@@ -107,7 +97,7 @@ public class ClusterHeartBeatMaster extends ClusterHeartBeat {
     }
 
     public void removeClusterNode(HostSpec key, HostSpec newKey, Set<HostSpec> slaves) {
-        synchronized (CLUSTER_NODE_RELATIONSHIP) {
+        synchronized (NODE_LOCK) {
             CLUSTER_NODE_RELATIONSHIP.remove(key);
             if (newKey != null) {
                 Set<HostSpec> hostSpecSet = CLUSTER_NODE_RELATIONSHIP.get(newKey);
@@ -122,8 +112,14 @@ public class ClusterHeartBeatMaster extends ClusterHeartBeat {
     }
 
     public Set<HostSpec> get(HostSpec hostSpec) {
-        synchronized (CLUSTER_NODE_RELATIONSHIP) {
+        synchronized (NODE_LOCK) {
             return CLUSTER_NODE_RELATIONSHIP.get(hostSpec);
+        }
+    }
+
+    public void clear() {
+        synchronized (NODE_LOCK) {
+            CLUSTER_NODE_RELATIONSHIP.clear();
         }
     }
 

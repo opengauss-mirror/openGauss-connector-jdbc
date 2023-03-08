@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ClusterHeartBeatFailureMaster extends ClusterHeartBeat{
 
-    public static Map<HostSpec, HostSpec> failureMap = new ConcurrentHashMap<>();
+    public Map<HostSpec, HostSpec> failureMap = new ConcurrentHashMap<>();
     private volatile static ClusterHeartBeatFailureMaster clusterHeartBeatFailureMaster;
     private static Log LOGGER = Logger.getLogger(ClusterHeartBeatFailureMaster.class.getName());
     private ClusterHeartBeatFailureMaster() {
@@ -112,6 +112,10 @@ public class ClusterHeartBeatFailureMaster extends ClusterHeartBeat{
 
     public void remove(HostSpec hostSpec) {
         failureMap.remove(hostSpec);
+    }
+
+    public void clear() {
+        failureMap.clear();
     }
 
 }
