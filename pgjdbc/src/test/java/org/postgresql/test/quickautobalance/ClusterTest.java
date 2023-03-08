@@ -18,6 +18,7 @@ package org.postgresql.test.quickautobalance;
 import org.junit.Test;
 import org.postgresql.QueryCNListUtils;
 import org.postgresql.jdbc.PgConnection;
+import org.postgresql.jdbc.StatementCancelState;
 import org.postgresql.log.Log;
 import org.postgresql.log.Logger;
 import org.postgresql.quickautobalance.Cluster;
@@ -336,7 +337,7 @@ public class ClusterTest {
     }
 
     @Test
-    public void setConnectionStateSuccessTest() throws SQLException {
+    public void updateParamsSuccessTest() throws SQLException {
         HostSpec[] hostSpecs = initHostSpecs();
         if (!checkHostSpecs(hostSpecs)) {
             return;
@@ -572,7 +573,7 @@ public class ClusterTest {
     }
 
     @Test
-    public void checkConnectionStateSuccessTest() throws PSQLException {
+    public void checkClusterStateSuccessTest() throws PSQLException {
         HostSpec[] hostSpecs = initHostSpecs();
         if (!checkHostSpecs(hostSpecs)) {
             return;
@@ -598,7 +599,7 @@ public class ClusterTest {
     }
 
     @Test
-    public void checkConnectionStateOneNodeFailedTest() throws PSQLException {
+    public void checkClusterStateOneNodeFailedTest() throws PSQLException {
         HostSpec[] hostSpecs = initHostSpecsWithInvalidNode();
         if (!checkHostSpecs(hostSpecs)) {
             return;
@@ -624,7 +625,7 @@ public class ClusterTest {
     }
 
     @Test
-    public void checkConnectionStateAndQuickLoadBalanceTest() throws PSQLException {
+    public void checkClusterStateAndQuickLoadBalanceTest() throws PSQLException {
         HostSpec[] hostSpecs = initHostSpecs();
         if (!checkHostSpecs(hostSpecs)) {
             return;
@@ -669,7 +670,7 @@ public class ClusterTest {
     }
 
     @Test
-    public void checkConnectionStateAndQuickLoadBalanceWithParamsTest() throws PSQLException {
+    public void checkClusterStateAndQuickLoadBalanceWithParamsTest() throws PSQLException {
         HostSpec[] hostSpecs = initHostSpecs();
         if (!checkHostSpecs(hostSpecs)) {
             return;
@@ -714,6 +715,34 @@ public class ClusterTest {
             Queue.class, "abandonedConnectionList");
         assertEquals((int) (total / 3 * 2 * (100 - 75) / 100), abandonedConnectionList.size());
         ConnectionManager.getInstance().clear();
+    }
+
+    @Test
+    public void setConnectionStateTest() throws PSQLException {
+        HostSpec[] hostSpecs = initHostSpecs();
+        if (!checkHostSpecs(hostSpecs)) {
+            return;
+        }
+        Properties properties = initPriority(hostSpecs);
+        String URLIdentifier = QueryCNListUtils.keyFromURL(properties);
+        Cluster cluster = new Cluster(URLIdentifier, properties);
+        String url = initURL(hostSpecs) + "?autoBalance=leastconn";
+        PgConnection pgConnection;
+        try {
+            pgConnection = getConnection(url, properties);
+            cluster.setConnection(pgConnection, properties);
+            assertEquals(StatementCancelState.IDLE, cluster.getConnectionInfo(pgConnection).getConnectionState());
+            cluster.setConnectionState(pgConnection, StatementCancelState.IN_QUERY);
+            assertEquals(StatementCancelState.IN_QUERY, cluster.getConnectionInfo(pgConnection).getConnectionState());
+            cluster.setConnectionState(pgConnection, StatementCancelState.CANCELLED);
+            assertEquals(StatementCancelState.CANCELLED, cluster.getConnectionInfo(pgConnection).getConnectionState());
+            cluster.setConnectionState(pgConnection, StatementCancelState.CANCELING);
+            assertEquals(StatementCancelState.CANCELING, cluster.getConnectionInfo(pgConnection).getConnectionState());
+            ConnectionManager.getInstance().clear();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            fail();
+        }
     }
 
     @Test
