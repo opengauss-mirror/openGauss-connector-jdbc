@@ -563,9 +563,7 @@ public class Driver implements java.sql.Driver {
         ConnectionManager.getInstance().setCluster(props);
         PgConnection pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props, url);
         GlobalConnectionTracker.possessConnectionReference(pgConnection.getQueryExecutor(), props);
-        if (ConnectionManager.getInstance().setConnection(pgConnection, props)) {
-            LoadBalanceHeartBeating.startScheduledExecutorService(props);
-        }
+        LoadBalanceHeartBeating.setConnection(pgConnection, props);
         return pgConnection;
     }
 
