@@ -317,4 +317,14 @@ public class ConnectionManagerTest {
             .decrementCachedCreatingConnectionSize(new HostSpec("127.127.127.127", 93589), properties));
         ConnectionManager.getInstance().clear();
     }
+
+    @Test
+    public void getCachedConnectionSizeTest() throws SQLException {
+        String url = initURLWithLeastConn();
+        int total = 10;
+        for (int i = 0; i < total; i++) {
+            PgConnection pgConnection = getConnection(url, TestUtil.getUser(), TestUtil.getPassword());;
+        }
+        assertEquals(total, ConnectionManager.getInstance().getCachedConnectionSize());
+    }
 }

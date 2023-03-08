@@ -245,7 +245,9 @@ public class ConnectionInfo {
             String result = queryExecutor.getEncoding().decode(bit[0]);
             isConnectionValid = result != null && result.equals("1");
         } catch (SQLException | IOException e) {
-            LOGGER.info(GT.tr("Check connection isValid failed."));
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug(GT.tr("CheckConnectionIsValid failed."));
+            }
             isConnectionValid = false;
         }
         return isConnectionValid;
