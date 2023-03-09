@@ -876,5 +876,31 @@ public class ClusterTest {
         assertEquals(total - 4 * (int) (Math.ceil((double) total * 0.2)), cluster.closeConnections());
         ConnectionManager.getInstance().clear();
     }
+
+    @Test
+    public void getCachedConnectionSizeTest() throws PSQLException {
+        HostSpec[] hostSpecs = initHostSpecs();
+        if (!checkHostSpecs(hostSpecs)) {
+            return;
+        }
+        Properties properties = initPriority(hostSpecs);
+        properties.setProperty("autoBalance", "leastconn");
+        properties.setProperty("enableQuickAutoBalance", "true");
+        Arrays.sort(hostSpecs);
+        String URLIdentifier = QueryCNListUtils.keyFromURL(properties);
+        Cluster cluster = new Cluster(URLIdentifier, properties);
+        String url = initURL(hostSpecs);
+        int total = 50;
+        for (int i = 0; i < total; i++) {
+            try {
+                PgConnection pgConnection = getConnection(url, properties);
+                cluster.setConnection(pgConnection, properties);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                fail();
+            }
+        }
+        assertEquals(total, cluster.getCachedConnectionSize());
+    }
 }
 

@@ -77,7 +77,7 @@ public class Cluster {
 
     private volatile long quickAutoBalanceStartTime;
 
-    private int totalAbandonedConnectionSize = 0;
+    private int totalAbandonedConnectionSize;
 
     public Cluster(final String urlIdentifier, final Properties properties) throws PSQLException {
         this.urlIdentifier = urlIdentifier;
@@ -226,7 +226,7 @@ public class Cluster {
      * @throws PSQLException minReservedConPerCluster parse failed
      */
     public static int parseMinReservedConPerCluster(Properties properties) throws PSQLException {
-        int perCluster = 0;
+        int perCluster;
         String param = PGProperty.MIN_RESERVED_CON_PER_CLUSTER.get(properties);
         if (param == null) {
             return MIN_RESERVED_CON_UNSET_PARAMS;
@@ -254,7 +254,7 @@ public class Cluster {
      * @throws PSQLException minReservedConPerDatanode parse failed
      */
     public static int parseMinReservedConPerDatanode(Properties properties) throws  PSQLException {
-        int perDatanode = 0;
+        int perDatanode;
         String param = PGProperty.MIN_RESERVED_CON_PER_DATANODE.get(properties);
         if (param == null) {
             return MIN_RESERVED_CON_UNSET_PARAMS;
@@ -615,7 +615,7 @@ public class Cluster {
     public int closeConnections() {
         int closed = 0;
         double ceilError = 0.001;
-        int atMost = (int) (Math.ceil(CLOSE_CONNECTION_PERCENTAGE_EACH_TIME * totalAbandonedConnectionSize) + + ceilError);
+        int atMost = (int) (Math.ceil(CLOSE_CONNECTION_PERCENTAGE_EACH_TIME * totalAbandonedConnectionSize) + ceilError);
         synchronized (abandonedConnectionList) {
             if (abandonedConnectionList.isEmpty()) {
                 return closed;
@@ -656,5 +656,14 @@ public class Cluster {
                 urlIdentifier, closed, oldSize, abandonedConnectionList.size()));
         }
         return closed;
+    }
+
+    /**
+     * Get cached connection size.
+     *
+     * @return cachedConnectionSize
+     */
+    public int getCachedConnectionSize() {
+        return cachedDnList.values().stream().mapToInt(DataNode::getCachedConnectionListSize).sum();
     }
 }

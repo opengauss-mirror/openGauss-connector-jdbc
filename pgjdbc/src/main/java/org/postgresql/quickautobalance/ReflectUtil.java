@@ -17,14 +17,33 @@ package org.postgresql.quickautobalance;
 
 import org.postgresql.log.Log;
 import org.postgresql.log.Logger;
+import org.postgresql.util.GT;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 /**
  * Reflect util
  */
 public class ReflectUtil {
     private static Log LOGGER = Logger.getLogger(ReflectUtil.class.getName());
+
+    /**
+     *
+     * @param classz classz
+     * @param object object
+     * @param methodName methodName
+     */
+    public static void invoke(Class classz, Object object, String methodName) {
+        try {
+            Method method = classz.getDeclaredMethod(methodName);
+            method.setAccessible(true);
+            method.invoke(object);
+        } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
+            LOGGER.error(GT.tr("call reflect method {}.{} error.", classz, methodName));
+        }
+    }
 
     /**
      * Get the private property of an object.
