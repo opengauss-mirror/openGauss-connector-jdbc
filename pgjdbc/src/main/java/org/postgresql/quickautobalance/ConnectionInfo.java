@@ -43,6 +43,8 @@ public class ConnectionInfo {
 
     public static final String ENABLE_QUICK_AUTO_BALANCE_PARAMS = "true";
 
+    private static final long MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE = 9223372036854775L;
+
     private static Log LOGGER = Logger.getLogger(ConnectionInfo.class.getName());
 
     private final PgConnection pgConnection;
@@ -78,17 +80,24 @@ public class ConnectionInfo {
         this.autoBalance = properties.getProperty("autoBalance", "");
         this.maxIdleTimeBeforeTerminal = DEFAULT_MAX_IDLE_TIME_BEFORE_TERMINAL;
         this.hostSpec = hostSpec;
-        parseEnableQuickAutoBalance(properties);
-        parseMaxIdleTimeBeforeTerminal(properties);
+        this.maxIdleTimeBeforeTerminal = parseMaxIdleTimeBeforeTerminal(properties);
+        this.enableQuickAutoBalance = parseEnableQuickAutoBalance(properties);
     }
 
-    private void parseEnableQuickAutoBalance(Properties properties) throws PSQLException {
+    /**
+     * Parse enableQuickAutoBalance.
+     *
+     * @param properties properties
+     * @return enableQuickAutoBalance
+     * @throws PSQLException EnableQuickAutoBalance parsed failed.
+     */
+    public static boolean parseEnableQuickAutoBalance(Properties properties) throws PSQLException {
         if (EnableQuickAutoBalanceParams.TRUE.getValue()
             .equals(PGProperty.ENABLE_QUICK_AUTO_BALANCE.get(properties))) {
-            this.enableQuickAutoBalance = true;
+            return true;
         } else if (EnableQuickAutoBalanceParams.FALSE.getValue()
             .equals(PGProperty.ENABLE_QUICK_AUTO_BALANCE.get(properties))) {
-            this.enableQuickAutoBalance = false;
+            return false;
         } else {
             throw new PSQLException(
                 GT.tr("Parameter enableQuickAutoBalance={0} parsed failed, value range: '{true, false'}).",
@@ -96,28 +105,35 @@ public class ConnectionInfo {
         }
     }
 
-    private void parseMaxIdleTimeBeforeTerminal(Properties properties) throws PSQLException {
+    /**
+     * Parse maxIdleTimeBeforeTerminal.
+     *
+     * @param properties properties
+     * @return maxIdleTimeBeforeTerminal
+     * @throws PSQLException MaxIdleTimeBeforeTerminal parse failed.
+     */
+    public static long  parseMaxIdleTimeBeforeTerminal(Properties properties) throws PSQLException {
         long inputMaxIdleTime;
         try {
             String param = PGProperty.MAX_IDLE_TIME_BEFORE_TERMINAL.get(properties);
             inputMaxIdleTime = Long.parseLong(param);
-            if (inputMaxIdleTime >= Long.MAX_VALUE / 1000) {
+            if (inputMaxIdleTime >= MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE) {
                 throw new PSQLException(
                     GT.tr("Parameter maxIdleTimeBeforeTerminal={0} can not be bigger than {1}, value range: long & [0,{1}).",
-                        inputMaxIdleTime, Long.MAX_VALUE / 1000), PSQLState.INVALID_PARAMETER_VALUE);
+                        inputMaxIdleTime, MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE), PSQLState.INVALID_PARAMETER_VALUE);
             }
             if (inputMaxIdleTime < 0) {
                 throw new PSQLException(
                     GT.tr("Parameter maxIdleTimeBeforeTerminal={0} can not be less than 0, value range: long & [0,{1}).",
-                        inputMaxIdleTime, Long.MAX_VALUE / 1000), PSQLState.INVALID_PARAMETER_VALUE);
+                        inputMaxIdleTime, MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE), PSQLState.INVALID_PARAMETER_VALUE);
 
             }
         } catch (NumberFormatException e) {
             throw new PSQLException(
                 GT.tr("Parameter maxIdleTimeBeforeTerminal parsed failed, value range: long & [0,{0}).",
-                    Long.MAX_VALUE / 1000), PSQLState.INVALID_PARAMETER_TYPE);
+                    MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE), PSQLState.INVALID_PARAMETER_TYPE);
         }
-        this.maxIdleTimeBeforeTerminal = inputMaxIdleTime;
+        return inputMaxIdleTime;
     }
 
     enum EnableQuickAutoBalanceParams {
