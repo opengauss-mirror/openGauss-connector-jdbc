@@ -18,10 +18,8 @@ package org.postgresql.clusterhealthy;
 import org.postgresql.PGProperty;
 import org.postgresql.log.Log;
 import org.postgresql.log.Logger;
-import org.postgresql.util.GT;
 import org.postgresql.util.HostSpec;
 import org.postgresql.util.PSQLException;
-import org.postgresql.util.PSQLState;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -36,9 +34,9 @@ import java.util.stream.Collectors;
  */
 public class ClusterNodeCache {
     private static volatile boolean status;
-    private static final String STATUS_LOCK = "status";
+    private static final Object STATUS_LOCK = new Object();
     private static Log LOGGER = Logger.getLogger(ClusterNodeCache.class.getName());
-    private static final ExecutorService executorService = Executors.newCachedThreadPool();
+    private static ExecutorService executorService = null;
     private static final ClusterHeartBeat CLUSTER_HEART_BEAT = new ClusterHeartBeat();
 
     public static boolean isOpen() {
@@ -69,9 +67,8 @@ public class ClusterNodeCache {
     /**
      * Verify parameters and replace the failed primary node
      * @param hostSpecs cluster node
-     * @param properties the parsed/defaulted connection properties
      */
-    public static void checkHostSpecs(HostSpec[] hostSpecs, Properties properties) throws PSQLException {
+    public static void checkHostSpecs(HostSpec[] hostSpecs) throws PSQLException {
         // check the interval of heartbeat threads.
         Set<HostSpec> set = Arrays.stream(hostSpecs)
                 .collect(Collectors.toSet());
@@ -93,12 +90,12 @@ public class ClusterNodeCache {
         boolean open = true;
         if (!isNumeric(period)) {
             open = false;
-            LOGGER.info("Invalid heartbeatPeriod value: " + period);
+            LOGGER.debug("Invalid heartbeatPeriod value: " + period);
         }
         long timePeriod = Long.parseLong(period);
         if (timePeriod <= 0) {
             open = false;
-            LOGGER.info("Invalid heartbeatPeriod value: " + period);
+            LOGGER.debug("Invalid heartbeatPeriod value: " + period);
         }
         if (set.size() > 1 && open) {
             CLUSTER_HEART_BEAT.addNodeRelationship(master, hostSpecs, properties);
@@ -118,11 +115,19 @@ public class ClusterNodeCache {
             }
             status = true;
         }
+        if (executorService == null) {
+            executorService = Executors.newSingleThreadExecutor();
+        }
         executorService.execute(CLUSTER_HEART_BEAT::masterNodeProbe);
     }
 
     public static void stop() {
-        status = false;
+        synchronized (STATUS_LOCK) {
+            status = false;
+            CLUSTER_HEART_BEAT.clear();
+            CLUSTER_HEART_BEAT.initPeriodTime();
+            executorService.shutdown();
+        }
     }
 
     private static boolean isNumeric(final CharSequence cs) {
@@ -139,4 +144,9 @@ public class ClusterNodeCache {
     }
 
 
+    public static void updateDetection() {
+        synchronized (STATUS_LOCK) {
+            CLUSTER_HEART_BEAT.updateDetection();
+        }
+    }
 }

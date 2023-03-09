@@ -31,7 +31,7 @@ import java.util.Set;
  */
 public class ClusterHeartBeatFailureCluster extends ClusterHeartBeat{
 
-    public static List<FailureCluster> failureCluster = new ArrayList<>();
+    public List<FailureCluster> failureCluster = new ArrayList<>();
     private volatile static ClusterHeartBeatFailureCluster clusterHeartBeatFailureCluster;
     private static Log LOGGER = Logger.getLogger(ClusterHeartBeatFailureCluster.class.getName());
     private ClusterHeartBeatFailureCluster() {
@@ -83,7 +83,6 @@ public class ClusterHeartBeatFailureCluster extends ClusterHeartBeat{
                     addClusterNode(cluster.getMaster(), cluster.getSalves().toArray(new HostSpec[0]));
                     addProperties(cluster.getMaster(), cluster.getProps());
                 } else {
-
                     HostSpec maseterNode = findMasterNode(cluster.getSalves(), cluster.getProps());
                     if (maseterNode != null) {
                         addProperties(maseterNode, cluster.getProps());
@@ -102,6 +101,10 @@ public class ClusterHeartBeatFailureCluster extends ClusterHeartBeat{
 
     public List<FailureCluster> getFailureCluster() {
         return failureCluster;
+    }
+
+    public void clear() {
+        failureCluster.clear();
     }
 
 }
