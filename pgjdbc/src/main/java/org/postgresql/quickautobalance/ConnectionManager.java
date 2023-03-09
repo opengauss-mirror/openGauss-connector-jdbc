@@ -16,6 +16,7 @@
 package org.postgresql.quickautobalance;
 
 import org.postgresql.Driver;
+import org.postgresql.PGProperty;
 import org.postgresql.QueryCNListUtils;
 import org.postgresql.jdbc.PgConnection;
 import org.postgresql.jdbc.StatementCancelState;
@@ -85,10 +86,29 @@ public class ConnectionManager {
         return hostSpecs.length > 1;
     }
 
+    /**
+     * Check a properties if enable quickAutoBalance.
+     *
+     * @param properties properties
+     * @return if enable quickAutoBalance
+     */
+    public static boolean checkEnableQuickAutoBalance(Properties properties) {
+        if (!checkEnableLeastConn(properties)) {
+            return false;
+        }
+        return ConnectionInfo.ENABLE_QUICK_AUTO_BALANCE_PARAMS
+            .equals(PGProperty.ENABLE_QUICK_AUTO_BALANCE.get(properties));
+    }
+
     private static class Holder {
         private static final ConnectionManager INSTANCE = new ConnectionManager();
     }
 
+    /**
+     * Get instance.
+     *
+     * @return connectionManager
+     */
     public static ConnectionManager getInstance() {
         return Holder.INSTANCE;
     }
@@ -292,9 +312,21 @@ public class ConnectionManager {
         return 0;
     }
 
+    /**
+     * Clear connection manager.
+     */
     public void clear() {
         synchronized (cachedClusters) {
             cachedClusters.clear();
         }
+    }
+
+    /**
+     * Get cached connection size.
+     *
+     * @return cached connection size
+     */
+    public int getCachedConnectionSize() {
+        return cachedClusters.values().stream().mapToInt(Cluster::getCachedConnectionSize).sum();
     }
 }
