@@ -15,6 +15,7 @@
 
 package org.postgresql.clusterhealthy;
 
+import org.postgresql.GlobalConnectionTracker;
 import org.postgresql.PGProperty;
 import org.postgresql.core.PGStream;
 import org.postgresql.core.QueryExecutor;
@@ -29,11 +30,16 @@ import org.postgresql.util.HostSpec;
 import javax.net.SocketFactory;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
-import static org.postgresql.GlobalConnectionTracker.closeConnectionOfCrash;
-import static org.postgresql.GlobalConnectionTracker.getConnections;
 import static org.postgresql.clusterhealthy.ClusterNodeCache.isOpen;
 import static org.postgresql.util.PSQLState.CONNECTION_REJECTED;
 
@@ -45,10 +51,11 @@ import static org.postgresql.util.PSQLState.CONNECTION_REJECTED;
 public class ClusterHeartBeat {
 
     public static final Map<HostSpec, Set<Properties>> CLUSTER_PROPERTIES = new ConcurrentHashMap<>();
-    private static Log LOGGER = Logger.getLogger(ClusterHeartBeat.class.getName());
-    private static final ConnectionFactoryImpl FACTORY = new ConnectionFactoryImpl();
-    private static final String UPDATE_TIME = "time";
-    private volatile Long periodTime = 5000L;
+    private Log LOGGER = Logger.getLogger(ClusterHeartBeat.class.getName());
+    private final ConnectionFactoryImpl FACTORY = new ConnectionFactoryImpl();
+    private volatile boolean detection;
+    private final Long DEFAULT_INTERVAL = 5000L;
+    private volatile AtomicLong periodTime = new AtomicLong(DEFAULT_INTERVAL);
 
 
     /**
@@ -56,6 +63,11 @@ public class ClusterHeartBeat {
      */
     public void masterNodeProbe() {
         while (isOpen()) {
+            // Detects whether the loop is broken
+            if (detection && !GlobalConnectionTracker.hasConnection()) {
+                ClusterNodeCache.stop();
+                break;
+            }
             LOGGER.debug("heartBeat thread start time: " + new Date(System.currentTimeMillis()));
             // failed node detection
             ClusterHeartBeatFailureMaster.getInstance().run();
@@ -65,12 +77,22 @@ public class ClusterHeartBeat {
             // The failed cluster seeks the primary node
             ClusterHeartBeatFailureCluster.getInstance().run();
             try {
-                Thread.sleep(periodTime);
+                Thread.sleep(periodTime.get());
             } catch (InterruptedException e) {
                 LOGGER.debug(e.getStackTrace());
             }
         }
-        periodTime = 5000L;
+    }
+
+    public void updateDetection () {
+        if (detection) {
+            return;
+        }
+        detection = true;
+    }
+
+    public void initPeriodTime() {
+        periodTime.set(DEFAULT_INTERVAL);
     }
 
     /**
@@ -79,9 +101,7 @@ public class ClusterHeartBeat {
      * @return properties set
      */
     public Set<Properties> getProperties(HostSpec hostSpec) {
-        synchronized (CLUSTER_PROPERTIES) {
-            return CLUSTER_PROPERTIES.computeIfAbsent(hostSpec, k -> new HashSet<>());
-        }
+        return CLUSTER_PROPERTIES.computeIfAbsent(hostSpec, k -> new HashSet<>());
     }
 
     public Map<HostSpec, Set<HostSpec>> getClusterRelationship () {
@@ -102,11 +122,7 @@ public class ClusterHeartBeat {
         if (PGProperty.HEARTBEAT_PERIOD.get(properties) != null) {
             String period = PGProperty.HEARTBEAT_PERIOD.get(properties);
             long time = Long.parseLong(period);
-            synchronized (UPDATE_TIME) {
-                if (time > 0) {
-                    periodTime = Math.min(periodTime, time);
-                }
-            }
+            periodTime.set(Math.min(periodTime.get(), time));
         }
     }
 
@@ -116,14 +132,12 @@ public class ClusterHeartBeat {
      * @param properties the parsed/defaulted connection properties
      */
     public void addProperties(HostSpec hostSpec, Set<Properties> properties) {
-        synchronized (CLUSTER_PROPERTIES) {
-            Set<Properties> propertiesSet = CLUSTER_PROPERTIES.get(hostSpec);
-            if (propertiesSet == null) {
-                propertiesSet = new HashSet<>();
-            }
-            propertiesSet.addAll(properties);
-            CLUSTER_PROPERTIES.put(hostSpec, propertiesSet);
+        Set<Properties> propertiesSet = CLUSTER_PROPERTIES.get(hostSpec);
+        if (propertiesSet == null) {
+            propertiesSet = new HashSet<>();
         }
+        propertiesSet.addAll(properties);
+        CLUSTER_PROPERTIES.put(hostSpec, propertiesSet);
     }
 
     /**
@@ -161,13 +175,20 @@ public class ClusterHeartBeat {
      * @param properties the parsed/defaulted connection properties
      */
     public void removeProperties(HostSpec hostSpec, Properties properties) {
-        synchronized (CLUSTER_PROPERTIES) {
-            Set<Properties> propertiesSet = CLUSTER_PROPERTIES.getOrDefault(hostSpec, null);
-            if (propertiesSet != null) {
-                propertiesSet.remove(properties);
-                CLUSTER_PROPERTIES.put(hostSpec, propertiesSet);
-            }
+        Set<Properties> propertiesSet = CLUSTER_PROPERTIES.getOrDefault(hostSpec, null);
+        if (propertiesSet != null) {
+            propertiesSet.remove(properties);
+            CLUSTER_PROPERTIES.put(hostSpec, propertiesSet);
         }
+    }
+
+    // Skip the heartbeat detection and clear the cache
+    public void clear() {
+        detection = false;
+        CLUSTER_PROPERTIES.clear();
+        ClusterHeartBeatMaster.getInstance().clear();
+        ClusterHeartBeatFailureMaster.getInstance().clear();
+        ClusterHeartBeatFailureCluster.getInstance().clear();
     }
 
     /**
@@ -241,7 +262,7 @@ public class ClusterHeartBeat {
             FailureCluster cluster = new FailureCluster(hostSpec, slaves, props);
             ClusterHeartBeatFailureCluster.getInstance().addFailureCluster(cluster);
         }
-        closeConnectionOfCrash(hostSpec.toString());
+        GlobalConnectionTracker.closeConnectionOfCrash(hostSpec.toString());
     }
 
     /**
@@ -253,12 +274,6 @@ public class ClusterHeartBeat {
      */
     public HostSpec findMasterNode(Set<HostSpec> hostSpecSet, Set<Properties> properties) {
         for (HostSpec hostSpec : hostSpecSet) {
-            List<QueryExecutor> queryExecutorList = getConnections(hostSpec.toString());
-            for (QueryExecutor executor : queryExecutorList) {
-                if (!executor.isClosed() && nodeRoleIsMaster(executor)) {
-                    return hostSpec;
-                }
-            }
             QueryExecutor queryExecutor = null;
             try {
                 queryExecutor = getQueryExecutor(hostSpec, properties);

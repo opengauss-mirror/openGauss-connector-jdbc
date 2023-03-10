@@ -1,7 +1,7 @@
 package org.postgresql;
 
+import org.postgresql.clusterhealthy.ClusterNodeCache;
 import org.postgresql.core.QueryExecutor;
-import org.postgresql.jdbc.PgConnection;
 import org.postgresql.log.Log;
 import org.postgresql.log.Logger;
 
@@ -45,7 +45,7 @@ public class GlobalConnectionTracker {
      * @param queryExecutor
      */
     public static void possessConnectionReference(QueryExecutor queryExecutor, Properties props) {
-        if (!isForceTargetServerSlave(props) || !isTargetServerMaster(props)) {
+        if (!isForceTargetServerSlave(props) && !isTargetServerMaster(props)) {
             return;
         }
         int identityQueryExecute = System.identityHashCode(queryExecutor);
@@ -67,7 +67,7 @@ public class GlobalConnectionTracker {
      * @param queryExecutor
      */
     public static void releaseConnectionReference(QueryExecutor queryExecutor, Properties props) {
-        if (!isForceTargetServerSlave(props)) {
+        if (!isForceTargetServerSlave(props) && !isTargetServerMaster(props)) {
             return;
         }
         String hostSpec = queryExecutor.getHostSpec().toString();
@@ -84,6 +84,7 @@ public class GlobalConnectionTracker {
                 LOGGER.info("[SWITCHOVER] No connection found under this host!");
             }
         }
+        ClusterNodeCache.updateDetection();
     }
 
     /**
@@ -147,6 +148,19 @@ public class GlobalConnectionTracker {
             }
             return ret;
         }
+    }
+
+    public static boolean hasConnection() {
+        synchronized (connectionManager) {
+            for (HashMap<Integer, QueryExecutor> queryExecutorMap : connectionManager.values()) {
+                boolean exist = queryExecutorMap.entrySet().stream()
+                        .anyMatch((entry) -> entry.getValue() != null && !entry.getValue().isClosed());
+                if (exist) {
+                    return exist;
+                }
+            }
+        }
+        return false;
     }
 
 
