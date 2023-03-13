@@ -428,6 +428,7 @@ public class Cluster {
             urlIdentifier, checkResult.toString()));
         // Start to quickLoadBalance.
         if (checkResult.get(DataNodeChangedState.CHANGE_TO_VALID).size() != 0
+            && checkResult.get(DataNodeChangedState.KEEP_VALID).size() != 0
             && LoadBalanceHeartBeating.isQuickAutoBalanceStarted()) {
             quickLoadBalance(checkResult.get(DataNodeChangedState.KEEP_VALID));
         }
