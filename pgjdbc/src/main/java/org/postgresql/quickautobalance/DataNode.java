@@ -31,6 +31,7 @@ import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 
 import javax.net.SocketFactory;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
@@ -210,7 +211,7 @@ public class DataNode {
      * @throws InvocationTargetException invocation target exception
      */
     public boolean checkDnState(Properties properties) throws PSQLException, InvocationTargetException {
-        Object pgStream = new Object();
+        Object pgStream;
         try {
             HostSpec dnHostSpec = new HostSpec(properties.getProperty("PGHOST")
                 , Integer.parseInt(properties.getProperty("PGPORT")));
@@ -228,8 +229,11 @@ public class DataNode {
             method.setAccessible(true);
             pgStream = method.invoke(connectionFactory, properties.getProperty("user"),
                 properties.getProperty("PGDBNAME"), properties, socketFactory, dnHostSpec, sslMode);
-        } catch (InstantiationException | IllegalAccessException | NoSuchMethodException |
-                 ClassNotFoundException e) {
+            if (pgStream instanceof  PGStream) {
+                ((PGStream) pgStream).close();
+            }
+        } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | ClassNotFoundException |
+                 IOException e) {
             throw new PSQLException("The queryExecutor of connection can't execute tryConnect",
                 PSQLState.WRONG_OBJECT_TYPE);
         }
@@ -275,6 +279,7 @@ public class DataNode {
                 if (pgConnection != null) {
                     QueryExecutor queryExecutor = pgConnection.getQueryExecutor();
                     if (queryExecutor != null && !queryExecutor.isClosed()) {
+                        queryExecutor.close();
                         queryExecutor.setAvailability(false);
                     }
                 } else {
