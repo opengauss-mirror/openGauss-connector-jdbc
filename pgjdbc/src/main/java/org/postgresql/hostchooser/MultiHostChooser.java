@@ -83,6 +83,9 @@ public class MultiHostChooser implements HostChooser {
   private List<HostSpec> loadBalance(List<HostSpec> allHosts) {
     Boolean isOutPutLog = true;
     if (allHosts.size() <= 1) {
+      if (allHosts.size() == 1 && Objects.equals(LoadBalanceType.LeastConn, loadBalanceType)) {
+        ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(allHosts.get(0), info);
+      }
       return allHosts;
     }
     switch (loadBalanceType) {

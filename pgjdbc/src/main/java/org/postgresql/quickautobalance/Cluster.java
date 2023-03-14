@@ -239,7 +239,7 @@ public class Cluster {
         }
         if (perCluster < 0 || perCluster > 100) {
             throw new PSQLException(GT.tr("Parameter minReservedConPerCluster={0} parsed failed, value range: int && [0, 100]."
-                , perCluster), PSQLState.INVALID_PARAMETER_VALUE);
+                , String.valueOf(perCluster)), PSQLState.INVALID_PARAMETER_VALUE);
         } else {
             return perCluster;
         }
@@ -268,7 +268,7 @@ public class Cluster {
 
         if (perDatanode < 0 || perDatanode > 100) {
             throw new PSQLException(GT.tr("Parameter minReservedConPerDatanode={0} parsed failed, value range: " +
-                "int && [0, 100].", perDatanode), PSQLState.INVALID_PARAMETER_VALUE);
+                "int && [0, 100].", String.valueOf(perDatanode)), PSQLState.INVALID_PARAMETER_VALUE);
         } else {
             return perDatanode;
         }
