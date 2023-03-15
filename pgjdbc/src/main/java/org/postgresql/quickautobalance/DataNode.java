@@ -329,6 +329,10 @@ public class DataNode {
      * @return cachedCreatingConnectionSize after updated
      */
     public int incrementCachedCreatingConnectionSize() {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug(GT.tr("【quickAutoBalance】incrementCachedCreatingConnectionSize, hostSpec: {0}, before " +
+                "increment: {1}", hostSpec.toString(), cachedCreatingConnectionSize.get()));
+        }
         return cachedCreatingConnectionSize.incrementAndGet();
     }
 
@@ -338,9 +342,15 @@ public class DataNode {
      * @return cachedCreatingConnectionSize after updated
      */
     public int decrementCachedCreatingConnectionSize() {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug(GT.tr("【quickAutoBalance】decrementCachedCreatingConnectionSize, hostSpec: {0}, before " +
+                "decrement: {1}", hostSpec.toString(), cachedCreatingConnectionSize.get()));
+        }
         if (cachedCreatingConnectionSize.get() == 0) {
             // Some of junit tests don't load balance, but setConnection, can generate this error.
-            LOGGER.error(GT.tr("CachedCreatingConnectionSize should not be less than 0, reset to 0."));
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug(GT.tr("CachedCreatingConnectionSize should not be less than 0, reset to 0."));
+            }
             return 0;
         }
         return cachedCreatingConnectionSize.decrementAndGet();

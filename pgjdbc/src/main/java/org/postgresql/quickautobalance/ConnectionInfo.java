@@ -120,18 +120,20 @@ public class ConnectionInfo {
             if (inputMaxIdleTime >= MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE) {
                 throw new PSQLException(
                     GT.tr("Parameter maxIdleTimeBeforeTerminal={0} can not be bigger than {1}, value range: long & [0,{1}).",
-                        inputMaxIdleTime, MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE), PSQLState.INVALID_PARAMETER_VALUE);
+                        String.valueOf(inputMaxIdleTime), String.valueOf(MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE)),
+                    PSQLState.INVALID_PARAMETER_VALUE);
             }
             if (inputMaxIdleTime < 0) {
                 throw new PSQLException(
                     GT.tr("Parameter maxIdleTimeBeforeTerminal={0} can not be less than 0, value range: long & [0,{1}).",
-                        inputMaxIdleTime, MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE), PSQLState.INVALID_PARAMETER_VALUE);
+                        String.valueOf(inputMaxIdleTime), String.valueOf(MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE)),
+                    PSQLState.INVALID_PARAMETER_VALUE);
 
             }
         } catch (NumberFormatException e) {
             throw new PSQLException(
                 GT.tr("Parameter maxIdleTimeBeforeTerminal parsed failed, value range: long & [0,{0}).",
-                    MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE), PSQLState.INVALID_PARAMETER_TYPE);
+                    String.valueOf(MAX_IDLE_TIME_BEFORE_TERMINAL_MAX_VALUE)), PSQLState.INVALID_PARAMETER_TYPE);
         }
         return inputMaxIdleTime;
     }
