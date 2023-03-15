@@ -286,9 +286,9 @@ public class ClusterTest {
         Properties properties = initPriority(hostSpecs);
         String URLIdentifier = QueryCNListUtils.keyFromURL(properties);
         Cluster cluster = new Cluster(URLIdentifier, properties);
-
+        String paramsOutOfRange = "2000000000";
         String url1 = initURL(hostSpecs) + "?autoBalance=leastconn";
-        properties.setProperty("minReservedConPerDatanode", "200");
+        properties.setProperty("minReservedConPerDatanode", paramsOutOfRange);
         try (PgConnection pgConnection = getConnection(url1, properties)) {
             cluster.setConnection(pgConnection, properties);
         } catch (SQLException e) {

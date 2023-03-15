@@ -58,13 +58,17 @@ public class ConnectionManagerTest {
 
     private static final String SECONDARY_2 = TestUtil.getSecondaryServer2() + ":" + TestUtil.getSecondaryServerPort2();
 
+    private static final String FAKE_HOST = "127.127.217.217";
+
+    private static final int FAKE_PORT = 1;
+
     private static final String DATABASE = TestUtil.getDatabase();
 
     private static final int DN_NUM = 3;
 
-    private String initURLWithLeastConn() {
-        return "jdbc:postgresql://" + MASTER_1 + "," + SECONDARY_1
-            + "," + SECONDARY_2 + "/" + DATABASE + "?autoBalance=leastconn&loggerLevel=OFF";
+    private String initURLWithLeastConn(HostSpec[] hostSpecs) {
+        return "jdbc:postgresql://" + hostSpecs[0].toString() + "," + hostSpecs[1].toString()
+            + "," + hostSpecs[2].toString() + "/" + DATABASE + "?autoBalance=leastconn";
     }
 
     private PgConnection getConnection(String url, String user, String password) throws SQLException {
@@ -76,6 +80,14 @@ public class ConnectionManagerTest {
         hostSpecs[0] = new HostSpec(TestUtil.getServer(), TestUtil.getPort());
         hostSpecs[1] = new HostSpec(TestUtil.getSecondaryServer(), TestUtil.getSecondaryPort());
         hostSpecs[2] = new HostSpec(TestUtil.getSecondaryServer2(), TestUtil.getSecondaryServerPort2());
+        return hostSpecs;
+    }
+
+    private HostSpec[] initHostSpecWithOneDnFailed() {
+        HostSpec[] hostSpecs = new HostSpec[DN_NUM];
+        hostSpecs[0] = new HostSpec(TestUtil.getServer(), TestUtil.getPort());
+        hostSpecs[1] = new HostSpec(TestUtil.getSecondaryServer(), TestUtil.getSecondaryPort());
+        hostSpecs[2] = new HostSpec(FAKE_HOST, FAKE_PORT);
         return hostSpecs;
     }
 
@@ -93,6 +105,12 @@ public class ConnectionManagerTest {
         return properties;
     }
 
+    private Properties initPriorityWithLeastConn(HostSpec[] hostSpecs) {
+        Properties properties = initPriority(hostSpecs);
+        properties.setProperty("autoBalance", "leastconn");
+        return properties;
+    }
+
     @Test
     public void setConnectionTest() throws ClassNotFoundException, SQLException {
         if (String.valueOf(TestUtil.getSecondaryPort()).equals(System.getProperty("def_pgport"))
@@ -100,7 +118,7 @@ public class ConnectionManagerTest {
             return;
         }
         Class.forName("org.postgresql.Driver");
-        String url = initURLWithLeastConn();
+        String url = initURLWithLeastConn(initHostSpec());
         PgConnection connection1 = getConnection(url, USER, PASSWORD);
         String urlIdentifier = ConnectionManager.getURLIdentifierFromUrl(url);
         Cluster cluster = ConnectionManager.getInstance().getCluster(urlIdentifier);
@@ -126,7 +144,7 @@ public class ConnectionManagerTest {
             return;
         }
         Class.forName("org.postgresql.Driver");
-        String url = initURLWithLeastConn();
+        String url = initURLWithLeastConn(initHostSpec());
         // set connection state which exists.
         PgConnection connection = getConnection(url, USER, PASSWORD);
         ConnectionManager.getInstance().setConnectionState(connection, StatementCancelState.IDLE);
@@ -153,13 +171,71 @@ public class ConnectionManagerTest {
     }
 
     @Test
+    public void cachedCreatingConnectionSizeTest() throws ClassNotFoundException, SQLException {
+        if (String.valueOf(TestUtil.getSecondaryPort()).equals(System.getProperty("def_pgport"))
+            || String.valueOf(TestUtil.getSecondaryServerPort2()).equals(System.getProperty("def_pgport"))) {
+            return;
+        }
+        Class.forName("org.postgresql.Driver");
+        HostSpec[] hostSpecs = initHostSpec();
+        Properties properties = initPriorityWithLeastConn(hostSpecs);
+        String url = initURLWithLeastConn(hostSpecs);
+        int num = 10;
+        for (int i = 0; i < num; i++) {
+            PgConnection connection = getConnection(url, USER, PASSWORD);
+            assertEquals(1, ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpecs[0],
+                properties));
+            assertEquals(0, ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpecs[0],
+                properties));
+            assertEquals(1, ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpecs[1],
+                properties));
+            assertEquals(0, ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpecs[1],
+                properties));
+            assertEquals(1, ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpecs[2],
+                properties));
+            assertEquals(0, ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpecs[2],
+                properties));
+        }
+        ConnectionManager.getInstance().clear();
+    }
+
+    @Test
+    public void cachedCreatingConnectionSizeOneFailTest() throws ClassNotFoundException, SQLException {
+        if (String.valueOf(TestUtil.getSecondaryPort()).equals(System.getProperty("def_pgport"))
+            || String.valueOf(TestUtil.getSecondaryServerPort2()).equals(System.getProperty("def_pgport"))) {
+            return;
+        }
+        Class.forName("org.postgresql.Driver");
+        HostSpec[] hostSpecs = initHostSpecWithOneDnFailed();
+        Properties properties = initPriorityWithLeastConn(hostSpecs);
+        String url = initURLWithLeastConn(hostSpecs);
+        int num = 10;
+        for (int i = 0; i < num; i++) {
+            PgConnection connection = getConnection(url, USER, PASSWORD);
+            assertEquals(1, ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpecs[0],
+                properties));
+            assertEquals(0, ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpecs[0],
+                properties));
+            assertEquals(1, ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpecs[1],
+                properties));
+            assertEquals(0, ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpecs[1],
+                properties));
+            assertEquals(1, ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpecs[2],
+                properties));
+            assertEquals(0, ConnectionManager.getInstance().decrementCachedCreatingConnectionSize(hostSpecs[2],
+                properties));
+        }
+        ConnectionManager.getInstance().clear();
+    }
+
+    @Test
     public void leastConnTest() throws SQLException, ClassNotFoundException {
         if (String.valueOf(TestUtil.getSecondaryPort()).equals(System.getProperty("def_pgport"))
             || String.valueOf(TestUtil.getSecondaryServerPort2()).equals(System.getProperty("def_pgport"))) {
             return;
         }
         Class.forName("org.postgresql.Driver");
-        String url = initURLWithLeastConn();
+        String url = initURLWithLeastConn(initHostSpec());
         int num = 100;
         HashMap<String, Integer> dns = new HashMap<>();
         for (int i = 0; i < num; i++) {
@@ -187,7 +263,7 @@ public class ConnectionManagerTest {
             return;
         }
         Class.forName("org.postgresql.Driver");
-        String url1 = initURLWithLeastConn();
+        String url1 = initURLWithLeastConn(initHostSpec());
         url1 += "&targetServerType=slave";
         int num1 = 100;
         HashMap<String, Integer> dns = new HashMap<>();
@@ -204,7 +280,7 @@ public class ConnectionManagerTest {
         }
 
         int num2 = 20;
-        String url2 = initURLWithLeastConn();
+        String url2 = initURLWithLeastConn(initHostSpec());
         String lastAddress = "";
         for (int i = 0; i < num2; i++) {
             PgConnection connection = getConnection(url2, TestUtil.getUser(), TestUtil.getPassword());
@@ -231,7 +307,7 @@ public class ConnectionManagerTest {
                 return;
             }
             Class.forName("org.postgresql.Driver");
-            String url = initURLWithLeastConn();
+            String url = initURLWithLeastConn(initHostSpec());
             List<PgConnection> pgConnections = new ArrayList<>();
             int total = 100;
             int remove = 10;
@@ -267,8 +343,7 @@ public class ConnectionManagerTest {
         properties.setProperty("password", TestUtil.getPassword());
         assertFalse(ConnectionManager.getInstance().setCluster(properties));
 
-        properties = initPriority(hostSpecs);
-        properties.setProperty("autoBalance", "leastconn");
+        properties = initPriorityWithLeastConn(hostSpecs);
         assertTrue(ConnectionManager.getInstance().setCluster(properties));
         assertFalse(ConnectionManager.getInstance().setCluster(properties));
         ConnectionManager.getInstance().clear();
@@ -277,8 +352,7 @@ public class ConnectionManagerTest {
     @Test
     public void incrementCachedCreatingConnectionSize() throws PSQLException {
         HostSpec[] hostSpecs = initHostSpec();
-        Properties properties = initPriority(hostSpecs);
-        properties.setProperty("autoBalance", "leastconn");
+        Properties properties = initPriorityWithLeastConn(hostSpecs);
         ConnectionManager.getInstance().setCluster(properties);
         assertEquals(1, ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpecs[0], properties));
         assertEquals(2, ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpecs[0], properties));
@@ -299,8 +373,7 @@ public class ConnectionManagerTest {
     @Test
     public void decrementCachedCreatingConnectionSize() throws PSQLException {
         HostSpec[] hostSpecs = initHostSpec();
-        Properties properties = initPriority(hostSpecs);
-        properties.setProperty("autoBalance", "leastconn");
+        Properties properties = initPriorityWithLeastConn(hostSpecs);
         ConnectionManager.getInstance().setCluster(properties);
         assertEquals(1, ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpecs[0], properties));
         assertEquals(2, ConnectionManager.getInstance().incrementCachedCreatingConnectionSize(hostSpecs[0], properties));
@@ -320,10 +393,10 @@ public class ConnectionManagerTest {
 
     @Test
     public void getCachedConnectionSizeTest() throws SQLException {
-        String url = initURLWithLeastConn();
+        String url = initURLWithLeastConn(initHostSpec());
         int total = 10;
         for (int i = 0; i < total; i++) {
-            PgConnection pgConnection = getConnection(url, TestUtil.getUser(), TestUtil.getPassword());;
+            PgConnection pgConnection = getConnection(url, TestUtil.getUser(), TestUtil.getPassword());
         }
         assertEquals(total, ConnectionManager.getInstance().getCachedConnectionSize());
     }
