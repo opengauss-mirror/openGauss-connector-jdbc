@@ -66,10 +66,15 @@ public class ClusterHeartBeatFailureCluster extends ClusterHeartBeat{
                 Set<HostSpec> salves = cluster.getSalves();
                 int count = 0;
                 for (HostSpec salf : salves) {
+                    QueryExecutor salveQueryExcutor = null;
                     try {
-                        getQueryExecutor(salf, cluster.getProps());
+                        salveQueryExcutor = getQueryExecutor(salf, cluster.getProps());
                     } catch (SQLException ex) {
                         count++;
+                    } finally {
+                        if (salveQueryExcutor != null) {
+                            salveQueryExcutor.close();
+                        }
                     }
                 }
                 if (count == salves.size()) {

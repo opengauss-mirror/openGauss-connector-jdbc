@@ -210,7 +210,7 @@ public class ClusterHeartBeat {
                 String database = props.getProperty("PGDBNAME", "");
                 PGStream pgStream = FACTORY.tryConnect(user, database, props, socketFactory, hostSpec, sslMode);
                 return new QueryExecutorImpl(pgStream, user, database,
-                        1000, props);
+                        1000, new Properties());
             }
         } catch (SQLException e) {
             String sqlState = e.getSQLState();
@@ -242,6 +242,8 @@ public class ClusterHeartBeat {
             LOGGER.debug("Error obtaining node role " + e.getMessage());
             LOGGER.debug(e.getStackTrace());
             return false;
+        } finally {
+          queryExecutor.close();
         }
     }
 
@@ -281,6 +283,7 @@ public class ClusterHeartBeat {
                 continue;
             }
             boolean isMaster = nodeRoleIsMaster(queryExecutor);
+            queryExecutor.close();
             if (isMaster) {
                 return hostSpec;
             }
