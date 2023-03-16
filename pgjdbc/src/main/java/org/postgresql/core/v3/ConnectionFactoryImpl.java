@@ -330,7 +330,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
           if (candidateHost.targetServerType != HostRequirement.any) {
             hostStatus = isMaster(queryExecutor) ? HostStatus.Master : HostStatus.Secondary;
             LOGGER.info("Known status of host " + hostSpec + " is " + hostStatus);
-            if (hostStatus == HostStatus.Master) {
+            if (targetServerType == HostRequirement.master && hostStatus == HostStatus.Master) {
               ClusterNodeCache.pushHostSpecs(hostSpec, currentHostSpecs, info);
             }
           }
