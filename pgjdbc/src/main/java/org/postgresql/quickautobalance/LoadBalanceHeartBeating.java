@@ -152,7 +152,7 @@ public class LoadBalanceHeartBeating {
                 closeConnectionExecutorService = Executors.newSingleThreadScheduledExecutor(r ->
                     new Thread(r, "closeConnectionsHeartBeatingThread"));
                 closeConnectionExecutorService.scheduleAtFixedRate(LoadBalanceHeartBeating::closeAbandonedConnections,
-                    INITIAL_DELAY, CHECK_CLUSTER_STATE_PERIOD, TimeUnit.MILLISECONDS);
+                    INITIAL_DELAY, CLOSE_CONNECTION_PERIOD, TimeUnit.MILLISECONDS);
                 LOGGER.info(GT.tr("Start closeConnectionScheduledFuture, period:{0} milliseconds.",
                     CLOSE_CONNECTION_PERIOD));
             }
