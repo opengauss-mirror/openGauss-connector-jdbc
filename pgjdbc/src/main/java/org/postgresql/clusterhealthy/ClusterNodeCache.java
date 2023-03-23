@@ -87,17 +87,16 @@ public class ClusterNodeCache {
         Set<HostSpec> set = Arrays.stream(hostSpecs)
                 .collect(Collectors.toSet());
         String period = PGProperty.HEARTBEAT_PERIOD.get(properties);
-        boolean open = true;
         if (!isNumeric(period)) {
-            open = false;
             LOGGER.debug("Invalid heartbeatPeriod value: " + period);
+            return;
         }
         long timePeriod = Long.parseLong(period);
         if (timePeriod <= 0) {
-            open = false;
             LOGGER.debug("Invalid heartbeatPeriod value: " + period);
+            return;
         }
-        if (set.size() > 1 && open) {
+        if (set.size() > 1) {
             CLUSTER_HEART_BEAT.addNodeRelationship(master, hostSpecs, properties);
             start();
         }
@@ -127,10 +126,11 @@ public class ClusterNodeCache {
             CLUSTER_HEART_BEAT.clear();
             CLUSTER_HEART_BEAT.initPeriodTime();
             executorService.shutdown();
+            executorService = Executors.newSingleThreadExecutor();
         }
     }
 
-    private static boolean isNumeric(final CharSequence cs) {
+    public static boolean isNumeric(final CharSequence cs) {
         if (cs.length() == 0) {
             return false;
         }

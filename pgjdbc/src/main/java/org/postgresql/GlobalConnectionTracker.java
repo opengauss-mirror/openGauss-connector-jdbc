@@ -4,6 +4,7 @@ import org.postgresql.clusterhealthy.ClusterNodeCache;
 import org.postgresql.core.QueryExecutor;
 import org.postgresql.log.Log;
 import org.postgresql.log.Logger;
+import org.postgresql.util.HostSpec;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -58,6 +59,10 @@ public class GlobalConnectionTracker {
             hostConnection.put(identityQueryExecute, queryExecutor);
             connectionManager.put(hostSpec, hostConnection);
         }
+        if (isTargetServerMaster(props)) {
+            HostSpec[] hostSpecs = Driver.GetHostSpecs(props);
+            ClusterNodeCache.pushHostSpecs(queryExecutor.getHostSpec(), hostSpecs, props);
+        }
     }
 
     /**
@@ -80,11 +85,11 @@ public class GlobalConnectionTracker {
                 } else {
                     LOGGER.info("[SWITCHOVER] The identity of the queryExecutor has changed!");
                 }
+                ClusterNodeCache.updateDetection();
             } else {
                 LOGGER.info("[SWITCHOVER] No connection found under this host!");
             }
         }
-        ClusterNodeCache.updateDetection();
     }
 
     /**
@@ -118,7 +123,7 @@ public class GlobalConnectionTracker {
     public static void closeConnectionOfCrash(String hostSpec) {
         synchronized (connectionManager) {
             HashMap<Integer, QueryExecutor> hostConnection = connectionManager.getOrDefault(hostSpec, null);
-            if (hostConnection != null) {
+            if (hostConnection != null && !hostConnection.isEmpty()) {
                 LOGGER.debug("[CRASH] The hostSpec: " + hostSpec + " fails, start to close the original connection.");
                 for (QueryExecutor queryExecutor : hostConnection.values()) {
                     if (queryExecutor != null && !queryExecutor.isClosed()) {
