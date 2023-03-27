@@ -33,7 +33,6 @@ import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -55,6 +54,7 @@ public class ClusterHeartBeat {
     private final ConnectionFactoryImpl FACTORY = new ConnectionFactoryImpl();
     private volatile boolean detection;
     private final Long DEFAULT_INTERVAL = 5000L;
+    private final String DEFAULT_TIMEOUT = "30000";
     private volatile AtomicLong periodTime = new AtomicLong(DEFAULT_INTERVAL);
 
 
@@ -64,8 +64,9 @@ public class ClusterHeartBeat {
     public void masterNodeProbe() {
         while (isOpen()) {
             // Detects whether the loop is broken
-            if (detection && !GlobalConnectionTracker.hasConnection()) {
+            if (detection && ClusterHeartBeatFailureCluster.getInstance().failureCluster.isEmpty() && !GlobalConnectionTracker.hasConnection()) {
                 ClusterNodeCache.stop();
+                LOGGER.debug("heartBeat thread stop");
                 break;
             }
             LOGGER.debug("heartBeat thread start time: " + new Date(System.currentTimeMillis()));
@@ -124,6 +125,12 @@ public class ClusterHeartBeat {
             long time = Long.parseLong(period);
             periodTime.set(Math.min(periodTime.get(), time));
         }
+        String timeout = PGProperty.MASTER_FAILURE_HEARTBEAT_TIMEOUT.get(properties);
+        if (!ClusterNodeCache.isNumeric(timeout)) {
+            LOGGER.debug("Invalid heartbeatPeriod value: " + timeout);
+            timeout = DEFAULT_TIMEOUT;
+        }
+        ClusterHeartBeatFailureCluster.getInstance().setThresholdValue((int) (Long.parseLong(timeout) / periodTime.get()));
     }
 
     /**
@@ -254,14 +261,14 @@ public class ClusterHeartBeat {
      * @param slaves   slaves set
      * @param props    the parsed/defaulted connection properties
      */
-    public void cacheProcess(HostSpec hostSpec, Set<HostSpec> slaves, Set<Properties> props) {
+    public void cacheProcess(HostSpec hostSpec, Set<HostSpec> slaves, Set<Properties> props, Integer frequency) {
         HostSpec maseterNode = findMasterNode(slaves, props);
         removeClusterNode(hostSpec, maseterNode, slaves);
         if (maseterNode != null) {
             addProperties(maseterNode, props);
             ClusterHeartBeatFailureMaster.getInstance().addFailureMaster(hostSpec, maseterNode);
         } else {
-            FailureCluster cluster = new FailureCluster(hostSpec, slaves, props);
+            FailureCluster cluster = new FailureCluster(hostSpec, slaves, props, frequency);
             ClusterHeartBeatFailureCluster.getInstance().addFailureCluster(cluster);
         }
         GlobalConnectionTracker.closeConnectionOfCrash(hostSpec.toString());

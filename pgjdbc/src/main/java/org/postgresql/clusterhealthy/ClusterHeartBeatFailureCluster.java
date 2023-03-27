@@ -32,6 +32,7 @@ import java.util.Set;
 public class ClusterHeartBeatFailureCluster extends ClusterHeartBeat{
 
     public List<FailureCluster> failureCluster = new ArrayList<>();
+    private int thresholdValue;
     private volatile static ClusterHeartBeatFailureCluster clusterHeartBeatFailureCluster;
     private static Log LOGGER = Logger.getLogger(ClusterHeartBeatFailureCluster.class.getName());
     private ClusterHeartBeatFailureCluster() {
@@ -80,7 +81,10 @@ public class ClusterHeartBeatFailureCluster extends ClusterHeartBeat{
                 if (count == salves.size()) {
                     continue;
                 }
-                cacheProcess(cluster.getMaster(), salves, cluster.getProps());
+                int frequency = cluster.getFrequency();
+                if (thresholdValue > frequency) {
+                    cacheProcess(cluster.getMaster(), salves, cluster.getProps(), ++ frequency);
+                }
             }
             if (queryExecutor != null) {
                 boolean isMaster = nodeRoleIsMaster(queryExecutor);
@@ -110,6 +114,10 @@ public class ClusterHeartBeatFailureCluster extends ClusterHeartBeat{
 
     public void clear() {
         failureCluster.clear();
+    }
+
+    public void setThresholdValue(int thresholdValue) {
+        this.thresholdValue = thresholdValue;
     }
 
 }
