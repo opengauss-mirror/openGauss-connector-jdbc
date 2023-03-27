@@ -28,7 +28,7 @@ public class ClusterHeartBeatFailureClusterTest {
         hostSpecs.remove(master);
         HashSet<Properties> set = new HashSet<>();
         set.add(ClusterHeartBeatUtil.getProperties(getHostSpecs()));
-        FailureCluster failureCluster = new FailureCluster(master, new HashSet<>(hostSpecs), set);
+        FailureCluster failureCluster = new FailureCluster(master, new HashSet<>(hostSpecs), set, 0);
         clusterHeartBeatFailureCluster.addFailureCluster(failureCluster);
         System.out.println(clusterHeartBeatFailureCluster.getFailureCluster());
         clusterHeartBeatFailureCluster.run();

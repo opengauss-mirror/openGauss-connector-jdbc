@@ -535,7 +535,18 @@ public enum PGProperty {
   /**
    * It is used to detect the thread interval of the survival task on the primary node in the high availability scenario.
    */
-  HEARTBEAT_PERIOD("heartbeatPeriod", "0", "heartbeat interval time")
+  HEARTBEAT_PERIOD("heartbeatPeriod", "0", "heartbeat interval time"),
+
+  /**
+   * In the scenario where heartbeat maintenance is enabled for the active node,
+   * if the active node is down, set the timeout threshold for searching for the active node.
+   * If the active node is not detected within this timeout period,
+   * the cluster is considered to have no active node and no maintenance is performed on the current cluster.
+   * This time should include the RTO time of the active node。
+   */
+  MASTER_FAILURE_HEARTBEAT_TIMEOUT("masterFailureHeartbeatTimeout", "30000", "In the scenario where heartbeat maintenance is enabled for the active node, " +
+          "if the active node is down, set the timeout threshold for searching for the active node. If the active node is not detected within this timeout period, " +
+          "the cluster is considered to have no active node and no maintenance is performed on the current cluster. This time should include the RTO time of the active node.")
 
   ;
 

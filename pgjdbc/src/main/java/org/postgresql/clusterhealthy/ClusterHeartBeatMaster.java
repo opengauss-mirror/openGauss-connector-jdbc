@@ -71,13 +71,13 @@ public class ClusterHeartBeatMaster extends ClusterHeartBeat {
                 queryExecutor = super.getQueryExecutor(master, propertiesSet);
             } catch (SQLException e) {
                 LOGGER.debug("acquire QueryExecutor failure");
-                super.cacheProcess(master, slaves, propertiesSet);
+                super.cacheProcess(master, slaves, propertiesSet, null);
                 continue;
             }
             LOGGER.debug("Information about the current connected node " + queryExecutor.getSocketAddress());
             if (!super.nodeRoleIsMaster(queryExecutor)) {
                 LOGGER.debug(master + ":The host is degraded to the standby server.");
-                super.cacheProcess(master, slaves, propertiesSet);
+                super.cacheProcess(master, slaves, propertiesSet, null);
             }
         }
     }

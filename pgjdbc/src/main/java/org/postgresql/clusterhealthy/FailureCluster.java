@@ -27,6 +27,7 @@ public class FailureCluster {
     private HostSpec master;
     private Set<HostSpec> salves;
     private Set<Properties> props;
+    private int frequency;
 
     /**
      *
@@ -34,10 +35,19 @@ public class FailureCluster {
      * @param salves Slave set
      * @param props Connection information
      */
-    public FailureCluster(HostSpec master, Set<HostSpec> salves, Set<Properties> props) {
+    public FailureCluster(HostSpec master, Set<HostSpec> salves, Set<Properties> props, Integer frequency) {
         this.master = master;
         this.salves = salves;
         this.props = props;
+        this.frequency = null == frequency ? 0 : frequency;
+    }
+
+    public int getFrequency() {
+        return frequency;
+    }
+
+    public void setFrequency(int frequency) {
+        this.frequency = frequency;
     }
 
     public void setSalves(Set<HostSpec> salves) {
@@ -62,5 +72,13 @@ public class FailureCluster {
 
     public Set<Properties> getProps() {
         return props;
+    }
+
+    @Override
+    public String toString() {
+        return "FailureCluster{" +
+                "master=" + master +
+                ", salves=" + salves +
+                '}';
     }
 }
