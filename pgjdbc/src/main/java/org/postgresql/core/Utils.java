@@ -9,11 +9,11 @@ package org.postgresql.core;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
-import org.postgresql.core.v3.ConnectionFactoryImpl;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
-import java.util.Locale;
 
 /**
  * Collection of utilities used by the protocol-level code.
@@ -45,7 +45,22 @@ public class Utils {
     // for performance measurements.
     // In OracleJDK 6u65, 7u55, and 8u40 String.getBytes(Charset) is
     // 3 times faster than other JDK approaches.
-    return str.getBytes(Charset.forName(ConnectionFactoryImpl.CLIENT_ENCODING));
+    return encodeUTF8(str, StandardCharsets.UTF_8.name());
+  }
+
+  /**
+   * Encode a String with encoding
+   *
+   * @param str  the string to encode
+   * @param encoding encoding type default utf-8
+   * @return the encoding representation of {@code str}
+   */
+  public static byte[] encodeUTF8(String str, String encoding) {
+    // See org.postgresql.benchmark.encoding.UTF8Encoding#string_getBytes
+    // for performance measurements.
+    // In OracleJDK 6u65, 7u55, and 8u40 String.getBytes(Charset) is
+    // 3 times faster than other JDK approaches.
+    return str.getBytes(Charset.forName(encoding));
   }
 
   /**
@@ -60,8 +75,7 @@ public class Utils {
    * @return the sbuf argument; or a new string builder for sbuf == null
    * @throws SQLException if the string contains a <tt>\0</tt> character
    */
-  public static StringBuilder escapeLiteral(StringBuilder sbuf, String value,
-      boolean standardConformingStrings) throws SQLException {
+  public static StringBuilder escapeLiteral(StringBuilder sbuf, String value, boolean standardConformingStrings) throws SQLException {
     if (sbuf == null) {
       sbuf = new StringBuilder((value.length() + 10) / 10 * 11); // Add 10% for escaping.
     }

@@ -127,10 +127,10 @@ class SimpleQuery implements Query {
     nativeQuery.nativeSql = sql;
   }
 
-  void setStatementName(String statementName, short deallocateEpoch) {
+  void setStatementName(String statementName, short deallocateEpoch, String clientEncoding) {
     assert statementName != null : "statement name should not be null";
     this.statementName = statementName;
-    this.encodedStatementName = Utils.encodeUTF8(statementName);
+    this.encodedStatementName = Utils.encodeUTF8(statementName, clientEncoding);
     this.deallocateEpoch = deallocateEpoch;
   }
 

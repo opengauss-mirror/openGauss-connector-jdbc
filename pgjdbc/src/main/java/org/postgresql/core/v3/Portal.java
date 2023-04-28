@@ -10,6 +10,7 @@ import org.postgresql.core.ResultCursor;
 import org.postgresql.core.Utils;
 
 import java.lang.ref.PhantomReference;
+import java.nio.charset.StandardCharsets;
 
 /**
  * V3 ResultCursor implementation in terms of backend Portals. This holds the state of a single
@@ -18,10 +19,15 @@ import java.lang.ref.PhantomReference;
  * @author Oliver Jowett (oliver@opencloud.com)
  */
 class Portal implements ResultCursor {
+
   Portal(SimpleQuery query, String portalName) {
+    this(query, portalName, StandardCharsets.UTF_8.name());
+  }
+
+  Portal(SimpleQuery query, String portalName, String clientEncoding) {
     this.query = query;
     this.portalName = portalName;
-    this.encodedName = Utils.encodeUTF8(portalName);
+    this.encodedName = Utils.encodeUTF8(portalName, clientEncoding);
   }
 
   public void close() {
