@@ -5,7 +5,7 @@
 // Copyright (c) 2004, Open Cloud Limited.
 
 package org.postgresql.core.v3;
-import org.postgresql.Driver;
+
 import org.postgresql.PGProperty;
 import org.postgresql.copy.CopyIn;
 import org.postgresql.copy.CopyOperation;
@@ -36,13 +36,14 @@ import org.postgresql.core.v3.replication.V3ReplicationProtocol;
 import org.postgresql.jdbc.AutoSave;
 import org.postgresql.jdbc.BatchResultHandler;
 import org.postgresql.jdbc.TimestampUtils;
+import org.postgresql.log.Log;
+import org.postgresql.log.Logger;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.util.PSQLWarning;
 import org.postgresql.util.ServerErrorMessage;
-import org.postgresql.log.Logger;
-import org.postgresql.log.Log;
+
 import java.io.IOException;
 import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
@@ -128,6 +129,8 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   private boolean enableOutparamOveride;
 
+  private String clientEncoding;
+
   /**
    * {@code CommandComplete(B)} messages are quite common, so we reuse instance to parse those
    */
@@ -181,6 +184,16 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   public void setEnableOutparamOveride(boolean enableOutparamOveride) {
     this.enableOutparamOveride = enableOutparamOveride;
+  }
+
+  @Override
+  public void setClientEncoding(String clientEncoding) {
+    this.clientEncoding = clientEncoding;
+  }
+
+  @Override
+  public String getClientEncoding() {
+    return this.clientEncoding;
   }
 
   /**
@@ -745,7 +758,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       if (params.isNull(i)) {
         encodedSize += 4;
       } else {
-        encodedSize += 4 + params.getV3Length(i);
+        encodedSize += 4 + params.getV3Length(i, getClientEncoding());
       }
     }
 
@@ -762,8 +775,8 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       if (params.isNull(i)) {
         pgStream.sendInteger4(-1);
       } else {
-        pgStream.sendInteger4(params.getV3Length(i)); // Parameter size
-        params.writeV3Value(i, pgStream);
+        pgStream.sendInteger4(params.getV3Length(i, getClientEncoding())); // Parameter size
+        params.writeV3Value(i, pgStream, getClientEncoding());
       }
     }
     pgStream.sendInteger2(1); // Binary result format
@@ -943,7 +956,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     if (!suppressBegin) {
       doSubprotocolBegin();
     }
-    byte[] buf = Utils.encodeUTF8(sql);
+    byte[] buf = Utils.encodeUTF8(sql, getClientEncoding());
 
     try {
       LOGGER.trace(" FE=> Query(CopyStart)");
@@ -1566,7 +1579,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       // NB: Must clone the OID array, as it's a direct reference to
       // the SimpleParameterList's internal array that might be modified
       // under us.
-      query.setStatementName(statementName, deallocateEpoch);
+      query.setStatementName(statementName, deallocateEpoch, getClientEncoding());
       query.setPrepareTypes(typeOIDs);
       registerParsedQuery(query, statementName);
     }
@@ -1622,7 +1635,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     // Send Parse.
     //
 
-    byte[] queryUtf8 = Utils.encodeUTF8(nativeSql);
+    byte[] queryUtf8 = Utils.encodeUTF8(nativeSql, getClientEncoding());
 
     // Total size = 4 (size field)
     // + N + 1 (statement name, zero-terminated)
@@ -1694,7 +1707,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       if (params.isNull(i)) {
         encodedSize += 4;
       } else {
-        encodedSize += (long) 4 + params.getV3Length(i);
+        encodedSize += (long) 4 + params.getV3Length(i, getClientEncoding());
       }
     }
 
@@ -1774,9 +1787,9 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       if (params.isNull(i)) {
         pgStream.sendInteger4(-1); // Magic size of -1 means NULL
       } else {
-        pgStream.sendInteger4(params.getV3Length(i)); // Parameter size
+        pgStream.sendInteger4(params.getV3Length(i, getClientEncoding())); // Parameter size
         try {
-          params.writeV3Value(i, pgStream); // Parameter value
+          params.writeV3Value(i, pgStream, getClientEncoding()); // Parameter value
         } catch (PGBindException be) {
           bindException = be;
         }
@@ -1823,7 +1836,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
         if (params.isNull(i)) {
           encodedSize += 4;
         } else {
-          encodedSize += (long) 4 + params.getV3Length(i);
+          encodedSize += (long) 4 + params.getV3Length(i, getClientEncoding());
         }
       }
     }
@@ -1925,9 +1938,9 @@ public class QueryExecutorImpl extends QueryExecutorBase {
         if (params.isNull(i)) {
           pgStream.sendInteger4(-1); // Magic size of -1 means NULL
         } else {
-          pgStream.sendInteger4(params.getV3Length(i)); // Parameter size
+          pgStream.sendInteger4(params.getV3Length(i, getClientEncoding())); // Parameter size
           try {
-            params.writeV3Value(i, pgStream); // Parameter value
+            params.writeV3Value(i, pgStream, getClientEncoding()); // Parameter value
           } catch (PGBindException be) {
             bindException = be;
           }
@@ -2045,7 +2058,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     LOGGER.trace("[" + socketAddress + "] " + " FE=> ClosePortal(" + portalName + ")");
 
-    byte[] encodedPortalName = (portalName == null ? null : Utils.encodeUTF8(portalName));
+    byte[] encodedPortalName = (portalName == null ? null : Utils.encodeUTF8(portalName, getClientEncoding()));
     int encodedSize = (encodedPortalName == null ? 0 : encodedPortalName.length);
 
     // Total size = 4 (size field) + 1 (close type, 'P') + 1 + N (portal name)
@@ -2065,7 +2078,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     LOGGER.trace("[" + socketAddress + "] " + " FE=> CloseStatement(" + statementName + ")");
 
-    byte[] encodedStatementName = Utils.encodeUTF8(statementName);
+    byte[] encodedStatementName = Utils.encodeUTF8(statementName, getClientEncoding());
 
     // Total size = 4 (size field) + 1 (close type, 'S') + N + 1 (statement name)
     pgStream.sendChar('C'); // Close
@@ -2171,7 +2184,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     Portal portal = null;
     if (usePortal) {
       String portalName = "C_" + (nextUniqueID++);
-      portal = new Portal(query, portalName);
+      portal = new Portal(query, portalName, getClientEncoding());
     }
 
     sendBind(query, params, portal, noBinaryTransfer);
@@ -2272,7 +2285,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     Portal portal = null;
     if (usePortal) {
       String portalName = "C_" + (nextUniqueID++);
-      portal = new Portal(query, portalName);
+      portal = new Portal(query, portalName, getClientEncoding());
     }
 
     sendBatchBind(query, parameterLists, portal, noBinaryTransfer, batchnum, rows);

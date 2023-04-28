@@ -60,16 +60,16 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   private static final int AUTH_REQ_GSS_CONTINUE = 8;
   private static final int AUTH_REQ_SSPI = 9;
 
-  public static String CLIENT_ENCODING = "UTF8";
+  public String CLIENT_ENCODING = "UTF8";
   public static String USE_BOOLEAN = "false";
   private static final int AUTH_REQ_SHA256 = 10;
   private static final int AUTH_REQ_MD5_SHA256 = 11;
-    private static final int AUTH_REQ_SM3 = 13;
+  private static final int AUTH_REQ_SM3 = 13;
   private static final int PLAIN_PASSWORD = 0;
-  private static final int MD5_PASSWORD  = 1;
-  private static final int SHA256_PASSWORD =  2;
-    private static final int SM3_PASSWORD = 3;
-    private static final int ERROR_PASSWORD = 4;
+  private static final int MD5_PASSWORD = 1;
+  private static final int SHA256_PASSWORD = 2;
+  private static final int SM3_PASSWORD = 3;
+  private static final int ERROR_PASSWORD = 4;
   private static final int PROTOCOL_VERSION_351 = 351;
   private static final int PROTOCOL_VERSION_350 = 350;
   private int protocolVerion = PROTOCOL_VERSION_351;
@@ -86,11 +86,11 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     CLIENT_ENCODING_WHITELIST.put("GBK", "GBK");
     CLIENT_ENCODING_WHITELIST.put("LATIN1", "LATIN1");
   }
-  public static void setStaticClientEncoding(String client) {
-      ConnectionFactoryImpl.CLIENT_ENCODING = client;
-  }
+//  public static void setStaticClientEncoding(String client) {
+//      this.CLIENT_ENCODING = client;
+//  }
   public void setClientEncoding(String client) {
-      setStaticClientEncoding(client);
+     this.CLIENT_ENCODING = client;
   }
   public static void setStaticUseBoolean(String useBoolean) {
       ConnectionFactoryImpl.USE_BOOLEAN = useBoolean;
@@ -308,7 +308,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
           QueryExecutor queryExecutor = new QueryExecutorImpl(newStream, user, database,
                   cancelSignalTimeout, info);
           queryExecutor.setProtocolVersion(this.protocolVerion);
-
+          // set encoding for queryExecutor
+          queryExecutor.setClientEncoding(this.CLIENT_ENCODING);
           //Check MasterCluster or SecondaryCluster
           if (PGProperty.PRIORITY_SERVERS.get(info) != null) {
             ClusterStatus currentClusterStatus = queryClusterStatus(queryExecutor);
@@ -591,8 +592,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         pgStream.sendInteger2(0); // protocol minor
     else if(this.protocolVerion == PROTOCOL_VERSION_350)
         pgStream.sendInteger2(50); // protocol minor
-	else if(this.protocolVerion == PROTOCOL_VERSION_351)
-		pgStream.sendInteger2(51); // protocol minor
+    else if(this.protocolVerion == PROTOCOL_VERSION_351)
+      pgStream.sendInteger2(51); // protocol minor
     for (byte[] encodedParam : encodedParams) {
       pgStream.send(encodedParam);
       pgStream.sendChar(0);
