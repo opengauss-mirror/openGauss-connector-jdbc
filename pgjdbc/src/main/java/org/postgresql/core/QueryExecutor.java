@@ -514,4 +514,17 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
    * @param enableOutparamOveride true or false
    */
   void setEnableOutparamOveride(boolean enableOutparamOveride);
+
+  /**
+   *  set encoding for this client
+   * @param clientEncoding encoding str
+   */
+  void setClientEncoding(String clientEncoding);
+
+  /**
+   * Get encoding for this client
+   *
+   * @return encoding str
+   */
+  String getClientEncoding();
 }

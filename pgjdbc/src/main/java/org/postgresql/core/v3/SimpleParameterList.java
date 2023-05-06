@@ -400,7 +400,7 @@ class SimpleParameterList implements V3ParameterList {
     return (byte) (flags[index] & INOUT);
   }
 
-  int getV3Length(int index) {
+  int getV3Length(int index, String clientEncoding) {
     --index;
 
     // Null?
@@ -421,13 +421,13 @@ class SimpleParameterList implements V3ParameterList {
     // Already encoded?
     if (encoded[index] == null) {
       // Encode value and compute actual length using UTF-8.
-      encoded[index] = Utils.encodeUTF8(paramValues[index].toString());
+      encoded[index] = Utils.encodeUTF8(paramValues[index].toString(), clientEncoding);
     }
 
     return encoded[index].length;
   }
 
-  void writeV3Value(int index, PGStream pgStream) throws IOException {
+  void writeV3Value(int index, PGStream pgStream, String clientEncoding) throws IOException {
     --index;
 
     // Null?
@@ -449,7 +449,7 @@ class SimpleParameterList implements V3ParameterList {
 
     // Encoded string.
     if (encoded[index] == null) {
-      encoded[index] = Utils.encodeUTF8((String) paramValues[index]);
+      encoded[index] = Utils.encodeUTF8((String) paramValues[index], clientEncoding);
     }
     pgStream.send(encoded[index]);
   }
