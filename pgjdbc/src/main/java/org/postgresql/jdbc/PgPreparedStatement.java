@@ -32,19 +32,17 @@ import org.postgresql.util.ReaderInputStream;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
-import java.io.Writer;
-import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
-import java.nio.charset.Charset;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.Clob;
@@ -267,7 +265,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
         }
         bindLiteral(parameterIndex, Integer.toString(x), Oid.INT2);
     }
-  
+
   public void setInt(int parameterIndex, int x) throws SQLException {
     checkClosed();
     if (connection.binaryTransferSend(Oid.INT4)) {
@@ -911,12 +909,12 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
         GT.tr("Cannot convert an instance of {0} to type {1}", fromType, toType),
         PSQLState.INVALID_PARAMETER_TYPE, cause);
   }
-  
+
   @Override
   public void setObject(final int parameterIndex, final Object x, final SQLType targetSqlType) throws SQLException {
       setObject(parameterIndex, x, targetSqlType.getVendorTypeNumber());
   }
-  
+
   public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
     setObject(parameterIndex, x, targetSqlType, -1);
   }
@@ -1447,12 +1445,30 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
      throw new PSQLException(GT.tr("Object is too large to send over the protocol."),
          PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE);
    }
-   preparedParameters.setBytea(parameterIndex, value, (int) length);
+   setBinaryStream(parameterIndex, value, (int) length);
  }
 
- public void setBinaryStream(int parameterIndex, InputStream value) throws SQLException {
-   preparedParameters.setBytea(parameterIndex, value);
- }
+  public void setBinaryStream(int parameterIndex, InputStream inputStream) throws SQLException {
+    try {
+      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+      long totalLength = 0;
+      byte[] buffer = new byte[2048];
+      int readLength = inputStream.read(buffer);
+      while (readLength > 0) {
+        totalLength += readLength;
+        outputStream.write(buffer, 0, readLength);
+        if (totalLength >= Integer.MAX_VALUE) {
+          throw new PSQLException(GT.tr("Object is too large to send over the protocol."), PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE);
+        }
+        readLength = inputStream.read(buffer);
+      }
+      byte[] sourceBytes = outputStream.toByteArray();
+      InputStream copiedInputStream = new ByteArrayInputStream(sourceBytes);
+      setBinaryStream(parameterIndex, copiedInputStream, sourceBytes.length);
+    } catch (IOException e) {
+      throw new PSQLException(GT.tr("Read ObjectLength error."), PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE);
+    }
+  }
 
  public void setAsciiStream(int parameterIndex, InputStream value, long length)
      throws SQLException {
@@ -1528,7 +1544,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
        throw new SQLException(e1.getMessage());
    }
 }
- 
+
  @Override
  public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
      checkClosed();
@@ -1539,7 +1555,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
          return;
      }
      preparedParameters.setBlob(parameterIndex, inputStream, (int)length);
-   
+
  }
 
 
