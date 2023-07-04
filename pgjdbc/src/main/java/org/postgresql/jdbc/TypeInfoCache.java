@@ -56,7 +56,7 @@ public class TypeInfoCache implements TypeInfo {
   private PreparedStatement getOidStatementComplexNonArray;
   private PreparedStatement getOidStatementComplexArray;
   private PreparedStatement _getNameStatement;
-  
+  private PreparedStatement _getTypeNameByOIDStatement;
   private PreparedStatement _getArrayElementOidStatement;
   private PreparedStatement _getArrayDelimiterStatement;
   private PreparedStatement _getTypeInfoStatement;
@@ -385,24 +385,22 @@ public class TypeInfoCache implements TypeInfo {
     if (pgTypeName != null) {
       return pgTypeName;
     }
-
-    if (_getNameStatement == null) {
+    if (_getTypeNameByOIDStatement == null) {
       String sql;
       sql = "SELECT n.nspname = ANY(current_schemas(true)), n.nspname, t.typname "
-            + "FROM pg_catalog.pg_type t "
-            + "JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = ?";
-
-      _getNameStatement = _conn.prepareStatement(sql);
+              + "FROM pg_catalog.pg_type t "
+              + "JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = ?";
+      _getTypeNameByOIDStatement = _conn.prepareStatement(sql);
     }
 
-    _getNameStatement.setInt(1, oid);
+    _getTypeNameByOIDStatement.setInt(1, oid);
 
     // Go through BaseStatement to avoid transaction start.
-    if (!((BaseStatement) _getNameStatement).executeWithFlags(QueryExecutor.QUERY_SUPPRESS_BEGIN)) {
+    if (!((BaseStatement) _getTypeNameByOIDStatement).executeWithFlags(QueryExecutor.QUERY_SUPPRESS_BEGIN)) {
       throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
     }
 
-    ResultSet rs = _getNameStatement.getResultSet();
+    ResultSet rs = _getTypeNameByOIDStatement.getResultSet();
     if (rs.next()) {
       boolean onPath = rs.getBoolean(1);
       String schema = rs.getString(2);
