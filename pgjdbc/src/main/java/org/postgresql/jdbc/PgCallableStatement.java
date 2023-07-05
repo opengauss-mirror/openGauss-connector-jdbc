@@ -186,29 +186,29 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
         callResult[j] = rs.getObject(i + 1);
         int columnType = rs.getMetaData().getColumnType(i + 1);
 
-        if (columnType != functionReturnType[j]) {
-          // this is here for the sole purpose of passing the cts
-          PgCallstatementTypeCompatibility typeCompatibility = new PgCallstatementTypeCompatibility(
-                  columnType, functionReturnType[j]);
-          if (typeCompatibility.isCompatibilityType()) {
-            if (callResult[j] != null && typeCompatibility.needConvert()) {
-              callResult[j] = typeCompatibility.convert(callResult[j]);
-            }
-            if (columnType == Types.STRUCT && functionReturnType[j] == Types.OTHER) {
-              if (callResult[j] != null) {
-                PGobject pGobject = (PGobject) callResult[j];
-                pGobject.setStruct(getcompositeTypeStruct(j + 1));
+        if (columnType == Types.STRUCT && functionReturnType[j] == Types.OTHER) {
+          if (callResult[j] != null) {
+            PGobject pGobject = (PGobject) callResult[j];
+            pGobject.setStruct(getcompositeTypeStruct(j + 1));
+          }
+        } else {
+          if (columnType != functionReturnType[j]) {
+            // this is here for the sole purpose of passing the cts
+            PgCallstatementTypeCompatibility typeCompatibility = new PgCallstatementTypeCompatibility(
+              columnType, functionReturnType[j]);
+            if (typeCompatibility.isCompatibilityType()) {
+              if (callResult[j] != null && typeCompatibility.needConvert()) {
+                callResult[j] = typeCompatibility.convert(callResult[j]);
               }
+            } else {
+              throw new PSQLException(GT.tr(
+                "A CallableStatement function was executed and the out parameter {0} was of type {1} however type" +
+                " {2} was registered.",
+                i + 1, "java.sql.Types=" + columnType, "java.sql.Types=" + functionReturnType[j]),
+                PSQLState.DATA_TYPE_MISMATCH);
             }
-          } else {
-            throw new PSQLException(GT.tr(
-                    "A CallableStatement function was executed and the out parameter {0} was of type {1} however type" +
-                            " {2} was registered.",
-                    i + 1, "java.sql.Types=" + columnType, "java.sql.Types=" + functionReturnType[j]),
-                    PSQLState.DATA_TYPE_MISMATCH);
           }
         }
-
       }
     }
     rs.close();
