@@ -2322,106 +2322,110 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
     return ((BaseStatement) createMetaDataStatement()).createDriverResultSet(f, v);
   }
 
-	public ResultSet getIndexInfo(String catalog, String schema, String tableName, boolean unique, boolean approximate)
-			throws SQLException {
-		/*
-		 * This is a complicated function because we have three possible situations: <=
-		 * 7.2 no schemas, single column functional index 7.3 schemas, single column
-		 * functional index >= 7.4 schemas, multi-column expressional index >= 8.3
-		 * supports ASC/DESC column info >= 9.0 no longer renames index columns on a
-		 * table column rename, so we must look at the table attribute names
-		 *
-		 * with the single column functional index we need an extra join to the table's
-		 * pg_attribute data to get the column the function operates on.
-		 */
-		/* 
-		 * in Version > ServerVersion.v8_3, information_schema._pg_expandarray(i.indkey)
-		 *  will be called for many times(as many as row count in pg_index) even we only
-		 *  need to fetch several rows.
-		 *  So I re-write the SQL to build one more sub query to call this function for only 
-		 *  indexes to be returned.
-		 *  This change had been test for such cases:
-		 *  for (boolean unique : new boolean[] { true, false }) {
-		 *  for (int version : new int[] {80000,90000,999999}) {
-		 *  for (boolean approximate : new boolean[] { true, false }) {
-		 *  for (String schema : new String[] {null,"pg_catalog","public"}) {
-		 *  for (String tableName : new String[] {"pg_class","tb_for_audit"}) {
-		 * == haixiong.luo@enmotech.com
-		 */
-		String sql;
-		if (connection.haveMinimumServerVersion(ServerVersion.v8_3)) {
-			sql = "SELECT TABLE_CAT,TABLE_SCHEM,TABLE_NAME,NON_UNIQUE,"
-					+ "INDEX_QUALIFIER,INDEX_NAME,TYPE, (i.keys).n AS ORDINAL_POSITION ,"
-					+ "trim(both '\"' from pg_catalog.pg_get_indexdef(i.cioid, (i.keys).n, false)) AS COLUMN_NAME,"
-					+ (connection.haveMinimumServerVersion(ServerVersion.v9_6)
-							? "  CASE i.amcanorder " + "    WHEN true THEN CASE i.indoption[(i.keys).n - 1] & 1 "
-									+ "      WHEN 1 THEN 'D' " + "      ELSE 'A' " + "    END " + "    ELSE NULL "
-									+ "  END AS ASC_OR_DESC, "
-							: "  CASE i.amcanorder " + "    WHEN true THEN CASE i.indoption[(i.keys).n - 1] & 1 "
-									+ "      WHEN 1 THEN 'D' " + "      ELSE 'A' " + "    END " + "    ELSE NULL "
-									+ "  END AS ASC_OR_DESC, ")
-					+ " CARDINALITY,PAGES,FILTER_CONDITION "
-					+ " FROM (SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, "
-					+ "  ct.relname AS TABLE_NAME, NOT i.indisunique AS NON_UNIQUE, "
-					+ "  NULL AS INDEX_QUALIFIER, ci.relname AS INDEX_NAME, " + "  CASE i.indisclustered "
-					+ "    WHEN true THEN " + java.sql.DatabaseMetaData.tableIndexClustered + "    ELSE CASE am.amname "
-					+ "      WHEN 'hash' THEN " + java.sql.DatabaseMetaData.tableIndexHashed + "      ELSE "
-					+ java.sql.DatabaseMetaData.tableIndexOther + "    END " + "  END AS TYPE, "
-					+ "   information_schema._pg_expandarray(i.indkey) AS keys, " + "  ci.reltuples AS CARDINALITY, "
-					+ "  ci.relpages AS PAGES, " + "  ci.oid AS cioid, " + "  i.indoption, "
-					+ "  pg_catalog.pg_get_expr(i.indpred, i.indrelid) AS FILTER_CONDITION "
-					+ (connection.haveMinimumServerVersion(ServerVersion.v9_6)
-							? "  ,case am.amname when 'btree' then true ELSE false end as amcanorder "
-							: " ,am.amcanorder ")
-					+ "FROM pg_catalog.pg_class ct " + "  JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid) "
-					+ "  JOIN (SELECT i.indexrelid, i.indrelid, i.indoption, "
-					+ "          i.indisunique, i.indisclustered, i.indpred, " + "          i.indexprs,i.indkey "
-					+ "        FROM pg_catalog.pg_index i) i " + "    ON (ct.oid = i.indrelid) "
-					+ "  JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid) "
-					+ "  JOIN pg_catalog.pg_am am ON (ci.relam = am.oid) " + "WHERE true ";
-			if (schema != null && !schema.isEmpty()) {
-				sql += " AND n.nspname = " + escapeQuotes(schema);
-			}
-		} else {
-			String select;
-			String from;
-			String where;
+  public ResultSet getIndexInfo(String catalog, String schema, String tableName,
+      boolean unique, boolean approximate) throws SQLException {
+    /*
+     * This is a complicated function because we have three possible situations: <= 7.2 no schemas,
+     * single column functional index 7.3 schemas, single column functional index >= 7.4 schemas,
+     * multi-column expressional index >= 8.3 supports ASC/DESC column info >= 9.0 no longer renames
+     * index columns on a table column rename, so we must look at the table attribute names
+     *
+     * with the single column functional index we need an extra join to the table's pg_attribute
+     * data to get the column the function operates on.
+     */
+    String sql;
+    if (connection.haveMinimumServerVersion(ServerVersion.v8_3)) {
+      sql = "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, "
+            + "  ct.relname AS TABLE_NAME, NOT i.indisunique AS NON_UNIQUE, "
+            + "  NULL AS INDEX_QUALIFIER, ci.relname AS INDEX_NAME, "
+            + "  CASE i.indisclustered "
+            + "    WHEN true THEN " + java.sql.DatabaseMetaData.tableIndexClustered
+            + "    ELSE CASE am.amname "
+            + "      WHEN 'hash' THEN " + java.sql.DatabaseMetaData.tableIndexHashed
+            + "      ELSE " + java.sql.DatabaseMetaData.tableIndexOther
+            + "    END "
+            + "  END AS TYPE, "
+            + "  (i.keys).n AS ORDINAL_POSITION, "
+            + "  trim(both '\"' from pg_catalog.pg_get_indexdef(ci.oid, (i.keys).n, false)) AS COLUMN_NAME, "
+            + (connection.haveMinimumServerVersion(ServerVersion.v9_6)
+               ? "  CASE am.amname "
+                 + "    WHEN 'btree' THEN CASE i.indoption[(i.keys).n - 1] & 1 "
+                 + "      WHEN 1 THEN 'D' "
+                 + "      ELSE 'A' "
+                 + "    END "
+                 + "    ELSE NULL "
+                 + "  END AS ASC_OR_DESC, "
+               : "  CASE am.amcanorder "
+                 + "    WHEN true THEN CASE i.indoption[(i.keys).n - 1] & 1 "
+                 + "      WHEN 1 THEN 'D' "
+                 + "      ELSE 'A' "
+                 + "    END "
+                 + "    ELSE NULL "
+                 + "  END AS ASC_OR_DESC, ")
+            + "  ci.reltuples AS CARDINALITY, "
+            + "  ci.relpages AS PAGES, "
+            + "  pg_catalog.pg_get_expr(i.indpred, i.indrelid) AS FILTER_CONDITION "
+            + "FROM pg_catalog.pg_class ct "
+            + "  JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid) "
+            + "  JOIN (SELECT i.indexrelid, i.indrelid, i.indoption, "
+            + "          i.indisunique, i.indisclustered, i.indpred, "
+            + "          i.indexprs, "
+            + "          information_schema._pg_expandarray(i.indkey) AS keys "
+            + "        FROM pg_catalog.pg_index i) i "
+            + "    ON (ct.oid = i.indrelid) "
+            + "  JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid) "
+            + "  JOIN pg_catalog.pg_am am ON (ci.relam = am.oid) "
+            + "WHERE true ";
+      sql+= " AND (i.keys).x >= 0";
+      if (schema != null && !schema.isEmpty()) {
+        sql += " AND n.nspname = " + escapeQuotes(schema);
+      }
+    } else {
+      String select;
+      String from;
+      String where;
 
-			select = "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, ";
-			from = " FROM pg_catalog.pg_namespace n, pg_catalog.pg_class ct, pg_catalog.pg_class ci, "
-					+ " pg_catalog.pg_attribute a, pg_catalog.pg_am am ";
-			where = " AND n.oid = ct.relnamespace ";
-			from += ", pg_catalog.pg_index i ";
+      select = "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, ";
+      from = " FROM pg_catalog.pg_namespace n, pg_catalog.pg_class ct, pg_catalog.pg_class ci, "
+             + " pg_catalog.pg_attribute a, pg_catalog.pg_am am ";
+      where = " AND n.oid = ct.relnamespace ";
+      from += ", pg_catalog.pg_index i ";
 
-			if (schema != null && !schema.isEmpty()) {
-				where += " AND n.nspname = " + escapeQuotes(schema);
-			}
+      if (schema != null && !schema.isEmpty()) {
+        where += " AND n.nspname = " + escapeQuotes(schema);
+      }
 
-			sql = select
-					+ " ct.relname AS TABLE_NAME, NOT i.indisunique AS NON_UNIQUE, NULL AS INDEX_QUALIFIER, ci.relname AS INDEX_NAME, "
-					+ " CASE i.indisclustered " + " WHEN true THEN " + java.sql.DatabaseMetaData.tableIndexClustered
-					+ " ELSE CASE am.amname " + " WHEN 'hash' THEN " + java.sql.DatabaseMetaData.tableIndexHashed
-					+ " ELSE " + java.sql.DatabaseMetaData.tableIndexOther + " END " + " END AS TYPE, "
-					+ " a.attnum AS ORDINAL_POSITION, " + " CASE WHEN i.indexprs IS NULL THEN a.attname "
-					+ " ELSE pg_catalog.pg_get_indexdef(ci.oid,a.attnum,false) END AS COLUMN_NAME, "
-					+ " NULL AS ASC_OR_DESC, " + " ci.reltuples AS CARDINALITY, " + " ci.relpages AS PAGES, "
-					+ " pg_catalog.pg_get_expr(i.indpred, i.indrelid) AS FILTER_CONDITION " + from
-					+ " WHERE ct.oid=i.indrelid AND ci.oid=i.indexrelid AND a.attrelid=ci.oid AND ci.relam=am.oid "
-					+ where;
-		}
+      sql = select
+            + " ct.relname AS TABLE_NAME, NOT i.indisunique AS NON_UNIQUE, NULL AS INDEX_QUALIFIER, ci.relname AS INDEX_NAME, "
+            + " CASE i.indisclustered "
+            + " WHEN true THEN " + java.sql.DatabaseMetaData.tableIndexClustered
+            + " ELSE CASE am.amname "
+            + " WHEN 'hash' THEN " + java.sql.DatabaseMetaData.tableIndexHashed
+            + " ELSE " + java.sql.DatabaseMetaData.tableIndexOther
+            + " END "
+            + " END AS TYPE, "
+            + " a.attnum AS ORDINAL_POSITION, "
+            + " CASE WHEN i.indexprs IS NULL THEN a.attname "
+            + " ELSE pg_catalog.pg_get_indexdef(ci.oid,a.attnum,false) END AS COLUMN_NAME, "
+            + " NULL AS ASC_OR_DESC, "
+            + " ci.reltuples AS CARDINALITY, "
+            + " ci.relpages AS PAGES, "
+            + " pg_catalog.pg_get_expr(i.indpred, i.indrelid) AS FILTER_CONDITION "
+            + from
+            + " WHERE ct.oid=i.indrelid AND ci.oid=i.indexrelid AND a.attrelid=ci.oid AND ci.relam=am.oid "
+            + where;
+    }
 
-		sql += " AND ct.relname = " + escapeQuotes(tableName);
+    sql += " AND ct.relname = " + escapeQuotes(tableName);
 
-		if (unique) {
-			sql += " AND i.indisunique ";
-		}
-		if (connection.haveMinimumServerVersion(ServerVersion.v8_3)) {
-			sql += ") i";
-		}
+    if (unique) {
+      sql += " AND i.indisunique ";
+    }
+    sql += " ORDER BY NON_UNIQUE, TYPE, INDEX_NAME, ORDINAL_POSITION ";
 
-		sql += "  ORDER BY NON_UNIQUE, TYPE, INDEX_NAME, ORDINAL_POSITION ";
-		return connection.createStatement().executeQuery(sql);
-	}
+    return createMetaDataStatement().executeQuery(sql);
+  }
+
   // ** JDBC 2 Extensions **
 
   public boolean supportsResultSetType(int type) throws SQLException {
