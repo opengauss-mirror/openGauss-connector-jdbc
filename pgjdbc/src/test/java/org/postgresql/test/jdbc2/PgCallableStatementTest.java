@@ -6,6 +6,7 @@ import org.junit.Test;
 import org.postgresql.test.TestUtil;
 import org.postgresql.util.PGobject;
 
+import java.math.BigDecimal;
 import java.sql.*;
 import java.util.Arrays;
 
@@ -255,6 +256,29 @@ public class PgCallableStatementTest extends BaseTest4 {
             assertEquals("[f1, f2, f3]", Arrays.toString(fifthObject.getStruct()));
             assertEquals("(,,)", fifthObject.getValue());
             assertEquals("[null, null, null]", Arrays.toString(fifthObject.getArrayValue()));
+        } finally {
+            TestUtil.closeQuietly(stmt);
+            TestUtil.closeQuietly(cmt);
+        }
+    }
+
+    @Test
+    public void testFuncOutNumeric() throws SQLException {
+        Statement stmt = null;
+        CallableStatement cmt = null;
+        try {
+            stmt = con.createStatement();
+            stmt.execute("create or replace FUNCTION fn_ty_in_ty_out3(o_code out numeric) return numeric is "
+                + "begin o_code := 0; return o_code; end;");
+            String queryStr = "{? = call fn_ty_in_ty_out3(?)}";
+            cmt = con.prepareCall(queryStr);
+            {
+                cmt.registerOutParameter(1, Types.NUMERIC);
+                cmt.registerOutParameter(2, Types.NUMERIC);
+            }
+            cmt.execute();
+            assertEquals(new BigDecimal(0), cmt.getObject(1));
+            assertEquals(new BigDecimal(0), cmt.getObject(1));
         } finally {
             TestUtil.closeQuietly(stmt);
             TestUtil.closeQuietly(cmt);
