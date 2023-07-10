@@ -182,9 +182,13 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
         while (j < functionReturnType.length && functionReturnType[j] == 0) {
           j++;
         }
-
-        callResult[j] = rs.getObject(i + 1);
         int columnType = rs.getMetaData().getColumnType(i + 1);
+
+        if (columnType == Types.NUMERIC) {
+            callResult[j] = rs.getBigDecimal(i + 1);
+        } else {
+            callResult[j] = rs.getObject(i + 1);
+        }
 
         if (columnType == Types.STRUCT && functionReturnType[j] == Types.OTHER) {
           if (callResult[j] != null) {
