@@ -12,6 +12,7 @@ import org.postgresql.log.Log;
 
 import java.io.Serializable;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 
@@ -35,6 +36,7 @@ public class ServerErrorMessage implements Serializable {
   private static final Character INTERNAL_QUERY = 'q';
   private static final Character SOCKET_ADDRESS = 'a';
   private final Map<Character, String> m_mesgParts = new HashMap<Character, String>();
+  private String query;
 
   public ServerErrorMessage(EncodingPredictor.DecodeResult serverError, String socketAddress) {
     this(serverError.result, socketAddress);
@@ -130,6 +132,92 @@ public class ServerErrorMessage implements Serializable {
     return Integer.parseInt(s);
   }
 
+  public void setErrorQuery(String query) {
+    this.query = query;
+  }
+
+  private String lineErrorMessage() {
+    StringBuilder lineMessBuilder = new StringBuilder();
+    int errIndex = Math.max(getPosition(), getInternalPosition());
+    if (errIndex == 0) {
+      return "";
+    }
+    String message = getInternalQuery();
+    String queryStr = query;
+    ErrMessageResult errMessageResult;
+    if (message == null) {
+      errMessageResult = errMessageForQuery(queryStr, errIndex);
+    } else {
+      errMessageResult = errMessageForInternalQuery(message, errIndex, queryStr);
+    }
+    String lineStr = String.format(Locale.ROOT, "Line %d:", errMessageResult.getLine());
+    char[] location = new char[lineStr.length() + errMessageResult.getScroffset()];
+    for (int i = 0; i < (lineStr.length() + errMessageResult.getScroffset()); ++i) {
+      location[i] = ' ';
+    }
+    String locationStr = String.valueOf(location) + '^';
+    lineMessBuilder.append("\n  ").append(lineStr).append(" ").append(errMessageResult.getLineMess());
+    lineMessBuilder.append("\n  ").append(locationStr);
+    return lineMessBuilder.toString();
+  }
+
+  private ErrMessageResult errMessageForQuery(String queryStr, int errIndex) {
+    int line = 1;
+    int scroffset = 0;
+    String lineMess = queryStr;
+    char[] chars = queryStr.toCharArray();
+    for (int i = 0; i <= errIndex; i++) {
+      char ch = chars[i];
+      if (ch == '\n') {
+        line++;
+        scroffset = errIndex - (i + 1);
+        lineMess = lineMess.substring(lineMess.indexOf("\n") + 1);
+      }
+    }
+    if (scroffset == 0) {
+      scroffset = errIndex;
+    }
+    if (lineMess.contains("\n")) {
+      lineMess = lineMess.substring(0, lineMess.indexOf("\n"));
+    }
+    return new ErrMessageResult(line, scroffset, lineMess);
+  }
+
+  private ErrMessageResult errMessageForInternalQuery(String message, int errIndex, String queryStr) {
+    int line = 1;
+    int scroffset = 0;
+    String lineMess = null;
+    String errStr = message.substring(errIndex);
+    message = message.trim();
+    if (message.startsWith("DECLARE")) {
+      message = message.substring(message.indexOf("DECLARE") + 7).trim();
+    }
+    if (message.startsWith("\n")) {
+      message = message.substring(1);
+    }
+    if (queryStr.startsWith("\n")) {
+      queryStr = queryStr.substring(1);
+    }
+    String[] lines = queryStr.split("\n");
+    if (errStr.contains("\n")) {
+      errStr = errStr.substring(0, errStr.indexOf("\n"));
+    }
+    for (int i = 0; i < lines.length; ++i) {
+      if (queryStr.startsWith(message)) {
+        line = i + 1;
+        for (String errLine : queryStr.split("\n")) {
+          if (errLine.contains(errStr)) {
+            lineMess = errLine;
+            scroffset = lineMess.indexOf(errStr) == 0 ? 1 : lineMess.indexOf(errStr);
+            break;
+          }
+        }
+        break;
+      }
+      queryStr = queryStr.substring(queryStr.indexOf("\n") + 1);
+    }
+    return new ErrMessageResult(line, scroffset, lineMess);
+  }
 
   public String toString() {
     // Now construct the message from what the server sent
@@ -161,6 +249,9 @@ public class ServerErrorMessage implements Serializable {
     l_message = m_mesgParts.get(MESSAGE);
     if (l_message != null) {
       l_totalMessage.append(l_message);
+    }
+    if (query != null) {
+      l_totalMessage.append(lineErrorMessage());
     }
     l_message = m_mesgParts.get(DETAIL);
     if (l_message != null) {
@@ -204,5 +295,81 @@ public class ServerErrorMessage implements Serializable {
     }
 
     return l_totalMessage.toString();
+  }
+
+  /**
+   * Error information Location result
+   */
+  private static class ErrMessageResult {
+    private int line;
+    private int scroffset;
+    private String lineMess;
+
+    /**
+     * All argument constructor
+     *
+     * @param line int
+     * @param scroffset int
+     * @param lineMess String
+     */
+    public ErrMessageResult(int line, int scroffset, String lineMess) {
+      this.line = line;
+      this.scroffset = scroffset;
+      this.lineMess = lineMess;
+    }
+
+    /**
+     * Set err message line
+     *
+     * @param line int
+     */
+    public void setLine(int line) {
+      this.line = line;
+    }
+
+    /**
+     * Get err message line
+     *
+     * @return line
+     */
+    public int getLine() {
+      return line;
+    }
+
+    /**
+     * Get err message scroffset
+     *
+     * @return scroffset
+     */
+    public int getScroffset() {
+      return scroffset;
+    }
+
+    /**
+     * Set err message scroffset
+     *
+     * @param scroffset int
+     */
+    public void setScroffset(int scroffset) {
+      this.scroffset = scroffset;
+    }
+
+    /**
+     * Get err message lineMess
+     *
+     * @return lineMess
+     */
+    public String getLineMess() {
+      return lineMess;
+    }
+
+    /**
+     * Set err message lineMess
+     *
+     * @param lineMess String
+     */
+    public void setLineMess(String lineMess) {
+      this.lineMess = lineMess;
+    }
   }
 }
