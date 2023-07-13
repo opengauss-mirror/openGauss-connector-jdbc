@@ -122,6 +122,7 @@ function install_jdbc()
     cp -r "${JDBC_DIR}/pgjdbc" "${JDBC_DIR}/jdbc"
     cd "${JDBC_DIR}/jdbc"
     find . -name 'Driver.java' | xargs sed -i "s/@GSVERSION@/${GS_VERSION}/g"
+    find . -name 'DriverInfo.java' | xargs sed -i "s|DRIVER_VERSION = .*;|DRIVER_VERSION = \"${pom_version_number}\";|g"
     mvn clean install -Dgpg.skip -Dmaven.test.skip=true >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
         die "mvn install driver failed."
