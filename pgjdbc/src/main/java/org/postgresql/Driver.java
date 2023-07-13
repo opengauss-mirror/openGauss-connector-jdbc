@@ -72,7 +72,7 @@ public class Driver implements java.sql.Driver {
     private static Log LOGGER = Logger.getLogger("org.postgresql.Driver");
     private static SharedTimer sharedTimer = new SharedTimer();
     private static final String DEFAULT_PORT =
-            /*$"\""+mvn.project.property.template.default.pg.port+"\";"$*//*-*/"5431";
+            /*$"\""+mvn.project.property.template.default.pg.port+"\";"$*//*-*/"5432";
     // Remove iam certification
     // private static CloseableHttpClient client = null;
     private static final String gsVersion = "@GSVERSION@";
