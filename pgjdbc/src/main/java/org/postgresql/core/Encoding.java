@@ -59,6 +59,7 @@ public class Encoding {
     encodings.put("SJIS", new String[]{"MS932", "SJIS"});
     encodings.put("BIG5", new String[]{"Big5", "MS950", "Cp950"});
     encodings.put("GBK", new String[]{"GBK", "MS936"});
+    encodings.put("GB18030", new String[]{"GB18030"});
     encodings.put("UHC", new String[]{"MS949", "Cp949", "Cp949C"});
     encodings.put("TCVN", new String[]{"Cp1258"});
     encodings.put("WIN1256", new String[]{"Cp1256"});
