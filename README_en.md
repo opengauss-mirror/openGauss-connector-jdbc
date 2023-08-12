@@ -1,4 +1,4 @@
-![openGauss Logo](https://opengauss.org/img/brand/view/logo2.jpg)
+![openGauss Logo](https://opengauss.org/category/brand/view/logo1.png)
 
 
 
@@ -6,14 +6,14 @@
 
 openGauss is an open source relational database management system. It has multi-core high-performance, full link security, intelligent operation and maintenance for enterprise features. openGauss, which is early originated from PostgreSQL, integrates Huawei's core experience in database field for many years. It optimizes the architecture, transaction, storage engine, optimizer and ARM architecture. At the meantime, openGauss as a global database open source community, aims to further advance the development and enrichment of the database software/hardware application ecosystem.
 
-**Java Database Connectivity** (**JDBC**) is an application programming interface (API) for the programming language Java, which defines how a client may access a database. It is a Java-based data access technology used for Java database connectivity. It provides methods to query and update data in a database, and is oriented toward relational databases. openGauss-connector-jdbc is to provide users with access to the database through the Java language application interface . Users can use the jar package provided by the openGauss official website (refer to the [Direct Access section](#1)) or build their own jar package ([refer to the Building from Source section](#BuildfromSource) to operate the database using JDBC.
+**Java Database Connectivity** (**JDBC**) is an application programming interface (API) for the programming language Java, which defines how a client may access a database. It is a Java-based data access technology used for Java database connectivity. It provides methods to query and update data in a database, and is oriented toward relational databases. openGauss-connector-jdbc is to provide users with access to the database through the Java language application interface . Users can use the jar package provided by the openGauss official website or build their own jar package to operate the database using JDBC.
 
 
 
 
-## Direct access {#1}
+## Direct access
 
-Before using the openGauss JDBC driver, make sure your server is up and running with the openGauss database (refer to the openGauss [Quickstart](https://opengauss.org/en/docs/latest/docs/Quickstart/Quickstart.html)）。
+Before using the openGauss JDBC driver, make sure your server is up and running with the openGauss database (refer to the openGauss [Quickstart](https://docs.opengauss.org/en/docs/latest/docs/GettingStarted/GettingStarted.html)）。
 
 ### Get from maven central repository
 
@@ -28,7 +28,7 @@ Java developers can get jar packages directly from the maven central repository 
 
 1. Download the installation package from the official website.
 
-   Click on [link](https://opengauss.org/en/download.html) and under the openGauss Connectors section, select the download button for JDBC_${version} according to the corresponding system of the server where you are deploying the database. ${version} is the version number you need.
+   Click on [link](https://opengauss.org/en/download/) and under the openGauss Connectors section, select the download button for JDBC_\\${version} according to the corresponding system of the server where you are deploying the database. \\${version} is the version number you need.
 
 2. Decompress the zip file.
 
@@ -36,7 +36,7 @@ Java developers can get jar packages directly from the maven central repository 
    tar -zxvf openGauss-${version}-JDBC.tar.gz
    ```
 
-3. After unpacking, you can see two jar packages in the same directory, opengauss-jdbc-${version}.jar and postgresql.jar. opengauss-jdbc-${version}.jar is a package that can coexist with PG-JDBC, the package name is changed from 2.0.1 to org.postgresql.jar. postgresql to org.opengauss, and the driver name is replaced from jdbc:postgresql:// to jdbc:opengauss://. This is the same package that is currently available from the maven central repository.
+3. After unpacking, you can see two jar packages in the same directory, opengauss-jdbc-\\${version}.jar and postgresql.jar. opengauss-jdbc-\\${version}.jar is a package that can coexist with PG-JDBC, the package name is changed from 2.0.1 to org.postgresql.jar. postgresql to org.opengauss, and the driver name is replaced from jdbc:postgresql:// to jdbc:opengauss://. This is the same package that is currently available from the maven central repository.
 
 ### INSTALLING THE DRIVER
 
@@ -54,15 +54,15 @@ export CLASSPATH=.:/usr/local/pgsql/share/java/opengauss-jdbc-${version}.jar
 
 
 
-## Build from Source {#BuildfromSource}
+## Build from Source
 
 ### Overview
 
 The openGauss JDBC driver currently offers 3 ways to build. One is to build via the one-click script build.sh. The second is a step-by-step build via script. The third is to build via the mvn command.
 
-This will compile the correct driver for your JVM, and build a .jar file (Java ARchive) called postgresql.jar and opengauss-jdbc--${version}.jar in output/, and you can get  openGauss-${version}-jdbc.tar.gz too.
+This will compile the correct driver for your JVM, and build a .jar file (Java ARchive) called postgresql.jar and opengauss-jdbc--\\${version}.jar in output/, and you can get  openGauss-\\${version}-jdbc.tar.gz too.
 
-Notice: postgresql.jar is conflict use with postgres database. Because all class was in package org.postgresql. opengauss-jdbc-${version}.jar is compatibility with postgres database, all java package renamed `org.opengauss`, and jdbc driver is: `jdbc:opengauss:/`
+Notice: postgresql.jar is conflict use with postgres database. Because all class was in package org.postgresql. opengauss-jdbc-\\${version}.jar is compatibility with postgres database, all java package renamed `org.opengauss`, and jdbc driver is: `jdbc:opengauss:/`
 
 Remember: Once you have compiled the driver, it will work on ALL platforms that support that version of the API. You don't need to build it for each platform.
 
@@ -163,17 +163,17 @@ so you can compile the openGauss-connector-jdbc by one command with build.sh. In
    [INFO] ------------------------------------------------------------------------
    ```
 
-   Two jar packages will appear after a successful build, opengauss-jdbc-${version}.jar and original-opengauss-jdbc-${version}.jar. jar package path is /sda/openGauss-connector-jdbc/pgjdbc /target/.
+   Two jar packages will appear after a successful build, opengauss-jdbc-\\${version}.jar and postgresql.jar. jar package path is /sda/openGauss-connector-jdbc/pgjdbc /target/.
    **notice: this build artifact's package name is org.postgresql which different with maven central repository. if you want build package with org.opengauss, please refer to build.sh.**
 
 
 ## Using JDBC
 
-Reference [JDBC-based development](https://opengauss.org/en/docs/latest/docs/Developerguide/development-based-on-jdbc.html).
+Reference [JDBC-based development](https://docs.opengauss.org/en/docs/latest/docs/DeveloperGuide/development-based-on-jdbc.html).
 
 ## Docs
 
-For more details about the installation guide, tutorials, and APIs, please see the [User Documentation](https://gitee.com/opengauss/docs).
+For more details about the installation guide, tutorials, and APIs, please see the [User Documentation](https://docs.opengauss.org/en/docs/latest/docs/GettingStarted/GettingStarted.html).
 
 ## Community
 
@@ -185,15 +185,15 @@ Check out how openGauss implements open governance [works](https://gitee.com/ope
 
 - WeLink- Communication platform for developers.
 - IRC channel at `#opengauss-meeting` (only for meeting minutes logging purpose)
-- Mailing-list: https://opengauss.org/en/community/onlineCommunication.html
+- Mailing-list: [Communication | openGauss](https://opengauss.org/en/community/onlineCommunication/)
 
 ## Contribution
 
-Welcome contributions. See our [Contributor](https://opengauss.org/en/contribution.html) for more details.
+Welcome contributions. See our [Contributor](https://opengauss.org/en/contribution/) for more details.
 
 ## Release Notes
 
-For the release notes, see our [RELEASE](https://opengauss.org/en/docs/2.0.0/docs/Releasenotes/Releasenotes.html).
+For the release notes, see our [RELEASE](https://docs.opengauss.org/en/docs/latest/docs/ReleaseNotes/Releasenotes.html).
 
 ## License
 
