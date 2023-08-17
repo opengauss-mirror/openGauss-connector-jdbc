@@ -89,6 +89,16 @@ public class TestUtil {
       ssl = "&ssl=" + getSSL();
     }
 
+    String characterEncoding = "";
+    if (getCharacterEncoding() != null && !getCharacterEncoding().equals("")) {
+        characterEncoding = "&characterEncoding=" + getCharacterEncoding();
+    }
+
+    String allowEncodingChanges = "";
+    if (getAllowEncodingChanges() != null && !getAllowEncodingChanges().equals("")) {
+        allowEncodingChanges = "&allowEncodingChanges=" + getAllowEncodingChanges();
+    }
+
     return "jdbc:postgresql://"
         + hostport + "/"
         + database
@@ -99,7 +109,7 @@ public class TestUtil {
         + binaryTransfer
         + receiveBufferSize
         + sendBufferSize
-        + ssl;
+        + ssl + allowEncodingChanges + characterEncoding;
   }
 
   /*
@@ -207,6 +217,20 @@ public class TestUtil {
   public static String getLogLevel() {
     return System.getProperty("loggerLevel");
   }
+
+    /**
+     * Returns the allowEncodingChanges
+     */
+    public static String getAllowEncodingChanges() {
+        return System.getProperty("allowEncodingChanges");
+    }
+
+    /**
+     * Returns the characterEncoding
+     */
+    public static String getCharacterEncoding() {
+        return System.getProperty("characterEncoding");
+    }
 
   /*
    * Returns the log file to use

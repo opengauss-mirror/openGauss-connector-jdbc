@@ -84,6 +84,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     CLIENT_ENCODING_WHITELIST.put("UTF8", "UTF8");
     CLIENT_ENCODING_WHITELIST.put("UTF-8", "UTF-8");
     CLIENT_ENCODING_WHITELIST.put("GBK", "GBK");
+    CLIENT_ENCODING_WHITELIST.put("GB18030", "GB18030");
     CLIENT_ENCODING_WHITELIST.put("LATIN1", "LATIN1");
   }
 //  public static void setStaticClientEncoding(String client) {
