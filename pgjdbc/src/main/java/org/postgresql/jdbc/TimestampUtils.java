@@ -59,6 +59,7 @@ public class TimestampUtils {
 
   private TimeZone prevDefaultZoneFieldValue;
   private TimeZone defaultTimeZoneCache;
+  private int timestampNanoFormat = 0;
 
   static {
     // The expected maximum value is 60 (seconds), so 64 is used "just in case"
@@ -129,6 +130,10 @@ public class TimestampUtils {
   public TimestampUtils(boolean usesDouble, Provider<TimeZone> timeZoneProvider) {
     this.usesDouble = usesDouble;
     this.timeZoneProvider = timeZoneProvider;
+  }
+  
+  public void setTimestampNanoFormat(int format) {
+    this.timestampNanoFormat = format;
   }
 
   private Calendar getCalendar(int sign, int hr, int min, int sec) {
@@ -661,7 +666,7 @@ public class TimestampUtils {
 
     appendDate(sbuf, cal);
     sbuf.append(' ');
-    appendTime(sbuf, cal, nanos);
+    appendTime(sbuf, cal, nanos, timestampNanoFormat);
     if (withTimeZone) {
       appendTimeZone(sbuf, cal);
     }
@@ -708,7 +713,7 @@ public class TimestampUtils {
 
     sbuf.setLength(0);
 
-    appendTime(sbuf, cal, cal.get(Calendar.MILLISECOND) * 1000000);
+    appendTime(sbuf, cal, cal.get(Calendar.MILLISECOND) * 1000000, timestampNanoFormat);
 
     // The 'time' parser for <= 7.3 doesn't like timezones.
     if (withTimeZone) {
@@ -742,11 +747,11 @@ public class TimestampUtils {
     sb.append(NUMBERS[day]);
   }
 
-  private static void appendTime(StringBuilder sb, Calendar cal, int nanos) {
+  private static void appendTime(StringBuilder sb, Calendar cal, int nanos, int format) {
     int hours = cal.get(Calendar.HOUR_OF_DAY);
     int minutes = cal.get(Calendar.MINUTE);
     int seconds = cal.get(Calendar.SECOND);
-    appendTime(sb, hours, minutes, seconds, nanos);
+    appendTime(sb, hours, minutes, seconds, nanos, format);
   }
 
   /**
@@ -759,7 +764,7 @@ public class TimestampUtils {
    * @param seconds seconds
    * @param nanos nanoseconds
    */
-  private static void appendTime(StringBuilder sb, int hours, int minutes, int seconds, int nanos) {
+  private static void appendTime(StringBuilder sb, int hours, int minutes, int seconds, int nanos, int format) {
     sb.append(NUMBERS[hours]);
 
     sb.append(':');
@@ -773,21 +778,24 @@ public class TimestampUtils {
     // a two digit fractional second, but we don't need to support 7.1
     // anymore and getting the version number here is difficult.
     //
-    if (nanos < 1000) {
+    if (nanos < 1000 && format != 0) {
       return;
     }
     sb.append('.');
     int len = sb.length();
     sb.append(nanos / 1000); // append microseconds
-    int needZeros = 6 - (sb.length() - len);
+    final int NANO_BITS = 6;
+    int needZeros = NANO_BITS - (sb.length() - len);
     if (needZeros > 0) {
       sb.insert(len, ZEROS, 0, needZeros);
     }
 
     int end = sb.length() - 1;
-    while (sb.charAt(end) == '0') {
+    int needDelete = NANO_BITS - 1;
+    while (sb.charAt(end) == '0' && needDelete != 0) {
       sb.deleteCharAt(end);
       end--;
+      needDelete --;
     }
   }
 
@@ -855,7 +863,7 @@ public class TimestampUtils {
       // it relies on the fact that appendTime just truncates 000..999 nanosecond part
       localTime = localTime.plus(ONE_MICROSECOND);
     }
-    appendTime(sbuf, localTime);
+    appendTime(sbuf, localTime, timestampNanoFormat);
 
     return sbuf.toString();
   }
@@ -879,7 +887,7 @@ public class TimestampUtils {
     LocalDate localDate = localDateTime.toLocalDate();
     appendDate(sbuf, localDate);
     sbuf.append(' ');
-    appendTime(sbuf, localDateTime.toLocalTime());
+    appendTime(sbuf, localDateTime.toLocalTime(), timestampNanoFormat);
     appendTimeZone(sbuf, offsetDateTime.getOffset());
     appendEra(sbuf, localDate);
 
@@ -911,12 +919,12 @@ public class TimestampUtils {
     appendDate(sb, year, month, day);
   }
 
-  private static void appendTime(StringBuilder sb, LocalTime localTime) {
+  private static void appendTime(StringBuilder sb, LocalTime localTime, int format) {
     int hours = localTime.getHour();
     int minutes = localTime.getMinute();
     int seconds = localTime.getSecond();
     int nanos = localTime.getNano();
-    appendTime(sb, hours, minutes, seconds, nanos);
+    appendTime(sb, hours, minutes, seconds, nanos, format);
   }
 
   private void appendTimeZone(StringBuilder sb, java.time.ZoneOffset offset) {
