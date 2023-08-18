@@ -490,7 +490,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
       return bytes;
   }
-  
+
   public Blob getBlob(int i) throws SQLException {
     checkResultSet(i);
     if (wasNullFlag) {
@@ -501,8 +501,15 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       blob.setBytes(1, this_row[i - 1]);
       return blob;
     }
-    String s = getString(i);
-    byte[] byt = toBytes(s);
+    int oid = this.fields[i - 1].getOID();
+    byte[] byt;
+    if (oid == Oid.BYTEA) {
+        byt = trimBytes(i, PGbytea.toBytes(this_row[i - 1]));
+    } else if (oid == Oid.BLOB) {
+        byt = toBytes(getString(1));
+    } else {
+        byt = trimBytes(i, this_row[i - 1]);
+    }
     PGBlob blob = new PGBlob();
     blob.setBytes(1, byt);
     return blob;
@@ -2706,7 +2713,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       wasNullFlag = true;
       return null;
     }
-    
+
     if(getPGType(columnIndex).equals("blob")){
     	return toBytes(getString(columnIndex));
     }

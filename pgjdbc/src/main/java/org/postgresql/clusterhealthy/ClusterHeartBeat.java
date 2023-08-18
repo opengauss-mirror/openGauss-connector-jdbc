@@ -52,10 +52,11 @@ public class ClusterHeartBeat {
     public static final Map<HostSpec, Set<Properties>> CLUSTER_PROPERTIES = new ConcurrentHashMap<>();
     private Log LOGGER = Logger.getLogger(ClusterHeartBeat.class.getName());
     private final ConnectionFactoryImpl FACTORY = new ConnectionFactoryImpl();
+    private final String clientEncoding = "UTF8";
     private volatile boolean detection;
-    private final Long DEFAULT_INTERVAL = 5000L;
+    private final Long defaultInterval = 5000L;
     private final String DEFAULT_TIMEOUT = "30000";
-    private volatile AtomicLong periodTime = new AtomicLong(DEFAULT_INTERVAL);
+    private volatile AtomicLong periodTime = new AtomicLong(defaultInterval);
 
 
     /**
@@ -93,7 +94,7 @@ public class ClusterHeartBeat {
     }
 
     public void initPeriodTime() {
-        periodTime.set(DEFAULT_INTERVAL);
+        periodTime.set(defaultInterval);
     }
 
     /**
@@ -216,22 +217,21 @@ public class ClusterHeartBeat {
                 String user = props.getProperty("user", "");
                 String database = props.getProperty("PGDBNAME", "");
                 PGStream pgStream = FACTORY.tryConnect(user, database, props, socketFactory, hostSpec, sslMode);
-                return new QueryExecutorImpl(pgStream, user, database,
+                QueryExecutor queryExecutor = new QueryExecutorImpl(pgStream, user, database,
                         1000, new Properties());
+                queryExecutor.setClientEncoding(pgStream.getEncoding() != null
+                        ? pgStream.getEncoding().name() : clientEncoding);
+                return queryExecutor;
             }
         } catch (SQLException e) {
             String sqlState = e.getSQLState();
             if (CONNECTION_REJECTED.getState().equals(sqlState) || "28P01".equals(sqlState)) {
-                LOGGER.debug("node " + hostSpec + " is active, and connenction authentication fails.");
-                LOGGER.debug("remove before propSet size :" + propSet.size());
+                LOGGER.error("node " + hostSpec + " is active, and connenction authentication fails.");
                 removeProperties(hostSpec, props);
-                LOGGER.debug("remove after propSet size :" + propSet.size());
             }
-
-            LOGGER.debug("acquire QueryExecutor failure " + e.getMessage());
+            LOGGER.error("acquire QueryExecutor failure " + e.getMessage());
         } catch (IOException e) {
-            LOGGER.debug("acquire QueryExecutor failure " + e.getMessage());
-            LOGGER.debug(e.getCause());
+            LOGGER.error(e.getCause());
         }
         throw new SQLException();
     }

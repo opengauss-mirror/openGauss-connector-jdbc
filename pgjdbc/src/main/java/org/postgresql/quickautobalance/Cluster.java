@@ -299,11 +299,9 @@ public class Cluster {
      * @param hostSpecs host specs
      * @return hostSpec list
      */
-    public List<HostSpec> sortDnsByLeastConn(List<HostSpec> hostSpecs) {
-        Map<HostSpec, DataNodeCompareInfo> dataNodeCompareInfoMap;
+    public synchronized List<HostSpec> sortDnsByLeastConn(List<HostSpec> hostSpecs) {
         // Copy dataNodeCompareInfo from cachedDnList.
-        synchronized (cachedDnList) {
-            dataNodeCompareInfoMap = hostSpecs.stream()
+        Map<HostSpec, DataNodeCompareInfo> dataNodeCompareInfoMap = hostSpecs.stream()
                 .collect(Collectors.toMap(Function.identity(), hostSpec -> {
                     DataNode dataNode = cachedDnList.get(hostSpec);
                     int cachedConnectionListSize = dataNode.getCachedConnectionListSize();
@@ -311,7 +309,6 @@ public class Cluster {
                     boolean dataNodeState = dataNode.getDataNodeState();
                     return new DataNodeCompareInfo(cachedConnectionListSize, cachedCreatingConnectionSize, dataNodeState);
                 }));
-        }
         hostSpecs.sort((o1, o2) -> {
             boolean o1State = dataNodeCompareInfoMap.get(o1).getDataNodeState();
             boolean o2State = dataNodeCompareInfoMap.get(o2).getDataNodeState();
@@ -376,11 +373,11 @@ public class Cluster {
 
         @Override
         public String toString() {
-            return "{" +
-                "connectionListSize=" + connectionListSize +
-                ", cachedCreatedConnectionSize=" + cachedCreatedConnectionSize +
-                ", dataNodeState=" + dataNodeState +
-                '}';
+            return "{"
+                + "connectionListSize=" + connectionListSize
+                + ", cachedCreatedConnectionSize=" + cachedCreatedConnectionSize
+                + ", dataNodeState=" + dataNodeState
+                + '}';
         }
     }
 
@@ -597,19 +594,21 @@ public class Cluster {
 
     @Override
     public boolean equals(final Object o) {
-        if (this == o)
+        if (this == o) {
             return true;
-        if (o == null || getClass() != o.getClass())
+        }
+        if (o == null || getClass() != o.getClass()) {
             return false;
+        }
         final Cluster that = (Cluster) o;
         return Objects.equals(urlIdentifier, that.urlIdentifier) && Objects.equals(dns, that.dns);
     }
 
     /**
-     * Close connections from abandonedConnectionList.
-     * Jdbc will continue to pop connections from abandonedConnectionList and determine whether each connection can be closed.
-     * If it does, the connection will be close. If it does not, the connection won't be put back into abandonedConnectionList.
-     * The number of connections closed at each cluster for each scheduled task at most: 20% * totalAbandonedConnectionSize.
+     * Close connections from abandonedConnectionList.Jdbc will continue to pop connections from abandonedConnectionList
+     * and determine whether each connection can be closed. If it does, the connection will be close. If it does not,
+     * the connection won't be put back into abandonedConnectionList. The number of connections closed at each cluster
+     * for each scheduled task at most: 20% * totalAbandonedConnectionSize.
      *
      * @return the number of connections which are closed
      */
@@ -651,9 +650,9 @@ public class Cluster {
                 this.quickAutoBalanceStartTime = 0;
                 this.totalAbandonedConnectionSize = 0;
             }
-            LOGGER.info(GT.tr("Close connections execute in cluster: {0}, closed connections: {1}, " +
-                    "size of abandonedConnectionList before closing: {2}," +
-                    " size of abandonedConnectionList after closing: {3}.",
+            LOGGER.info(GT.tr("Close connections execute in cluster: {0}, closed connections: {1}, "
+                    + "size of abandonedConnectionList before closing: {2},"
+                    + " size of abandonedConnectionList after closing: {3}.",
                 urlIdentifier, closed, oldSize, abandonedConnectionList.size()));
         }
         return closed;

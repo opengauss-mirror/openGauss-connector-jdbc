@@ -536,6 +536,11 @@ public enum PGProperty {
    * It is used to detect the thread interval of the survival task on the primary node in the high availability scenario.
    */
   HEARTBEAT_PERIOD("heartbeatPeriod", "0", "heartbeat interval time"),
+  
+  /**
+   * It is used to change timestamp parameter in TimestampUtils convert.
+   */
+  TIMESTAMP_NANO_FORMAT("timestampNanoFormat", "0", "0 main's already add nana seconds. 1 mains nano<1000 will not add"),
 
   /**
    * In the scenario where heartbeat maintenance is enabled for the active node,
