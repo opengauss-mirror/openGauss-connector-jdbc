@@ -313,6 +313,7 @@ public class PgConnection implements BaseConnection {
         return queryExecutor.getTimeZone();
       }
     });
+    timestampUtils.setTimestampNanoFormat(PGProperty.TIMESTAMP_NANO_FORMAT.getInteger(info));
 
     // Initialize common queries.
     // isParameterized==true so full parse is performed and the engine knows the query
