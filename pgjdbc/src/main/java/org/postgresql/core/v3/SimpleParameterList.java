@@ -365,8 +365,15 @@ class SimpleParameterList implements V3ParameterList {
   // Package-private V3 accessors
   //
 
-  int getTypeOID(int index) {
+  public int getTypeOID(int index) {
     return paramTypes[index - 1];
+  }
+
+  public void setTypeOID(int index, int oid) {
+    if (index < 1 || index > paramTypes.length) {
+      return;
+    }
+    paramTypes[index - 1] = oid;
   }
 
   boolean hasUnresolvedTypes() {

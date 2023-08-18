@@ -244,4 +244,8 @@ public interface ParameterList {
   Object[] getValues();
 
   void bindRegisterOutParameter(int index,int oid, boolean isACompatibilityFunction) throws SQLException;
+
+  int getTypeOID(int index);
+
+  void setTypeOID(int index, int oid);
 }

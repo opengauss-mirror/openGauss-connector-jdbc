@@ -63,13 +63,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Map;
-import java.util.TimeZone;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.Locale;
 
 class PgPreparedStatement extends PgStatement implements PreparedStatement {
   protected final CachedQuery preparedQuery; // Query fragments for prepared statement.
@@ -287,7 +282,32 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       preparedParameters.saveLiteralValueForClientLogic(parameterIndex, Long.toString(x));
       return;
     }
+    switchOidIntToInt8(parameterIndex);
     bindLiteral(parameterIndex, Long.toString(x), Oid.INT8);
+  }
+
+  public boolean isBatchMode() {
+    if (batchParameters == null) {
+      return false;
+    }
+    if (!connection.isAdaptiveSetSQLType()) {
+      return false;
+    }
+    return connection.IsBatchInsert() && batchParameters.size() >= 1;
+  }
+
+  public void switchOidIntToInt8(int parameterIndex) {
+    switchOid(parameterIndex, Oid.INT4, Oid.INT8);
+  }
+
+  public void switchOid(int parameterIndex, int oldOid, int newOid) {
+    if (!isBatchMode()) {
+      return;
+    }
+    ParameterList parameter = batchParameters.get(0);
+    if (parameter.getTypeOID(parameterIndex) == oldOid && newOid == Oid.INT8) {
+      parameter.setTypeOID(parameterIndex, newOid);
+    }
   }
 
   public void setFloat(int parameterIndex, float x) throws SQLException {

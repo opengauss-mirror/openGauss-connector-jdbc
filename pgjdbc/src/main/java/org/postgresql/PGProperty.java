@@ -546,7 +546,10 @@ public enum PGProperty {
    */
   MASTER_FAILURE_HEARTBEAT_TIMEOUT("masterFailureHeartbeatTimeout", "30000", "In the scenario where heartbeat maintenance is enabled for the active node, " +
           "if the active node is down, set the timeout threshold for searching for the active node. If the active node is not detected within this timeout period, " +
-          "the cluster is considered to have no active node and no maintenance is performed on the current cluster. This time should include the RTO time of the active node.")
+          "the cluster is considered to have no active node and no maintenance is performed on the current cluster. This time should include the RTO time of the active node."),
+
+  ADAPTIVE_SET_SQL_TYPE("adaptiveSetSQLType","false","Adaptively modify the inconsistent set sqlType in batch mode. If the first set sqlType is INTEGER and the second set is LONG, " +
+          "the first one will be automatically modify to LONG")
 
   ;
 

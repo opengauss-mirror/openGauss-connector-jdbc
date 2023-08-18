@@ -214,4 +214,12 @@ class CompositeParameterList implements V3ParameterList {
       subparams[sub].setBlob(index - offsets[sub], stream, length);
   }
 
+  public int getTypeOID(int index) {
+     int[] oids = this.getTypeOIDs();
+     return oids[index];
+  }
+
+  public void setTypeOID(int index, int oid) {
+    return;
+  }
 }
