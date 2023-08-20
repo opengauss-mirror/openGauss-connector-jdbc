@@ -194,6 +194,7 @@ public class PgConnection implements BaseConnection {
   private final String xmlFactoryFactoryClass;
   private PGXmlFactoryFactory xmlFactoryFactory;
   private String socketAddress;
+  private boolean adaptiveSetSQLType = false;
   final CachedQuery borrowQuery(String sql) throws SQLException {
     return queryExecutor.borrowQuery(sql);
   }
@@ -456,6 +457,8 @@ public class PgConnection implements BaseConnection {
         LOGGER.trace("WARNING, unrecognized batchmode type");
         batchInsert = false;
     }
+
+    adaptiveSetSQLType = PGProperty.ADAPTIVE_SET_SQL_TYPE.getBoolean(info);
     
     initClientLogic(info);
   }
@@ -2078,5 +2081,13 @@ public class PgConnection implements BaseConnection {
         return CANCEL_TIMER_UPDATER;
     }
 
+    @Override
+    public boolean IsBatchInsert() {
+        return this.batchInsert;
+    }
+
+    public boolean isAdaptiveSetSQLType() {
+        return this.adaptiveSetSQLType;
+    }
 
 }

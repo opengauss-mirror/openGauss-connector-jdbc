@@ -236,4 +236,8 @@ public interface BaseConnection extends PGConnection, Connection {
    * @return AtomicReferenceFieldUpdater<PgStatement, TimerTask>
    */
   AtomicReferenceFieldUpdater<PgStatement, TimerTask> getTimerUpdater();
+
+  public boolean IsBatchInsert();
+
+  public boolean isAdaptiveSetSQLType();
 }
