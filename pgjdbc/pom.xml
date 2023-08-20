@@ -101,7 +101,7 @@
               <sourceDirectory>${project.build.sourceDirectory}</sourceDirectory>
               <outputDirectory>${project.build.sourceDirectory}</outputDirectory>
               <keysFile>messages.pot</keysFile>
-              <poDirectory>src/java/main/org/postgresql/translation</poDirectory>
+              <poDirectory>src/main/java/org/postgresql/translation</poDirectory>
               <targetBundle>org.postgresql.translation.messages</targetBundle>
               <keywords>-kGT.tr</keywords>
               <msgmergeCmd>msgmerge</msgmergeCmd>
