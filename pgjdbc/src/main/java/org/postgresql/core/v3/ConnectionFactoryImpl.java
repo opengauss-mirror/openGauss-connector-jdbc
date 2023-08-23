@@ -470,6 +470,11 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     if (PGProperty.PG_CLIENT_LOGIC.get(info) != null && PGProperty.PG_CLIENT_LOGIC.get(info).equals("1")) {
       paramList.add(new String[]{"enable_full_encryption", "1"});
     }
+
+    String options = PGProperty.OPTIONS.get(info);
+    if (options != null) {
+        paramList.add(new String[]{"options", options});
+    }
     return paramList;
   }
 
