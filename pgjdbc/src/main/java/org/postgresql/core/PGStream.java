@@ -21,6 +21,7 @@ import java.io.OutputStream;
 import java.io.Writer;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
 import java.sql.SQLException;
 import javax.net.SocketFactory;
@@ -566,13 +567,20 @@ public class PGStream implements Closeable, Flushable {
     return connection.getSoTimeout();
   }
 
+  private static String getSocketAddressDescStr(SocketAddress address) {
+    String strAddress = "af_unix";
+    if (address != null) {
+      strAddress = address.toString().substring(1);
+    }
+    return strAddress;
+  }
   /**
    * This function returns the String which contains the server socket address and client socket address.
    * This function is only used to distinguish different connections when we create dump file.
    */
   public String getConnectInfo() {
-    String clientSocketAddress = connection.getLocalSocketAddress().toString().substring(1);
-    String serverSocketAddress = connection.getRemoteSocketAddress().toString().substring(1);
+    String clientSocketAddress = getSocketAddressDescStr(connection.getLocalSocketAddress());
+    String serverSocketAddress = getSocketAddressDescStr(connection.getRemoteSocketAddress());
     return clientSocketAddress + "/" + serverSocketAddress;
   }
 
