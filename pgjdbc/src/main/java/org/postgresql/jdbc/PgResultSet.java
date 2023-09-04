@@ -506,7 +506,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     if (oid == Oid.BYTEA) {
         byt = trimBytes(i, PGbytea.toBytes(this_row[i - 1]));
     } else if (oid == Oid.BLOB) {
-        byt = toBytes(getString(1));
+        byt = toBytes(getString(i));
     } else {
         byt = trimBytes(i, this_row[i - 1]);
     }
