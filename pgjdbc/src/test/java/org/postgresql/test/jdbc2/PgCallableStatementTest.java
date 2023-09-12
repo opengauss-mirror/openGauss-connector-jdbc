@@ -13,10 +13,15 @@ import java.util.Arrays;
 import static org.junit.Assert.assertEquals;
 
 public class PgCallableStatementTest extends BaseTest4 {
+    private String schemaName = getSchemaByRandom();
+    private String setPathSql = "SET search_path TO ";
 
     @Before
     public void setUp() throws Exception {
         super.setUp();
+        TestUtil.createSchema(con, schemaName);
+        TestUtil.execute(setPathSql + schemaName, con);
+
         TestUtil.execute("set behavior_compat_options='proc_outparam_override'", con);
         TestUtil.createCompositeType(con, "compfoos", "f1 int, f2 varchar(20), f3 varchar(20)");
         TestUtil.createTable(con, "test_user_type", "a int, b compfoos, c compfoos, d varchar(20)");
@@ -59,6 +64,8 @@ public class PgCallableStatementTest extends BaseTest4 {
     public void tearDown() throws SQLException {
         TestUtil.dropType(con, "compfoos");
         TestUtil.dropTable(con, "test_user_type");
+        // drop schema
+        TestUtil.dropSchema(con, schemaName);
     }
 
     @Test
@@ -76,7 +83,7 @@ public class PgCallableStatementTest extends BaseTest4 {
             String query_str = "{call test_proc_user_type_out(?,?,?)}";
             cmt = con.prepareCall(query_str);
             cmt.setInt(1, 1);
-            cmt.registerOutParameter(2, Types.STRUCT, "wumk3.compfoos");
+            cmt.registerOutParameter(2, Types.STRUCT, schemaName + ".compfoos");
             cmt.setInt(3, 1);
             cmt.execute();
             PGobject object = (PGobject) cmt.getObject(2);
@@ -105,8 +112,8 @@ public class PgCallableStatementTest extends BaseTest4 {
             String query_str = "{call test_proc_user_type_out(?,?,?,?)}";
             cmt = con.prepareCall(query_str);
             cmt.setInt(1, 1);
-            cmt.registerOutParameter(2, Types.STRUCT, "wumk3.compfoos");
-            cmt.registerOutParameter(3, Types.STRUCT, "wumk3.compfoos");
+            cmt.registerOutParameter(2, Types.STRUCT, schemaName + ".compfoos");
+            cmt.registerOutParameter(3, Types.STRUCT, schemaName + ".compfoos");
             cmt.registerOutParameter(4, Types.VARCHAR);
             cmt.execute();
             PGobject firstObject = (PGobject) cmt.getObject(2);
@@ -207,7 +214,7 @@ public class PgCallableStatementTest extends BaseTest4 {
             TestUtil.execute(TestUtil.insertSQL("test_user_type", "3, (1,'demo','demo'), null, null"), con);
             cmt = con.prepareCall("{call test_proc_user_type_out2(?,?)}");
             cmt.setInt(1, 3);
-            cmt.registerOutParameter(2, Types.STRUCT, "wumk3.compfoos");
+            cmt.registerOutParameter(2, Types.STRUCT, schemaName + ".compfoos");
             cmt.execute();
             PGobject firstObject = (PGobject) cmt.getObject(2);
             assertEquals("[f1, f2, f3]", Arrays.toString(firstObject.getStruct()));
@@ -217,7 +224,7 @@ public class PgCallableStatementTest extends BaseTest4 {
             TestUtil.execute(TestUtil.insertSQL("test_user_type", "4, (1,'','demo'), null, null"), con);
             cmt = con.prepareCall("{call test_proc_user_type_out2(?,?)}");
             cmt.setInt(1, 4);
-            cmt.registerOutParameter(2, Types.STRUCT, "wumk3.compfoos");
+            cmt.registerOutParameter(2, Types.STRUCT, schemaName + ".compfoos");
             cmt.execute();
             PGobject secondObject = (PGobject) cmt.getObject(2);
             assertEquals("[f1, f2, f3]", Arrays.toString(secondObject.getStruct()));
@@ -228,7 +235,7 @@ public class PgCallableStatementTest extends BaseTest4 {
                     "null"), con);
             cmt = con.prepareCall("{call test_proc_user_type_out2(?,?)}");
             cmt.setInt(1, 5);
-            cmt.registerOutParameter(2, Types.STRUCT, "wumk3.compfoos");
+            cmt.registerOutParameter(2, Types.STRUCT, schemaName + ".compfoos");
             cmt.execute();
             PGobject thirdObject = (PGobject) cmt.getObject(2);
             assertEquals("[f1, f2, f3]", Arrays.toString(thirdObject.getStruct()));
@@ -239,7 +246,7 @@ public class PgCallableStatementTest extends BaseTest4 {
                     "null"), con);
             cmt = con.prepareCall("{call test_proc_user_type_out2(?,?)}");
             cmt.setInt(1, 6);
-            cmt.registerOutParameter(2, Types.STRUCT, "wumk3.compfoos");
+            cmt.registerOutParameter(2, Types.STRUCT, schemaName + ".compfoos");
             cmt.execute();
             PGobject fourthObject = (PGobject) cmt.getObject(2);
             assertEquals("[f1, f2, f3]", Arrays.toString(fourthObject.getStruct()));
@@ -250,7 +257,7 @@ public class PgCallableStatementTest extends BaseTest4 {
                     "null"), con);
             cmt = con.prepareCall("{call test_proc_user_type_out2(?,?)}");
             cmt.setInt(1, 7);
-            cmt.registerOutParameter(2, Types.STRUCT, "wumk3.compfoos");
+            cmt.registerOutParameter(2, Types.STRUCT, schemaName + ".compfoos");
             cmt.execute();
             PGobject fifthObject = (PGobject) cmt.getObject(2);
             assertEquals("[f1, f2, f3]", Arrays.toString(fifthObject.getStruct()));

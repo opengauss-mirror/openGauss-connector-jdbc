@@ -279,6 +279,8 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
         return getClob(columnIndex);
       case Types.BLOB:
         return getBlob(columnIndex);
+      case Types.STRUCT:
+        return getStruct(columnIndex);
 
       default:
         String type = getPGType(columnIndex);
@@ -339,6 +341,21 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
         return null;
     }
   }
+
+    /**
+     * Get the PGStruct object based on parameter index
+     *
+     * @Params index
+     * @Return the PGStruct object
+     */
+    public PGStruct getStruct(int i) throws SQLException {
+      int oid = fields[i - 1].getOID();
+      String attrsValue = getString(i);
+      String sqlType = getPGType(i);
+      PGStruct pgStruct = new PGStruct(connection, oid, attrsValue);
+      pgStruct.setType(sqlType);
+      return pgStruct;
+    }
 
   private void checkScrollable() throws SQLException {
     checkClosed();

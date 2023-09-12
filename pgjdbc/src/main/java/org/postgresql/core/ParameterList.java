@@ -248,4 +248,9 @@ public interface ParameterList {
   int getTypeOID(int index);
 
   void setTypeOID(int index, int oid);
+
+    /**
+     * set the parameter value by index
+     */
+    void setObjectParameter(int parameterIndex, Object obj, int oid) throws SQLException;
 }

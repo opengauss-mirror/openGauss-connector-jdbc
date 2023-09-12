@@ -20,11 +20,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class TypeInfoCache implements TypeInfo {
@@ -60,6 +56,9 @@ public class TypeInfoCache implements TypeInfo {
   private PreparedStatement _getArrayElementOidStatement;
   private PreparedStatement _getArrayDelimiterStatement;
   private PreparedStatement _getTypeInfoStatement;
+
+    private PreparedStatement _getStructElementStatement;
+    private Map<Integer, List<Integer>> _pgStructToPgTypes;
 
   // basic pg types info:
   // 0 - type name
@@ -127,6 +126,7 @@ public class TypeInfoCache implements TypeInfo {
     _pgNameToPgObject = new HashMap<String, Class<? extends PGobject>>();
     _pgArrayToPgType = new HashMap<Integer, Integer>();
     _arrayOidToDelimiter = new HashMap<Integer, Character>();
+    _pgStructToPgTypes = new HashMap<>();
 
     // needs to be synchronized because the iterator is returned
     // from getPGTypeNamesWithSQLTypes()
@@ -877,4 +877,70 @@ public class TypeInfoCache implements TypeInfo {
     }
     return true;
   }
+
+    /*
+     * query struct attributes type by oid sql
+     */
+    private final String queryStructAttributesTypeByOidSql = "select "
+            + "a.oid, n.nspname = ANY(current_schemas(true)), n.nspname, a.typname "
+            + "from pg_type t join pg_class on (reltype = t.oid) "
+            + "join pg_attribute on (attrelid = pg_class.oid and attnum > 0) "
+            + "join pg_type a on (atttypid = a.oid) "
+            + "join pg_namespace n on (a.typnamespace = n.oid) "
+            + "where t.oid = ? order by pg_attribute.attnum ;";
+
+    /**
+     * Returns the attributes sql type list of the object based on oid
+     *
+     * @param oid
+     * @return the attributes sql type list
+     * @throws SQLException if something goes wrong
+     */
+    @Override
+    public List<Integer> getStructAttributesSqlType(int oid) throws SQLException {
+      if (oid == 0) {
+        return null;
+      }
+
+      List<Integer> pgTypes = _pgStructToPgTypes.get(oid);
+      if (pgTypes != null) {
+        return pgTypes;
+      }
+
+      if (_getStructElementStatement == null) {
+        _getStructElementStatement = _conn.prepareStatement(queryStructAttributesTypeByOidSql);
+      }
+      _getStructElementStatement.setInt(1, oid);
+
+      // Go through BaseStatement to avoid transaction start.
+      if (!((BaseStatement) _getStructElementStatement).executeWithFlags(QueryExecutor.QUERY_SUPPRESS_BEGIN)) {
+        throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
+      }
+
+      ResultSet rs = _getStructElementStatement.getResultSet();
+      String quotes = "\"";
+      String point = ".";
+      pgTypes = new ArrayList<>();
+      while (rs.next()) {
+        int pgType = rs.getInt(1);
+        boolean onPath = rs.getBoolean(2);
+        String schema = rs.getString(3);
+        String name = rs.getString(4);
+        StringBuilder sb = new StringBuilder();
+        sb.append(quotes).append(schema).append(quotes).append(point).append(quotes).append(name).append(quotes);
+        String fullName = sb.toString();
+        _pgNameToOid.put(schema + point + name, pgType);
+        _pgNameToOid.put(fullName, pgType);
+        if (onPath && name.equals(name.toLowerCase())) {
+          _oidToPgName.put(pgType, name);
+          _pgNameToOid.put(name, pgType);
+        } else {
+          _oidToPgName.put(pgType, fullName);
+        }
+        pgTypes.add(pgType);
+      }
+      _pgStructToPgTypes.put(oid, pgTypes);
+      rs.close();
+      return pgTypes;
+    }
 }

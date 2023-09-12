@@ -24,6 +24,7 @@ import org.postgresql.log.Log;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
+import java.sql.Struct;
 import java.util.Arrays;
 
 
@@ -275,6 +276,9 @@ class SimpleParameterList implements V3ParameterList {
           return "'" + pgBox.toString() + "'::box";
       }
       return "?";
+    } else if (paramValues[index] instanceof Struct) {
+      Struct struct = (Struct) paramValues[index];
+      return struct.toString();
     } else {
       String param = paramValues[index].toString();
 
@@ -425,6 +429,13 @@ class SimpleParameterList implements V3ParameterList {
       return ((StreamWrapper) paramValues[index]).getLength();
     }
 
+    // java.sql.Struct encoded?
+    if (paramValues[index] instanceof Struct) {
+      Struct struct = (Struct) paramValues[index];
+      String value = struct.toString();
+      return Utils.encodeUTF8(value, clientEncoding).length;
+    }
+
     // Already encoded?
     if (encoded[index] == null) {
       // Encode value and compute actual length using UTF-8.
@@ -451,6 +462,14 @@ class SimpleParameterList implements V3ParameterList {
     // Binary-format bytea?
     if (paramValues[index] instanceof StreamWrapper) {
       streamBytea(pgStream, (StreamWrapper) paramValues[index]);
+      return;
+    }
+
+    // java.sql.Struct encoded?
+    if (paramValues[index] instanceof Struct) {
+      Struct struct = (Struct) paramValues[index];
+      String value = struct.toString();
+      pgStream.send(Utils.encodeUTF8(value, clientEncoding));
       return;
     }
 
@@ -554,5 +573,10 @@ class SimpleParameterList implements V3ParameterList {
   private static final Object NULL_OBJECT = new Object();
 
   private int pos = 0;
+
+    @Override
+    public void setObjectParameter(int index, Object obj, int oid) throws SQLException {
+      bind(index, obj, oid, (byte) 0);
+    }
 }
 

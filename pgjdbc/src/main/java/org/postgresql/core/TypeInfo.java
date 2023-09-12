@@ -9,6 +9,7 @@ import org.postgresql.util.PGobject;
 
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.List;
 
 public interface TypeInfo {
   void addCoreType(String pgTypeName, Integer oid, Integer sqlType, String javaClass,
@@ -112,4 +113,13 @@ public interface TypeInfo {
    * @throws SQLException if something goes wrong
    */
   boolean requiresQuotingSqlType(int sqlType) throws SQLException;
+
+    /**
+     * Returns the attributes sql type list of the object based on oid
+     *
+     * @param oid the type's OID
+     * @return the attributes sql type list
+     * @throws SQLException if something goes wrong
+     */
+    List<Integer> getStructAttributesSqlType(int oid) throws SQLException;
 }

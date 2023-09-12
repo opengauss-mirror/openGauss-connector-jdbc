@@ -1562,11 +1562,22 @@ public class PgConnection implements BaseConnection {
     return makeSQLXML();
   }
 
-  @Override
-  public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
-    checkClosed();
-    throw org.postgresql.Driver.notImplemented(this.getClass(), "createStruct(String, Object[])");
-  }
+    @Override
+    public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
+        checkClosed();
+        if (attributes == null) {
+            return null;
+        }
+        final TypeInfo typeInfo = getTypeInfo();
+        // Query the oid of this type based on typeName
+        final int oid = typeInfo.getPGType(typeName);
+        if (oid == Oid.UNSPECIFIED) {
+            throw new PSQLException(GT.tr("Unable to find server struct type for provided name {0}.", typeName),
+                    PSQLState.INVALID_NAME);
+        }
+        // Create a PGStruct object
+        return new PGStruct(this, oid, attributes);
+    }
 
   @Override
   public Array createArrayOf(String typeName, Object elements) throws SQLException {
