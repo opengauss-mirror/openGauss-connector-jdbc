@@ -2906,7 +2906,14 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     int elen = pgStream.receiveInteger4();
     EncodingPredictor.DecodeResult totalMessage = pgStream.receiveErrorString(elen - 4);
     ServerErrorMessage errorMsg = new ServerErrorMessage(totalMessage, socketAddress);
-
+    int size = pendingParseQueue.size();
+    SimpleQuery query;
+    if (size > 0) {
+      query = pendingParseQueue.getLast();
+    } else {
+      query = pendingExecuteQueue.getFirst().query;
+    }
+    errorMsg.setErrorQuery(query.getNativeSql());
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace(" <=BE ErrorMessage(" + errorMsg.toString() + ")");
     }
