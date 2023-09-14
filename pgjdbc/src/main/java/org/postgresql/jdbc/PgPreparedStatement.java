@@ -59,6 +59,7 @@ import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.sql.Struct;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
@@ -1027,6 +1028,15 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       setClob(parameterIndex, (Clob) x);
     } else if (x instanceof Array) {
       setArray(parameterIndex, (Array) x);
+    } else if (x instanceof Struct) {
+      PGStruct pgStruct = null;
+      if (x instanceof PGStruct) {
+        pgStruct = (PGStruct) x;
+      } else {
+        Struct struct = (Struct) x;
+        pgStruct = (PGStruct) connection.createStruct(struct.getSQLTypeName(), struct.getAttributes());
+      }
+      preparedParameters.setObjectParameter(parameterIndex, pgStruct, pgStruct.getOid());
     } else if (x instanceof PGobject) {
       setPGobject(parameterIndex, (PGobject) x);
     } else if (x instanceof Map) {

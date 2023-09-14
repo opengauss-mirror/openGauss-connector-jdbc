@@ -200,13 +200,13 @@ class CompositeParameterList implements V3ParameterList {
   private final int total;
   private final SimpleParameterList[] subparams;
   private final int[] offsets;
-  
+
 	@Override
 	public void setBlob(int index, byte[] data, int offset, int length)
 			throws SQLException {
 		int sub = findSubParam(index);
 		subparams[sub].setBlob(index - offsets[sub], data, offset, length);
-		
+
 	}
 
   public void setBlob(int index, InputStream stream, int length) throws SQLException {
@@ -222,4 +222,11 @@ class CompositeParameterList implements V3ParameterList {
   public void setTypeOID(int index, int oid) {
     return;
   }
+
+    @Override
+    public void setObjectParameter(int index, Object obj, int oid) throws SQLException {
+      int sub = findSubParam(index);
+      int subIndex = index - offsets[sub];
+      subparams[sub].setObjectParameter(subIndex, obj, oid);
+    }
 }

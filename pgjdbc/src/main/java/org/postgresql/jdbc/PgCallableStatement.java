@@ -163,9 +163,10 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
         }
         sb.deleteCharAt(sb.length() - 1);
         sb.append(")");
-        PGobject pGobject = (PGobject) connection.getObject("null", sb.toString(), null);
-        pGobject.setStruct(getcompositeTypeStruct(j + 1));
-        callResult[j] = pGobject;
+        PGStruct pgStruct = new PGStruct(connection, 0, sb.toString());
+        pgStruct.setAttrsSqlTypeList(getCompositeTypeOid(j + 1));
+        pgStruct.setStruct(getcompositeTypeStruct(j + 1));
+        callResult[j] = pgStruct;
       }
     } else {
       if (cols != outParameterCount) {
@@ -721,6 +722,21 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
     }
     return res;
   }
+
+    /**
+     * Get the attributes sql type list of the object based on oid
+     *
+     * @Params index
+     * @Return the attributes sql type list
+     */
+    private List<Integer> getCompositeTypeOid(int index) {
+      List<Object[]> struct = compositeTypeStructMap.get(index);
+      List<Integer> res = new ArrayList<>();
+      for (Object[] objects : struct) {
+        res.add((Integer) objects[1]);
+      }
+      return res;
+    }
 
   public void registerOutParameter(int parameterIndex, int sqlType, String typeName)
       throws SQLException {

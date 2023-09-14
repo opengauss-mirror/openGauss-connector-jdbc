@@ -18,6 +18,7 @@ import org.junit.Before;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
+import java.util.Random;
 
 public class BaseTest4 {
 
@@ -123,4 +124,20 @@ public class BaseTest4 {
     Assume.assumeTrue(TestUtil.haveMinimumServerVersion(con, version));
   }
 
+  /**
+   * Randomly generate an 8-digit schema name.
+   */
+  public String getSchemaByRandom() {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < 8; i++) {
+      int rand = new Random().nextInt(26);
+      if (rand <= 0) {
+        sb.append('a');
+      } else {
+        char start = (char) ('a' + rand);
+        sb.append(start);
+      }
+    }
+    return sb.toString();
+  }
 }
