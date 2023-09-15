@@ -79,8 +79,11 @@ public class DatabaseMetaDataTest {
           "CREATE OR REPLACE FUNCTION f5() RETURNS TABLE (i int) LANGUAGE sql AS 'SELECT 1'");
     }
 
+    /*
+    ERROR: DOMAIN is not yet supported.
     TestUtil.createDomain(con, "nndom", "int not null");
     TestUtil.createTable(con, "domaintable", "id nndom");
+     */
     stmt.close();
   }
 
@@ -99,15 +102,21 @@ public class DatabaseMetaDataTest {
     TestUtil.dropTable(con, "\"a'\"");
     TestUtil.dropTable(con, "arraytable");
     TestUtil.dropTable(con, "intarraytable");
+    /*
     TestUtil.dropTable(con, "customtable");
     TestUtil.dropType(con, "custom");
     TestUtil.dropType(con, "_custom");
+    */
 
     stmt.execute("DROP FUNCTION f1(int, varchar)");
     stmt.execute("DROP FUNCTION f2(int, varchar)");
     stmt.execute("DROP FUNCTION f3(int, varchar)");
+
+    /*
+    ERROR: DOMAIN is not yet supported.
     TestUtil.dropType(con, "domaintable");
     TestUtil.dropDomain(con, "nndom");
+    */
 
     TestUtil.closeDB(con);
   }
@@ -148,9 +157,9 @@ public class DatabaseMetaDataTest {
     assertEquals("_custom", res.getString("TYPE_NAME"));
     if (TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_3)) {
       assertTrue(res.next());
-      assertEquals("__custom", res.getString("TYPE_NAME"));
+      assertEquals("_custom_1", res.getString("TYPE_NAME"));
       assertTrue(res.next());
-      assertEquals("___custom", res.getString("TYPE_NAME"));
+      assertEquals("__custom", res.getString("TYPE_NAME"));
     }
     if (TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_3)) {
       con.createArrayOf("custom", new Object[]{});
@@ -160,9 +169,9 @@ public class DatabaseMetaDataTest {
       assertTrue(res.next());
       assertEquals("_custom", res.getString("TYPE_NAME"));
       assertTrue(res.next());
-      assertEquals("__custom", res.getString("TYPE_NAME"));
+      assertEquals("_custom_1", res.getString("TYPE_NAME"));
       assertTrue(res.next());
-      assertEquals("___custom", res.getString("TYPE_NAME"));
+      assertEquals("__custom", res.getString("TYPE_NAME"));
     }
   }
 
@@ -635,6 +644,8 @@ public class DatabaseMetaDataTest {
     rs.close();
   }
 
+  /*
+  ERROR: DOMAIN is not yet supported.
   @Test
   public void testNotNullDomainColumn() throws SQLException {
     DatabaseMetaData dbmd = con.getMetaData();
@@ -644,6 +655,7 @@ public class DatabaseMetaDataTest {
     assertEquals("NO", rs.getString("IS_NULLABLE"));
     assertTrue(!rs.next());
   }
+  */
 
   @Test
   public void testAscDescIndexInfo() throws SQLException {
@@ -967,6 +979,8 @@ public class DatabaseMetaDataTest {
 
   }
 
+  /*
+  ERROR: DOMAIN is not yet supported.
   @Test
   public void testGetUDT1() throws Exception {
     try {
@@ -1094,6 +1108,7 @@ public class DatabaseMetaDataTest {
       }
     }
   }
+  */
 
   @Test
   public void testTypes() throws SQLException {

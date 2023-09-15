@@ -81,7 +81,7 @@ public class PGStruct extends PGobject implements Struct {
      */
     private List<Integer> getAttrsSqlTypeList() throws SQLException {
         final TypeInfo typeInfo = conn.getTypeInfo();
-        return typeInfo.getStructAttributesSqlType(oid);
+        return typeInfo.getStructAttributesOid(oid);
     }
 
     @Override

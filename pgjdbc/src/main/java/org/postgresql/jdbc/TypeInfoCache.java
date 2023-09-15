@@ -43,6 +43,9 @@ public class TypeInfoCache implements TypeInfo {
   // type array oid -> base type's oid
   private Map<Integer, Integer> _pgArrayToPgType;
 
+  // table of type -> base type's oid
+  private Map<Integer, Integer> _pgTableOfPgType;
+
   // array type oid -> base type array element delimiter
   private Map<Integer, Character> _arrayOidToDelimiter;
 
@@ -59,6 +62,9 @@ public class TypeInfoCache implements TypeInfo {
 
     private PreparedStatement _getStructElementStatement;
     private Map<Integer, List<Integer>> _pgStructToPgTypes;
+
+  // cache the subscript of the current custom type in the statement and the struct of the custom type
+  private ConcurrentHashMap<Integer, List<Object[]>> compositeTypeStructMap = new ConcurrentHashMap<>();
 
   // basic pg types info:
   // 0 - type name
@@ -125,6 +131,7 @@ public class TypeInfoCache implements TypeInfo {
     _pgNameToJavaClass = new HashMap<String, String>();
     _pgNameToPgObject = new HashMap<String, Class<? extends PGobject>>();
     _pgArrayToPgType = new HashMap<Integer, Integer>();
+    _pgTableOfPgType = new HashMap<Integer, Integer>();
     _arrayOidToDelimiter = new HashMap<Integer, Character>();
     _pgStructToPgTypes = new HashMap<>();
 
@@ -245,15 +252,18 @@ public class TypeInfoCache implements TypeInfo {
 
   private PreparedStatement getOidStatement(String pgTypeName) throws SQLException {
     boolean isArray = pgTypeName.endsWith("[]");
-    boolean hasQuote = pgTypeName.contains("\"");
+    String[] names = getPgTypeSchemaName(pgTypeName, true);
+    String schema = names[0];
+    String typeName = names[1];
+    boolean hasQuote = typeName.contains("\"");
     int dotIndex = pgTypeName.indexOf('.');
   
-    if (dotIndex == -1 && !hasQuote && !isArray) {
+    if (schema == null && !hasQuote && !isArray) {
       if (_getNameStatement == null) {
         String sql;
         // see comments in @getSQLType()
         // -- go with older way of unnesting array to be compatible with 8.0
-        sql = "SELECT pg_type.oid, typname "
+          sql = "SELECT pg_type.oid, typname, typtype, typelem "
                 + "  FROM pg_catalog.pg_type "
                 + "  LEFT "
                 + "  JOIN (select ns.oid as nspoid, ns.nspname, r.r "
@@ -268,7 +278,7 @@ public class TypeInfoCache implements TypeInfo {
         _getNameStatement = _conn.prepareStatement(sql);
       }
       // coerce to lower case to handle upper case type names
-      String lcName = pgTypeName.toLowerCase(Locale.ROOT);
+      String lcName = typeName.toLowerCase(Locale.ROOT);
       // default arrays are represented with _ as prefix ... this dont even work for public schema
       // fully
       _getNameStatement.setString(1, lcName);
@@ -279,14 +289,14 @@ public class TypeInfoCache implements TypeInfo {
       if (getOidStatementComplexArray == null) {
         String sql;
         if ( _conn.haveMinimumServerVersion(ServerVersion.v8_3)) {
-          sql = "SELECT t.typarray, arr.typname "
+            sql = "SELECT t.typarray, arr.typname, arr.typtype, arr.typelem "
                   + "  FROM pg_catalog.pg_type t"
                   + "  JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid"
                   + "  JOIN pg_catalog.pg_type arr ON arr.oid = t.typarray"
                   + " WHERE t.typname = ? AND (n.nspname = ? OR ? AND n.nspname = ANY (current_schemas(true)))"
                   + " ORDER BY t.oid DESC LIMIT 1";
         } else {
-          sql = "SELECT t.oid, t.typname "
+            sql = "SELECT t.oid, t.typname, typtype, typelem "
                   + "  FROM pg_catalog.pg_type t"
                   + "  JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid"
                   + " WHERE t.typelem = (SELECT oid FROM pg_catalog.pg_type WHERE typname = ?)"
@@ -299,7 +309,7 @@ public class TypeInfoCache implements TypeInfo {
       oidStatementComplex = getOidStatementComplexArray;
     } else {
       if (getOidStatementComplexNonArray == null) {
-        String sql = "SELECT t.oid, t.typname "
+          String sql = "SELECT t.oid, t.typname, typtype, typelem "
                 + "  FROM pg_catalog.pg_type t"
                 + "  JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid"
                 + " WHERE t.typname = ? AND (n.nspname = ? OR ? AND n.nspname = ANY (current_schemas(true)))"
@@ -308,12 +318,29 @@ public class TypeInfoCache implements TypeInfo {
       }
       oidStatementComplex = getOidStatementComplexNonArray;
     }
+    // simple use case
+    oidStatementComplex.setString(1, typeName);
+    oidStatementComplex.setString(2, schema);
+    oidStatementComplex.setBoolean(3, schema == null);
+    return oidStatementComplex;
+  }
+
+  /**
+   * Processing type names returns the schema+typename array
+   *
+   * @param pgTypeName type_name/type_name[]/_type_name/
+   *                   schema.type_name/schema.type_name[]/schema._type_name
+   * @return Name array string[2] schema,type_name
+   */
+  private String[] getPgTypeSchemaName(String pgTypeName, boolean trimQuote) {
+    String[] names = new String[2];
+    boolean isArray = pgTypeName.endsWith("[]");
+    int dotIndex = pgTypeName.indexOf('.');
+    String schema = null;
+    String name = null;
     //type name requested may be schema specific, of the form "{schema}"."typeName",
     //or may check across all schemas where a schema is not specified.
     String fullName = isArray ? pgTypeName.substring(0, pgTypeName.length() - 2) : pgTypeName;
-    String schema;
-    String name;
-    // simple use case
     if (dotIndex == -1) {
       schema = null;
       name = fullName;
@@ -333,20 +360,21 @@ public class TypeInfoCache implements TypeInfo {
         name = fullName.substring(dotIndex + 1);
       }
     }
-    if (schema != null && schema.startsWith("\"") && schema.endsWith("\"")) {
-      schema = schema.substring(1, schema.length() - 1);
-    } else if (schema != null) {
-      schema = schema.toLowerCase(Locale.ROOT);
+    if (trimQuote) {
+      if (schema != null && schema.startsWith("\"") && schema.endsWith("\"")) {
+        schema = schema.substring(1, schema.length() - 1);
+      } else if (schema != null) {
+        schema = schema.toLowerCase(Locale.ROOT);
+      }
+      if (name.startsWith("\"") && name.endsWith("\"")) {
+        name = name.substring(1, name.length() - 1);
+      } else {
+        name = name.toLowerCase(Locale.ROOT);
+      }
     }
-    if (name.startsWith("\"") && name.endsWith("\"")) {
-      name = name.substring(1, name.length() - 1);
-    } else {
-      name = name.toLowerCase(Locale.ROOT);
-    }
-    oidStatementComplex.setString(1, name);
-    oidStatementComplex.setString(2, schema);
-    oidStatementComplex.setBoolean(3, schema == null);
-    return oidStatementComplex;
+    names[0] = schema;
+    names[1] = name;
+    return names;
   }
   
   public synchronized int getPGType(String pgTypeName) throws SQLException {
@@ -367,6 +395,16 @@ public class TypeInfoCache implements TypeInfo {
     if (rs.next()) {
       oid = (int) rs.getLong(1);
       String internalName = rs.getString(2);
+      String tytType = rs.getString(3);
+      int typElem = (int) rs.getLong(4);
+      // the tytType value of pgarray is b
+      if (tytType != null && tytType.equals("b")) {
+        _pgArrayToPgType.put(oid, typElem);
+      }
+      // the tytType value of pg table of type is o
+      if (tytType != null && tytType.equals("o")) {
+        _pgTableOfPgType.put(oid, typElem);
+      }
       _oidToPgName.put(oid, internalName);
       _pgNameToOid.put(internalName, oid);
     }
@@ -426,28 +464,47 @@ public class TypeInfoCache implements TypeInfo {
     return pgTypeName;
   }
 
+  /**
+   * use type          ty_test  return _ty_test  oid
+   * use table of type tyt_test return _tyt_test oid
+   *
+   * @param elementTypeName the base type's
+   * @return array oid
+   * @throws SQLException if something goes wrong
+   */
   public int getPGArrayType(String elementTypeName) throws SQLException {
     elementTypeName = getTypeForAlias(elementTypeName);
+    String[] names = getPgTypeSchemaName(elementTypeName, false);
+    String schema = null;
+    if (names[0] != null) {
+      schema = names[0];
+      elementTypeName = names[1];
+    }
     int pgType = Oid.UNSPECIFIED;
-    for (String newTypeName: new String[] {
-            combainStringIfOneQuoted("_", elementTypeName),
-            combainStringIfOneQuoted(elementTypeName, "[]")}) {
-        pgType = getPGType(newTypeName);
-        if (pgType != Oid.UNSPECIFIED) {
-          return pgType;
-        }
+    // the _getOidStatementComplexArray is type[], the _getNameStatement is table of type.
+    String[] newTypeNameArray = new String[]{elementTypeName + "[]", elementTypeName};
+    for (String newTypeName : newTypeNameArray) {
+      if (schema != null && !schema.equals("")) {
+        newTypeName = schema + "." + newTypeName;
+      }
+      pgType = getPGType(newTypeName);
+
+      // if pgType is table of type return pg_type.typelem
+      Integer elementId = _pgTableOfPgType.get(pgType);
+      if (elementId != null && elementId > Oid.UNSPECIFIED) {
+        return elementId;
+      }
+
+      elementId = _pgArrayToPgType.get(pgType);
+      if (elementId == null) {
+        continue;
+      }
+
+      if (pgType != Oid.UNSPECIFIED) {
+        return pgType;
+      }
     }
     return pgType;
-  }
-
-  private static String combainStringIfOneQuoted(String first, String second) {
-    if (first.startsWith("\"")) {
-      return first.substring(0, first.length() - 1) + second + "\"";
-    }
-    if (second.startsWith("\"")) {
-      return "\"" + first + second.substring(1);
-    }
-    return first + second;
   }
 
   /**
@@ -520,7 +577,7 @@ public class TypeInfoCache implements TypeInfo {
 
     if (_getArrayElementOidStatement == null) {
       String sql;
-      sql = "SELECT e.oid, n.nspname = ANY(current_schemas(true)), n.nspname, e.typname "
+        sql = "SELECT e.oid, n.nspname = ANY(current_schemas(true)), n.nspname, e.typname, t.typtype as Ptyptype, e.typtype as Ctyptype "
             + "FROM pg_catalog.pg_type t JOIN pg_catalog.pg_type e ON t.typelem = e.oid "
             + "JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = ?";
       _getArrayElementOidStatement = _conn.prepareStatement(sql);
@@ -543,6 +600,12 @@ public class TypeInfoCache implements TypeInfo {
     boolean onPath = rs.getBoolean(2);
     String schema = rs.getString(3);
     String name = rs.getString(4);
+    String pTytType = rs.getString(5);
+    String cTytType = rs.getString(6);
+    // use typElem oid query, if pgType is array return oid tytType is o and the typElem oid tytType is b
+    if (pTytType.equals("o") && cTytType.equals("b")) {
+      return this.getPGArrayElement(pgType);
+    }
     _pgArrayToPgType.put(oid, pgType);
     _pgNameToOid.put(schema + "." + name, pgType);
     String fullName = "\"" + schema + "\".\"" + name + "\"";
@@ -878,69 +941,95 @@ public class TypeInfoCache implements TypeInfo {
     return true;
   }
 
-    /*
-     * query struct attributes type by oid sql
-     */
-    private final String queryStructAttributesTypeByOidSql = "select "
-            + "a.oid, n.nspname = ANY(current_schemas(true)), n.nspname, a.typname "
-            + "from pg_type t join pg_class on (reltype = t.oid) "
-            + "join pg_attribute on (attrelid = pg_class.oid and attnum > 0) "
-            + "join pg_type a on (atttypid = a.oid) "
-            + "join pg_namespace n on (a.typnamespace = n.oid) "
-            + "where t.oid = ? order by pg_attribute.attnum ;";
+  /**
+   * Returns the attributes sql type list of the object based on oid
+   *
+   * @param oid the type's OID
+   * @return the attributes sql type list
+   * @throws SQLException if something goes wrong
+   */
+  @Override
+  public List<Integer> getStructAttributesOid(int oid) throws SQLException {
+    List<Object[]> struct = this.getCompositeTypeStruct(oid);
+    if (struct == null) {
+      return null;
+    }
+    List<Integer> res = new ArrayList<>();
+    for (Object[] objects : struct) {
+      res.add((Integer) objects[1]);
+    }
+    return res;
+  }
 
-    /**
-     * Returns the attributes sql type list of the object based on oid
-     *
-     * @param oid
-     * @return the attributes sql type list
-     * @throws SQLException if something goes wrong
-     */
-    @Override
-    public List<Integer> getStructAttributesSqlType(int oid) throws SQLException {
-      if (oid == 0) {
-        return null;
-      }
+  @Override
+  public Object[] getStructAttributesName(int oid) throws SQLException {
+    List<Object[]> struct = this.getCompositeTypeStruct(oid);
+    if (struct == null) {
+      return null;
+    }
+    Object[] res = new Object[struct.size()];
+    for (int i = 0; i < struct.size(); i++) {
+      res[i] = struct.get(i)[0];
+    }
+    return res;
+  }
 
-      List<Integer> pgTypes = _pgStructToPgTypes.get(oid);
-      if (pgTypes != null) {
-        return pgTypes;
-      }
+  /*
+   * query struct attributes type by oid sql
+   */
+  private final String queryStructAttributesTypeByOidSql = "select "
+        + "a.oid, n.nspname = ANY(current_schemas(true)), n.nspname, a.typname, attname "
+        + "from pg_type t join pg_class on (reltype = t.oid) "
+        + "join pg_attribute on (attrelid = pg_class.oid and attnum > 0) "
+        + "join pg_type a on (atttypid = a.oid) "
+        + "join pg_namespace n on (a.typnamespace = n.oid) "
+        + "where t.oid = ? order by pg_attribute.attnum ";
 
-      if (_getStructElementStatement == null) {
-        _getStructElementStatement = _conn.prepareStatement(queryStructAttributesTypeByOidSql);
-      }
-      _getStructElementStatement.setInt(1, oid);
+  /**
+   * Returns the attributes sql type list of the object based on oid
+   *
+   * @param oid the type's OID
+   * @return get custom Type attr list
+   */
+  private List<Object[]> getCompositeTypeStruct(int oid) throws SQLException {
+    if (oid == 0) {
+      return null;
+    }
+    List<Object[]> list = this.compositeTypeStructMap.get(oid);
+    if (list != null) {
+      return list;
+    }
+    if (this._getStructElementStatement == null) {
+      this._getStructElementStatement = this._conn.prepareStatement(queryStructAttributesTypeByOidSql);
+    }
 
-      // Go through BaseStatement to avoid transaction start.
-      if (!((BaseStatement) _getStructElementStatement).executeWithFlags(QueryExecutor.QUERY_SUPPRESS_BEGIN)) {
-        throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
-      }
-
-      ResultSet rs = _getStructElementStatement.getResultSet();
-      String quotes = "\"";
-      String point = ".";
-      pgTypes = new ArrayList<>();
+    this._getStructElementStatement.setInt(1, oid);
+    // Go through BaseStatement to avoid transaction start.
+    if (!((BaseStatement) this._getStructElementStatement).executeWithFlags(QueryExecutor.QUERY_SUPPRESS_BEGIN)) {
+      throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
+    }
+    // get attribute list from result set
+    ResultSet rs = this._getStructElementStatement.getResultSet();
+    List<Object[]> compositeType = new ArrayList<>();
       while (rs.next()) {
-        int pgType = rs.getInt(1);
+        int attrOid = rs.getInt(1);
         boolean onPath = rs.getBoolean(2);
         String schema = rs.getString(3);
-        String name = rs.getString(4);
-        StringBuilder sb = new StringBuilder();
-        sb.append(quotes).append(schema).append(quotes).append(point).append(quotes).append(name).append(quotes);
-        String fullName = sb.toString();
-        _pgNameToOid.put(schema + point + name, pgType);
-        _pgNameToOid.put(fullName, pgType);
-        if (onPath && name.equals(name.toLowerCase())) {
-          _oidToPgName.put(pgType, name);
-          _pgNameToOid.put(name, pgType);
+        String typName = rs.getString(4);
+        String attrName = rs.getString(5);
+        this._pgNameToOid.put(schema + "." + typName, attrOid);
+        String fullName = "\"" + schema + "\".\"" + typName + "\"";
+        this._pgNameToOid.put(fullName, attrOid);
+        if (onPath && typName.equals(typName.toLowerCase())) {
+          this._oidToPgName.put(attrOid, typName);
+          this._pgNameToOid.put(typName, attrOid);
         } else {
-          _oidToPgName.put(pgType, fullName);
+          this._oidToPgName.put(attrOid, fullName);
         }
-        pgTypes.add(pgType);
-      }
-      _pgStructToPgTypes.put(oid, pgTypes);
-      rs.close();
-      return pgTypes;
+        compositeType.add(new Object[]{attrName, attrOid});
     }
+    rs.close();
+    compositeTypeStructMap.put(oid, compositeType);
+    return compositeType;
+  }
 }

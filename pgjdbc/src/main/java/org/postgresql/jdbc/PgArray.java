@@ -770,6 +770,19 @@ public class PgArray implements java.sql.Array {
         oa[length++] = (dims > 1 && v != null) ? buildArray((PgArrayList) v, 0, -1)
             : (v == null ? null : arrAssistant.buildElement((String) v));
       }
+    } else if (type == Types.STRUCT) {
+      Object[] oa = new Object[count];
+      for (; count > 0; count--) {
+        Object v = input.get(index++);
+        if (v instanceof String) {
+          oa[length++] = new PGStruct(connection, connection.getTypeInfo().getPGArrayElement(oid), (String) v);
+        } else if (v == null) {
+          oa[length++] = null;
+        } else {
+          throw org.postgresql.Driver.notImplemented(this.getClass(), "getArrayImpl(long,int,Map)");
+        }
+      }
+      ret = oa;
     } else if (dims == 1) {
       Object[] oa = new Object[count];
       String typeName = getBaseTypeName();
@@ -787,7 +800,7 @@ public class PgArray implements java.sql.Array {
       }
       ret = oa;
     } else {
-      // other datatypes not currently supported
+      // other datatype not currently supported
       connection.getLogger().trace("getArrayImpl(long,int,Map) with " + getBaseTypeName());
 
       throw org.postgresql.Driver.notImplemented(this.getClass(), "getArrayImpl(long,int,Map)");
@@ -976,5 +989,13 @@ public class PgArray implements java.sql.Array {
     fieldString = null;
     fieldBytes = null;
     arrayList = null;
+  }
+
+  public void setOid(int oid) {
+    this.oid = oid;
+  }
+
+  public int getOid() {
+    return this.oid;
   }
 }

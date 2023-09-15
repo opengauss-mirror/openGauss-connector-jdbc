@@ -6,15 +6,12 @@
 package org.postgresql.jdbc;
 
 import org.postgresql.Driver;
-import org.postgresql.core.BaseStatement;
 import org.postgresql.core.Oid;
 import org.postgresql.core.ParameterList;
 import org.postgresql.core.Query;
-import org.postgresql.core.QueryExecutor;
 import org.postgresql.core.types.PGBlob;
 import org.postgresql.core.types.PGClob;
 import org.postgresql.util.GT;
-import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 
@@ -26,7 +23,6 @@ import java.sql.Blob;
 import java.sql.CallableStatement;
 import java.sql.Clob;
 import java.sql.NClob;
-import java.sql.PreparedStatement;
 import java.sql.Ref;
 import java.sql.ResultSet;
 import java.sql.RowId;
@@ -35,7 +31,6 @@ import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
@@ -57,13 +52,12 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
   private String compatibilityMode;
   private boolean isACompatibilityFunction;
   private boolean enableOutparamOveride;
-  // cache the subscript of the current custom type in the statement and the struct of the custom type
-  private ConcurrentHashMap<Integer, List<Object[]>> compositeTypeStructMap = new ConcurrentHashMap<>();
   // whether the current executed SQL statement contains a custom type
   private boolean isContainCompositeType = false;
-  private PreparedStatement getCompositeTypeStatementSimple;
   // cache custom types that have been queried
   private ConcurrentHashMap<String, List<Object[]>> compositeTypeMap = new ConcurrentHashMap<>();
+
+  private int[] returnOids;
 
   PgCallableStatement(PgConnection connection, String sql, int rsType, int rsConcurrency,
       int rsHoldability) throws SQLException {
@@ -76,6 +70,7 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
       int inParamCount = this.preparedParameters.getInParameterCount() + 1;
       this.testReturn = new int[inParamCount];
       this.functionReturnType = new int[inParamCount];
+      this.returnOids = new int[inParamCount];
     }
   }
 
@@ -135,10 +130,11 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
         while (j < functionReturnType.length && functionReturnType[j] == 0) {
           j++;
         }
-        if (compositeTypeStructMap.get(j + 1) == null) {
+        Object[] compositeTypeStruct = connection.getTypeInfo().getStructAttributesName(returnOids[j]);
+        if (compositeTypeStruct == null) {
           throw new PSQLException(GT.tr("Unknown composite type."), PSQLState.UNKNOWN_STATE);
         }
-        int compositeTypeLength = compositeTypeStructMap.get(j + 1).size();
+        int compositeTypeLength = compositeTypeStruct.length;
         StringBuffer sb = new StringBuffer();
         sb.append("(");
         for (int k = 0; k < compositeTypeLength; k++, i++) {
@@ -164,8 +160,8 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
         sb.deleteCharAt(sb.length() - 1);
         sb.append(")");
         PGStruct pgStruct = new PGStruct(connection, 0, sb.toString());
-        pgStruct.setAttrsSqlTypeList(getCompositeTypeOid(j + 1));
-        pgStruct.setStruct(getcompositeTypeStruct(j + 1));
+        pgStruct.setAttrsSqlTypeList(connection.getTypeInfo().getStructAttributesOid(returnOids[j]));
+        pgStruct.setStruct(compositeTypeStruct);
         callResult[j] = pgStruct;
       }
     } else {
@@ -190,28 +186,20 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
         } else {
             callResult[j] = rs.getObject(i + 1);
         }
-
-        if (columnType == Types.STRUCT && functionReturnType[j] == Types.OTHER) {
-          if (callResult[j] != null) {
-            PGobject pGobject = (PGobject) callResult[j];
-            pGobject.setStruct(getcompositeTypeStruct(j + 1));
-          }
-        } else {
-          if (columnType != functionReturnType[j]) {
-            // this is here for the sole purpose of passing the cts
-            PgCallstatementTypeCompatibility typeCompatibility = new PgCallstatementTypeCompatibility(
-              columnType, functionReturnType[j]);
-            if (typeCompatibility.isCompatibilityType()) {
-              if (callResult[j] != null && typeCompatibility.needConvert()) {
-                callResult[j] = typeCompatibility.convert(callResult[j]);
-              }
-            } else {
-              throw new PSQLException(GT.tr(
-                "A CallableStatement function was executed and the out parameter {0} was of type {1} however type" +
-                " {2} was registered.",
-                i + 1, "java.sql.Types=" + columnType, "java.sql.Types=" + functionReturnType[j]),
-                PSQLState.DATA_TYPE_MISMATCH);
+        if (columnType != functionReturnType[j]) {
+          // this is here for the sole purpose of passing the cts
+          PgCallstatementTypeCompatibility typeCompatibility = new PgCallstatementTypeCompatibility(
+                  columnType, functionReturnType[j]);
+          if (typeCompatibility.isCompatibilityType()) {
+            if (callResult[j] != null && typeCompatibility.needConvert()) {
+              callResult[j] = typeCompatibility.convert(callResult[j]);
             }
+          } else {
+            throw new PSQLException(GT.tr(
+                    "A CallableStatement function was executed and the out parameter {0} was of type {1} however type" +
+                            " {2} was registered.",
+                    i + 1, "java.sql.Types=" + columnType, "java.sql.Types=" + functionReturnType[j]),
+                    PSQLState.DATA_TYPE_MISMATCH);
           }
         }
       }
@@ -687,60 +675,10 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
     return connection.getTimestampUtils().toTimestamp(cal, value);
   }
 
-  private PreparedStatement getCompositeTypeStatement(String typeName) throws SQLException {
-    // query the column name and oid value of a custom type sub-column.
-    if (getCompositeTypeStatementSimple == null) {
-      String sql = "SELECT attname, atttypid " +
-              "FROM pg_attribute a " +
-              "JOIN pg_class c ON a.attrelid = c.oid " +
-              "WHERE c.oid IN ( " +
-              "SELECT a.typrelid " +
-              "FROM ( " +
-              "SELECT pn.nspname || '.' || pt.typname AS typname, pt.typrelid " +
-              "FROM pg_namespace pn " +
-              "LEFT JOIN pg_type pt ON pn.oid = pt.typnamespace" +
-              ") a " +
-              "WHERE a.typname = ? " +
-              ") " +
-              "AND a.attnum > 0 ORDER BY a.attnum";
-      getCompositeTypeStatementSimple = connection.prepareStatement(sql);
-    }
-    getCompositeTypeStatementSimple.setString(1, typeName);
-    return getCompositeTypeStatementSimple;
-  }
-
-  /**
-   * get custom type structure based on index
-   * @param index element index
-   * @return struct of the composite type
-   */
-  private Object[] getcompositeTypeStruct(int index) {
-    List<Object[]> struct = compositeTypeStructMap.get(index);
-    Object[] res = new Object[struct.size()];
-    for (int i = 0; i < struct.size(); i++) {
-      res[i] = struct.get(i)[0];
-    }
-    return res;
-  }
-
-    /**
-     * Get the attributes sql type list of the object based on oid
-     *
-     * @Params index
-     * @Return the attributes sql type list
-     */
-    private List<Integer> getCompositeTypeOid(int index) {
-      List<Object[]> struct = compositeTypeStructMap.get(index);
-      List<Integer> res = new ArrayList<>();
-      for (Object[] objects : struct) {
-        res.add((Integer) objects[1]);
-      }
-      return res;
-    }
-
   public void registerOutParameter(int parameterIndex, int sqlType, String typeName)
-      throws SQLException {
+          throws SQLException {
     if (sqlType == Types.STRUCT) {
+      // Bind struct object
       checkClosed();
       if (!isFunction) {
         throw new PSQLException(
@@ -748,34 +686,40 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
                         "This statement does not declare an OUT parameter.  Use '{' ?= call ... '}' to declare one."),
                 PSQLState.STATEMENT_NOT_ALLOWED_IN_FUNCTION_CALL);
       }
-      checkIndex(parameterIndex, false);
-      if (compositeTypeMap.containsKey(typeName)) {
-        compositeTypeStructMap.put(parameterIndex, compositeTypeMap.get(typeName));
-      } else {
-        PreparedStatement compositeTypeStatement = getCompositeTypeStatement(typeName);
-        // Go through BaseStatement to avoid transaction start.
-        if (!((BaseStatement) compositeTypeStatement).executeWithFlags(QueryExecutor.QUERY_SUPPRESS_BEGIN)) {
-          throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
-        }
-        ResultSet rs = compositeTypeStatement.getResultSet();
-        List<Object[]> compositeType = new ArrayList<>();
-        while (rs.next()) {
-          compositeType.add(new Object[]{rs.getString(1), rs.getInt(2)});
-        }
-        rs.close();
-        compositeTypeStructMap.put(parameterIndex, compositeType);
+      int oid = connection.getTypeInfo().getPGType(typeName);
+      if (oid == Oid.UNSPECIFIED) {
+        throw new PSQLException(
+                GT.tr("Unable to find server array type for provided name {0}.", typeName),
+                PSQLState.INVALID_NAME);
       }
-
+      checkIndex(parameterIndex, false);
       // determine whether to overwrite the original VOID with the oid of the out parameter according to the
       // compatibility mode and the state of the guc parameter value
-      preparedParameters.registerOutParameter(parameterIndex, Types.OTHER);
+      preparedParameters.registerOutParameter(parameterIndex, Types.STRUCT);
       if (isACompatibilityAndOverLoad()) {
-        preparedParameters.bindRegisterOutParameter(parameterIndex, connection.getTypeInfo().getPGType(typeName), isACompatibilityFunction);
+        preparedParameters.bindRegisterOutParameter(parameterIndex, oid, isACompatibilityFunction);
       }
-      functionReturnType[parameterIndex - 1] = Types.OTHER;
-      testReturn[parameterIndex - 1] = Types.OTHER;
+      returnOids[parameterIndex - 1] = oid;
+      functionReturnType[parameterIndex - 1] = Types.STRUCT;
+      testReturn[parameterIndex - 1] = Types.STRUCT;
       returnTypeSet = true;
       isContainCompositeType = true;
+    } else if (sqlType == Types.ARRAY) {
+      // Bind array object
+      int oid = connection.getTypeInfo().getPGArrayType(typeName);
+      if (oid == Oid.UNSPECIFIED) {
+        throw new PSQLException(
+                GT.tr("Unable to find server array type for provided name {0}.", typeName),
+                PSQLState.INVALID_NAME);
+      }
+      preparedParameters.registerOutParameter(parameterIndex, Types.ARRAY);
+      if (isACompatibilityAndOverLoad()) {
+        preparedParameters.bindRegisterOutParameter(parameterIndex, oid, isACompatibilityFunction);
+      }
+      returnOids[parameterIndex - 1] = oid;
+      functionReturnType[parameterIndex - 1] = Types.ARRAY;
+      testReturn[parameterIndex - 1] = Types.ARRAY;
+      returnTypeSet = true;
     } else {
       throw Driver.notImplemented(this.getClass(), "registerOutParameter(int,int,String)");
     }

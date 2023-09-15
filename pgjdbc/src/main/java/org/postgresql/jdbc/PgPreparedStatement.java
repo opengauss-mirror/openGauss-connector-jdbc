@@ -1164,11 +1164,17 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
    // literal from Array.toString(), such as the implementation we return
    // from ResultSet.getArray(). Eventually we need a proper implementation
    // here that works for any Array implementation.
+   int oid = Oid.UNSPECIFIED;
    String typename = x.getBaseTypeName();
-   int oid = connection.getTypeInfo().getPGArrayType(typename);
+   if (x instanceof PgArray) {
+     oid = ((PgArray) x).getOid();
+   }
+   if (oid == Oid.UNSPECIFIED) {
+     oid = connection.getTypeInfo().getPGArrayType(typename);
+   }
    if (oid == Oid.UNSPECIFIED) {
      throw new PSQLException(GT.tr("Unknown type {0}.", typename),
-         PSQLState.INVALID_PARAMETER_TYPE);
+             PSQLState.INVALID_PARAMETER_TYPE);
    }
 
    if (x instanceof PgArray) {

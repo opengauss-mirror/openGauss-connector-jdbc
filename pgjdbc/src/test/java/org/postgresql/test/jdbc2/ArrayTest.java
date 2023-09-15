@@ -96,6 +96,8 @@ public class ArrayTest extends BaseTest4 {
 
     Statement stmt = conn.createStatement();
     ResultSet rs = stmt.executeQuery("SELECT intarr, decarr, strarr FROM arrtest");
+    ResultSetMetaData m = rs.getMetaData();
+    assertEquals(Types.ARRAY,m.getColumnType(1));
     Assert.assertTrue(rs.next());
 
     Array arr = rs.getArray(1);

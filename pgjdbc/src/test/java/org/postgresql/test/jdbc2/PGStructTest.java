@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004, openGauss Global Development Group
+ * Copyright (c) 2023, openGauss Global Development Group
  * See the LICENSE file in the project root for more information.
  */
 package org.postgresql.test.jdbc2;
