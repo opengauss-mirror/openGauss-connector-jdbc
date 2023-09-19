@@ -121,5 +121,14 @@ public interface TypeInfo {
      * @return the attributes sql type list
      * @throws SQLException if something goes wrong
      */
-    List<Integer> getStructAttributesSqlType(int oid) throws SQLException;
+    List<Integer> getStructAttributesOid(int oid) throws SQLException;
+
+    /**
+     * Returns the attribute name list based on oid
+     *
+     * @param oid the type's OID
+     * @return the attributes name list
+     * @throws SQLException if something goes wrong
+     */
+    Object[] getStructAttributesName(int oid) throws SQLException;
 }

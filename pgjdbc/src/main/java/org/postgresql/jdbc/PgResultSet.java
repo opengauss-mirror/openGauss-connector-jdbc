@@ -351,9 +351,10 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     public PGStruct getStruct(int i) throws SQLException {
       int oid = fields[i - 1].getOID();
       String attrsValue = getString(i);
-      String sqlType = getPGType(i);
       PGStruct pgStruct = new PGStruct(connection, oid, attrsValue);
-      pgStruct.setType(sqlType);
+      pgStruct.setType(this.getPGType(i));
+      // set struct attribute name array
+      pgStruct.setStruct(this.connection.getTypeInfo().getStructAttributesName(oid));
       return pgStruct;
     }
 

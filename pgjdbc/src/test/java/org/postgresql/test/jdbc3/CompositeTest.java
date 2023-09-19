@@ -102,7 +102,7 @@ public class CompositeTest {
   public void testCompositeFromTable() throws SQLException {
     PreparedStatement pstmt = _conn.prepareStatement("INSERT INTO compositetabletest VALUES(?, ?)");
     PGobject pgo1 = new PGobject();
-    pgo1.setType("public.simplecompositetest");
+    pgo1.setType("simplecompositetest");
     pgo1.setValue("(1,2.2,)");
     pstmt.setObject(1, pgo1);
     String[] ctArr = new String[1];
@@ -151,7 +151,7 @@ public class CompositeTest {
   public void testTableMetadata() throws SQLException {
     PreparedStatement pstmt = _conn.prepareStatement("INSERT INTO compositetabletest VALUES(?, ?)");
     PGobject pgo1 = new PGobject();
-    pgo1.setType("public.simplecompositetest");
+    pgo1.setType("simplecompositetest");
     pgo1.setValue("(1,2.2,)");
     pstmt.setObject(1, pgo1);
     String[] ctArr = new String[1];
@@ -171,7 +171,7 @@ public class CompositeTest {
   public void testComplexTableNameMetadata() throws SQLException {
     PreparedStatement pstmt = _conn.prepareStatement("INSERT INTO \"Composites\".\"Table\" VALUES(?, ?)");
     PGobject pgo1 = new PGobject();
-    pgo1.setType("public.simplecompositetest");
+    pgo1.setType("simplecompositetest");
     pgo1.setValue("(1,2.2,)");
     pstmt.setObject(1, pgo1);
     String[] ctArr = new String[1];
