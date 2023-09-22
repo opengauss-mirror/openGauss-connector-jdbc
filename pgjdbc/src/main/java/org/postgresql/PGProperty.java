@@ -480,7 +480,7 @@ public enum PGProperty {
   ENABLE_QUICK_AUTO_BALANCE("enableQuickAutoBalance", "false",
       "If the connection enable quickAutoBalance, this parameter only takes effect when autoBalance=leastconn."
           + "value: true or false.",
-      false, "true", "false"),
+        false, "true", "false"),
   
   /**
    * Idle time threshold of connections when quick auto balancing filters connections.
@@ -508,6 +508,20 @@ public enum PGProperty {
           + "jdbc will retain minReservedConPerCluster percent of the connections pre data node that meet the closing conditions during quick auto balancing."
           + "Value range: int && [0, 100]."
           + "This parameter only takes effect when autoBalance=leastconn and enableQuickAutoBalance=true"),
+
+    /**
+     * Enable statement load balance.
+     */
+    ENABLE_STATEMENT_LOAD_BALANCE("enableStatementLoadBalance", "false",
+        "Enable statement-level load balancing configuration, "
+        + "so that load balancing routing will be performed when each SQL statement is executed."
+        + "Optional values: true or false.",
+        false, "true", "false"),
+
+    /**
+     * Write data source address.
+     */
+    WRITE_DATA_SOURCE_ADDRESS("writeDataSourceAddress", "", "Specify the host and port for write database", false),
   
   /**
    * Supported TLS cipher suites
