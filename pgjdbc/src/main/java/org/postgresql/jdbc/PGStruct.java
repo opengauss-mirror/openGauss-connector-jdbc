@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004, openGauss Global Development Group
+ * Copyright (c) 2023, openGauss Global Development Group
  * See the LICENSE file in the project root for more information.
  */
 package org.postgresql.jdbc;
@@ -41,11 +41,6 @@ public class PGStruct extends PGobject implements Struct {
      */
     boolean standardConformingStrings;
 
-    /**
-     * Whether to support escapeLiteral escapes.
-     */
-    boolean supportsEStringSyntax = true;
-
     public PGStruct(BaseConnection conn, int oid, String attrsValue) throws SQLException {
         this.conn = conn;
         this.oid = oid;
@@ -60,7 +55,7 @@ public class PGStruct extends PGobject implements Struct {
         this.conn = conn;
         this.standardConformingStrings = conn.getStandardConformingStrings();
         super.type = conn.getTypeInfo().getPGType(oid);
-        super.value = PGStructAttrsConverter.convertAttributes(attributes, standardConformingStrings, supportsEStringSyntax);
+        super.value = PGStructAttrsConverter.convertAttributes(attributes);
         this.attrsSqlTypeList = getAttrsSqlTypeList();
     }
 

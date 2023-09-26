@@ -6,18 +6,22 @@ package org.postgresql.jdbc;
 
 import org.postgresql.core.BaseConnection;
 import org.postgresql.core.Oid;
-import org.postgresql.core.Utils;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.PSQLState;
+import org.postgresql.util.csv.CSVReader;
+import org.postgresql.util.csv.CSVReaderBuilder;
+import org.postgresql.util.csv.CSVReaderNullFieldIndicator;
+import org.postgresql.util.csv.CSVWriter;
 
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.sql.Array;
 import java.sql.SQLException;
 import java.sql.Struct;
 import java.sql.Types;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * @Projecet pgjdbc
@@ -31,261 +35,128 @@ import java.util.regex.Pattern;
  */
 public class PGStructAttrsConverter {
     private static final String QUOTES = "\"";
-    private static final char BACKSLASH_CHARACTER = '\\';
-    private static final char QUOTES_CHARACTER = '"';
-    private static final char COMMA_CHARACTER = ',';
-    private static final String COMMA = ",";
+    private static final char BACKSLASH_CHAR = '\\';
+    private static final String BACKSLASH_STRING = "\\";
+    private static final String DOUBLE_BACKSLASH_STRING = "\\\\";
 
     /**
-     * @Params
-     * @Return
-     * @Exception
-     * @Description: Convert Object[] attributes to String sttrsValue, taking into account the configuration switches of standardConformingStrings and supportsESringSyntax.
+     * Convert Object[] attributes to String sttrsValue, taking into account the configuration switches of standardConformingStrings and supportsESringSyntax.
+     *
+     * @param attributes object array of attribute
+     * @throws SQLException if something wrong happens
      */
-    public static String convertAttributes(Object[] attributes, boolean standardConformingStrings, boolean supportsEStringSyntax) throws SQLException {
+    public static String convertAttributes(Object[] attributes) throws SQLException {
         if (attributes == null) {
             return null;
         }
         StringBuffer sb = new StringBuffer();
         sb.append("(");
 
+        String[] dataArray = new String[attributes.length];
         for (int i = 0; i < attributes.length; i++) {
-            if (i > 0) {
-                sb.append(COMMA);
-            }
-
-            if (attributes[i] == null) {
-                continue;
-            }
-
-            if (attributes[i] instanceof Number) {
-                sb.append(attributes[i]);
-                continue;
-            }
-
             Object attrObj = attributes[i];
-            String formattedAttrValue = null;
             if (attrObj instanceof Struct) {
                 Struct struct = (Struct) attrObj;
                 String attrValue = struct.toString();
-                formattedAttrValue = formatterComplexityAttribute(attrValue, QUOTES);
+                dataArray[i] = attrValue;
             } else if (attributes[i] instanceof Array) {
                 String attrsValue = attributes[i].toString();
-                formattedAttrValue = formatterComplexityAttribute(attrsValue, QUOTES);
+                dataArray[i] = attrsValue;
             } else {
                 // Handle common attributes
                 String attrValue = attributes[i].toString();
-                formattedAttrValue = formatterNormalAttribute(attrValue, QUOTES, standardConformingStrings, supportsEStringSyntax);
+                dataArray[i] = attrValue;
             }
-            sb.append(QUOTES).append(formattedAttrValue).append(QUOTES);
+        }
+
+        try {
+            // Format the attributeValue object using open csv.
+            StringWriter writer = new StringWriter();
+            CSVWriter csvWriter = new CSVWriter(writer);
+            csvWriter.writeNext(dataArray);
+            csvWriter.flush();
+            String attributeStr = writer.toString().trim();
+            // Handling backslash characters
+            attributeStr = processBackslashChar(attributeStr);
+            sb.append(attributeStr);
+        } catch (IOException ioe) {
+            throw new PSQLException("Invalid character data was found. CSVWriter write text error, ", PSQLState.DATA_ERROR, ioe);
         }
         sb.append(")");
         return sb.toString();
     }
 
     /**
-     * @Params
-     * @Return
-     * @Exception
-     * @Description: Methods for dealing with ordinary Object objects
+     * Parse the attribute list in the Struct object according to the literal value of attributes.
+     * To convert String attributes into Object[] attributes, it needs to be encapsulated in combination with att_type_id in the system view.
+     *
+     * @param conn             a database connection
+     * @param elementOIDs      the list of  datatype
+     * @param attributesString the string value of attribute
+     * @throws SQLException if something wrong happens
      */
-    private static String formatterNormalAttribute(String attrValue, String quote, boolean standardConformingStrings, boolean supportsEStringSyntax) throws SQLException {
-        // Handle \ character
-        boolean hasBackslash = attrValue.indexOf(BACKSLASH_CHARACTER) != -1;
-        StringBuilder sb = new StringBuilder();
-        if (hasBackslash && !standardConformingStrings && supportsEStringSyntax) {
-            sb.append('E');
-        }
-
-        // escape codes
-        // No E'..' here since escapeLiteral escapes all things and it does not use \123 kind of
-        sb = Utils.escapeLiteral(sb, attrValue, standardConformingStrings);
-
-        // If the escaped string contains " , replace it with ""
-        String formattedValue = sb.toString();
-        if (formattedValue.contains(QUOTES)) {
-            String doubleQuotes = getFormatterQuotesByLevel(2, quote);
-            formattedValue.replaceAll(quote, doubleQuotes);
-        }
-        return formattedValue;
-    }
-
-    /**
-     * @MethodName:
-     * @Params
-     * @Return
-     * @Exception
-     * @Description: Methods for handling complex objects, such as PGStruct, PgArray
-     */
-    private static String formatterComplexityAttribute(String attrValue, String quote) {
-        if (attrValue.isEmpty()) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        char[] attrCharArray = attrValue.toCharArray();
-
-        List<Integer> startStack = new ArrayList<>();
-        List<Integer> endStack = new ArrayList<>();
-        for (int i = 0; i < attrCharArray.length; i++) {
-            char ch = attrCharArray[i];
-            if (ch == '(' || ch == '{') {
-                startStack.add(i);
-            } else if (ch == ')' || ch == '}') {
-                endStack.add(i);
-            }
-        }
-        String formattedValue = null;
-        if (startStack.size() <= 1) {
-            // There are only two type nestings, just format them directly.
-            formattedValue = formattedQuotesByLevel(1, attrValue, quote);
-        } else {
-            // Types used more than twice need to be processed in order from the inside to the outside.
-            Map<Integer, List<String>> structDataMap = new LinkedHashMap<>();
-            for (int i = 0; i < startStack.size(); i++) {
-                int level = i + 1;
-
-                int begin = startStack.get(i);
-                int end = endStack.get(endStack.size() - 1 - i);
-                String subString = attrValue.substring(begin, end + 1);
-                if (structDataMap.containsKey(level)) {
-                    structDataMap.get(level).add(subString);
-                } else {
-                    List<String> tmpList = new ArrayList<>();
-                    tmpList.add(subString);
-                    structDataMap.put(level, tmpList);
-                }
-            }
-            // Handle formatted attribute value
-            formattedValue = structDataMap.get(1).get(0);
-            formattedValue = formattedQuotesByLevel(1, formattedValue, quote);
-            int maxLevel = structDataMap.keySet().size();
-            for (int i = maxLevel; i > 1; i--) {
-                List<String> tmpList = structDataMap.get(i);
-                for (int j = 0; j < tmpList.size(); j++) {
-                    String srcStr = tmpList.get(j);
-                    String destStr = formattedQuotesByLevel(i, srcStr, quote);
-                    formattedValue = formattedValue.replace(srcStr, destStr);
-                }
-            }
-        }
-        sb.append(formattedValue);
-        return sb.toString();
-    }
-
-    /**
-     * @MethodName:
-     * @Params
-     * @Return
-     * @Exception
-     * @Description: According to the number of layers, increase the quote exponentially by 2 to the String value.
-     */
-    public static String formattedQuotesByLevel(int level, String value, String quote) {
-        String replaceQuote = getFormatterQuotesByLevel(level + 1, quote);
-        return value.replaceAll(quote, replaceQuote);
-    }
-
-    /**
-     * @MethodName:
-     * @Params
-     * @Return
-     * @Exception
-     * @Description: Copy quote exponentially by 2 according to level. When it is 0, return nothing.
-     */
-    private static String getFormatterQuotesByLevel(int level, String quote) {
-        if (level <= 0) {
-            return "";
-        } else {
-            StringBuilder sb = new StringBuilder();
-            int total = (int) Math.pow(2, level - 1);
-            for (int i = 0; i < total; ++i) {
-                sb.append(quote);
-            }
-            return sb.toString();
-        }
-    }
-
-    /**
-     * @MethodName:
-     * @Params
-     * @Return
-     * @Exception
-     * @Description: To convert String sttrsValue into Object[] attributes, it needs to be encapsulated in combination with att_type_id in the system view.
-     */
-    public static Object[] parseAttributes(BaseConnection conn, List<Integer> elementOIDs, String attrsValue) throws SQLException {
+    public static Object[] parseAttributes(BaseConnection conn, List<Integer> elementOIDs, String attributesString) throws SQLException {
         String quote = QUOTES;
-        List<Object> list = new ArrayList();
-
-        if (!attrsValue.startsWith("(") && !attrsValue.endsWith(")")) {
-            throw new RuntimeException("Not a valid construct value for a Row");
-        } else {
-            // Remove the left and right brackets and process the attrs attribute.
-            attrsValue = attrsValue.substring(1, attrsValue.length() - 1);
-
-            char[] attrsCharArray = attrsValue.toCharArray();
-            // Handle the PGStruct object contained in attrsValue
-            String innerStructValue = null;
-            String innerFormattedAttrsValue = null;
-            String innerReplaceValue = null;
-            if (attrsValue.contains("(") && attrsValue.contains(")")) {
-                String patternStr = ("\\((.+)\\)");
-                Pattern pattern = Pattern.compile(patternStr);
-                Matcher matcher = pattern.matcher(attrsValue);
-                if (matcher.find()) {
-                    // Find what's inside the brackets
-                    innerStructValue = matcher.group();
-                    int hashCode = innerStructValue.hashCode();
-                    innerReplaceValue = Math.random() + "" + hashCode;
-
-                    int i = attrsValue.indexOf(innerStructValue);
-                    int level = 0;
-                    while (i < attrsCharArray.length && i >= 0) {
-                        char levelCh = attrsCharArray[i - 1];
-                        if (levelCh == QUOTES_CHARACTER) {
-                            level++;
-                            i--;
-                        } else if (levelCh == COMMA_CHARACTER) {
-                            break;
-                        }
-                    }
-                    String formattedQuotes = getFormatterQuotesByLevel(level + 1, quote);
-                    innerFormattedAttrsValue = innerStructValue.replace(formattedQuotes, quote);
-
-                    // Replace placeholders to prevent misparsing
-                    attrsValue = attrsValue.replace(innerStructValue, innerReplaceValue);
+        List<Object> attributeList = new ArrayList();
+        // Remove the surrounding brackets and process the attribute value within the brackets.
+        if (attributesString.startsWith("(") && attributesString.endsWith(")")) {
+            attributesString = attributesString.substring(1, attributesString.length() - 1);
+        }
+        // Parse attributesString into attributeValueArray.
+        String[] attributeValueArray = parseAttributeValueArray(attributesString);
+        for (int i = 0; i < attributeValueArray.length; i++) {
+            String attributeValue = attributeValueArray[i];
+            int oid = elementOIDs.get(i);
+            int sqlType = conn.getTypeInfo().getSQLType(oid);
+            if (sqlType == Types.STRUCT) {
+                String objectValue = attributeValue;
+                // Handle double backslashes in attributeValue.
+                objectValue = processDoubleBackslashStr(objectValue);
+                attributeList.add(new PGStruct(conn, oid, objectValue));
+            } else if (sqlType == Types.ARRAY) {
+                String objectValue = attributeValue;
+                attributeList.add(new PgArray(conn, oid, objectValue));
+            } else {
+                String objectValue = attributeValue;
+                if (!objectValue.isEmpty() && objectValue.length() > 1
+                        && objectValue.startsWith(quote) && objectValue.endsWith(quote)) {
+                    objectValue = objectValue.substring(1, objectValue.length() - 1);
                 }
-            }
-
-            String[] attrsValueArray = attrsValue.split(COMMA);
-            // According to , number comes out the attrs value array
-            for (int i = 0; i < attrsValueArray.length; i++) {
-                String attrsObjectValue = attrsValueArray[i];
-                int oid = elementOIDs.get(i);
-                int sqlType = conn.getTypeInfo().getSQLType(oid);
-                if (sqlType == Types.STRUCT) {
-                    attrsObjectValue = innerFormattedAttrsValue;
-                    list.add(new PGStruct(conn, oid, attrsObjectValue));
-                } else if (sqlType == Types.ARRAY) {
-                    String objectValue = attrsObjectValue;
-                    list.add(new PgArray(conn, oid, objectValue));
-                } else {
-                    String objectValue = attrsObjectValue;
-                    if (!objectValue.isEmpty() && objectValue.startsWith(quote) && objectValue.endsWith(quote)) {
-                        objectValue = objectValue.substring(1, objectValue.length() - 1);
-                    }
-                    Object obj = getObject(conn, objectValue, oid, sqlType);
-                    list.add(obj);
-                }
+                Object obj = getObject(conn, objectValue, oid, sqlType);
+                attributeList.add(obj);
             }
         }
-        return list.toArray();
+        return attributeList.toArray();
     }
 
     /**
-     * @MethodName:
-     * @Params
-     * @Return
-     * @Exception
-     * @Description: Convert to Object object of corresponding type according to oid and att_type_id.
+     * Use the open CSV tool to parse the attribute object array from attributesString
+     *
+     * @param attributesString the string value of attribute
+     * @throws PSQLException if something wrong happens
+     */
+    public static String[] parseAttributeValueArray(String attributesString) throws PSQLException {
+        if (attributesString.isEmpty()) {
+            return new String[0];
+        }
+        try {
+            StringReader strReader = new StringReader(attributesString);
+            CSVReader csvReader = new CSVReaderBuilder(strReader)
+                    .withFieldAsNull(CSVReaderNullFieldIndicator.EMPTY_SEPARATORS).build();
+            return csvReader.readNext();
+        } catch (IOException ioe) {
+            throw new PSQLException("Invalid character data was found. csvReader read text error, ", PSQLState.DATA_ERROR, ioe);
+        }
+    }
+
+    /**
+     * Convert to Object object of corresponding type according to oid and att_type_id.
+     *
+     * @param connection a database connection
+     * @param text       the value of data
+     * @param oid        type oid
+     * @param type       the jdbc type
+     * @throws SQLException if something wrong happens
      */
     private static Object getObject(BaseConnection connection, String text, int oid, int type) throws SQLException {
         switch (type) {
@@ -318,5 +189,38 @@ public class PGStructAttrsConverter {
             default:
                 return text;
         }
+    }
+
+    /**
+     * Handle backslashes, replace 1 backslashes with 2 backslashes
+     *
+     * @param attributeValue the string value of attribute
+     */
+    private static String processBackslashChar(String attributeValue) {
+        if (attributeValue.contains(BACKSLASH_STRING)) {
+            StringBuilder sb = new StringBuilder();
+            char[] charArray = attributeValue.toCharArray();
+            for (char ch : charArray) {
+                if (ch == BACKSLASH_CHAR) {
+                    sb.append(DOUBLE_BACKSLASH_STRING);
+                } else {
+                    sb.append(ch);
+                }
+            }
+            return sb.toString();
+        }
+        return attributeValue;
+    }
+
+    /**
+     * Handle backslashes, replace 2 backslashes with 1 backslashes
+     *
+     * @param attributeValue the string value of attribute
+     */
+    private static String processDoubleBackslashStr(String attributeValue) {
+        if (attributeValue.contains(DOUBLE_BACKSLASH_STRING)) {
+            attributeValue = attributeValue.replace(DOUBLE_BACKSLASH_STRING, BACKSLASH_STRING);
+        }
+        return attributeValue;
     }
 }
