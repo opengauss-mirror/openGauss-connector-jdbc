@@ -57,12 +57,15 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
 import java.util.UUID;
@@ -118,6 +121,17 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   private Map<String, Integer> columnNameIndexMap; // Speed up findColumn by caching lookups
 
   private ResultSetMetaData rsMetaData;
+
+  private static final String TINYBLOB_TYPNAME = "tinyblob";
+
+  private static final String BLOB_TYPNAME = "blob";
+
+  private static final String MEDIUMBLOB_TYPNAME = "mediumblob";
+
+  private static final String LONGBLOB_TYPNAME = "longblob";
+
+  private static final Set<String> blobSet =
+          new HashSet<>(Arrays.asList(TINYBLOB_TYPNAME, BLOB_TYPNAME, MEDIUMBLOB_TYPNAME, LONGBLOB_TYPNAME));
 
   protected ResultSetMetaData createMetaData() throws SQLException {
     return new PgResultSetMetaData(connection, fields);
@@ -505,7 +519,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     byte[] byt;
     if (oid == Oid.BYTEA) {
         byt = trimBytes(i, PGbytea.toBytes(this_row[i - 1]));
-    } else if (oid == Oid.BLOB) {
+    } else if (oid == Oid.BLOB || blobSet.contains(getPGType(i))) {
         byt = toBytes(getString(i));
     } else {
         byt = trimBytes(i, this_row[i - 1]);
@@ -2714,7 +2728,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       return null;
     }
 
-    if(getPGType(columnIndex).equals("blob")){
+    if(blobSet.contains(getPGType(columnIndex))){
     	return toBytes(getString(columnIndex));
     }
 
