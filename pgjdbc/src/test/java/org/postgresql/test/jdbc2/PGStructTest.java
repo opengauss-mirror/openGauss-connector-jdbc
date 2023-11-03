@@ -207,4 +207,94 @@ public class PGStructTest extends BaseTest4 {
             TestUtil.closeQuietly(cmt);
         }
     }
+
+    @Test
+    public void testCreateStructContainsNullAttribute() throws SQLException {
+        Statement stmt = null;
+        CallableStatement cmt = null;
+        try {
+            // Create display_emp and save it.
+            // The input and output parameters are both emp_obj_typ_v2 custom types.
+            String procedureSql = "create or replace PROCEDURE display_emp (a INOUT emp_obj_typ_v2)\n"
+                    + "  IS\n"
+                    + "  BEGIN\n"
+                    + "    a.empno:=1;\n"
+                    + "  END;";
+            stmt = con.createStatement();
+            stmt.execute(procedureSql);
+
+            // Create addr_object_type_v2 Struct object using jdbc connection
+            Struct address = con.createStruct("addr_object_type_v2",
+                    new Object[]{"123 MAIN STREET", null, "NJ", null});
+            // Use jdbc connection to create the emp_obj_typ_v2 Struct object
+            // and put addr_object_type_v2 into emp_obj_typ_v2.
+            Struct emp = con.createStruct("emp_obj_typ_v2", new Object[]{9001, null, address});
+
+            // set emp_obj_typ_v2 type param
+            String commandText = "{call display_emp(?)}";
+            cmt = con.prepareCall(commandText);
+            cmt.registerOutParameter(1, Types.STRUCT, schemaName + ".emp_obj_typ_v2");
+            cmt.setObject(1, emp);
+            cmt.execute();
+
+            emp = (Struct) cmt.getObject(1);
+            Object[] attrEmp = emp.getAttributes();
+            assertEquals(1, attrEmp[0]);
+            assertEquals(null, attrEmp[1]);
+            address = (Struct) attrEmp[2];
+            Object[] attrAddress = address.getAttributes();
+            assertEquals("123 MAIN STREET", attrAddress[0]);
+            assertEquals(null, attrAddress[1]);
+            assertEquals("NJ", attrAddress[2]);
+            assertEquals(null, attrAddress[3]);
+        } finally {
+            TestUtil.closeQuietly(stmt);
+            TestUtil.closeQuietly(cmt);
+        }
+    }
+
+    @Test
+    public void testCreateStructContainsNullStruct() throws SQLException {
+        Statement stmt = null;
+        CallableStatement cmt = null;
+        try {
+            // Create display_emp and save it.
+            // The input and output parameters are both emp_obj_typ_v2 custom types.
+            String procedureSql = "create or replace PROCEDURE display_emp (a INOUT emp_obj_typ_v2)\n"
+                    + "  IS\n"
+                    + "  BEGIN\n"
+                    + "    a.empno:=1;\n"
+                    + "  END;";
+            stmt = con.createStatement();
+            stmt.execute(procedureSql);
+
+            // Create addr_object_type_v2 Struct object using jdbc connection
+            Struct address = con.createStruct("addr_object_type_v2",
+                    new Object[]{"123 MAIN STREET", null, "NJ", 8817});
+            // Use jdbc connection to create the emp_obj_typ_v2 Struct object
+            // and put addr_object_type_v2 into emp_obj_typ_v2.
+            Struct emp = con.createStruct("emp_obj_typ_v2", new Object[]{9001, "JONES", null});
+
+            // set emp_obj_typ_v2 type param
+            String commandText = "{call display_emp(?)}";
+            cmt = con.prepareCall(commandText);
+            cmt.registerOutParameter(1, Types.STRUCT, schemaName + ".emp_obj_typ_v2");
+            cmt.setObject(1, emp);
+            cmt.execute();
+
+            emp = (Struct) cmt.getObject(1);
+            Object[] attrEmp = emp.getAttributes();
+            assertEquals(1, attrEmp[0]);
+            assertEquals("JONES", attrEmp[1]);
+            address = (Struct) attrEmp[2];
+            Object[] attrAddress = address.getAttributes();
+            assertEquals(null, attrAddress[0]);
+            assertEquals(null, attrAddress[1]);
+            assertEquals(null, attrAddress[2]);
+            assertEquals(null, attrAddress[3]);
+        } finally {
+            TestUtil.closeQuietly(stmt);
+            TestUtil.closeQuietly(cmt);
+        }
+    }
 }

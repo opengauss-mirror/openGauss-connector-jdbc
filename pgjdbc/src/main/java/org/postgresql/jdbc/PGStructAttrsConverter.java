@@ -64,7 +64,10 @@ public class PGStructAttrsConverter {
                 dataArray[i] = attrsValue;
             } else {
                 // Handle common attributes
-                String attrValue = attributes[i].toString();
+                String attrValue = null;
+                if (attributes[i] != null) {
+                    attrValue = attributes[i].toString();
+                }
                 dataArray[i] = attrValue;
             }
         }
@@ -118,12 +121,16 @@ public class PGStructAttrsConverter {
                 attributeList.add(new PgArray(conn, oid, objectValue));
             } else {
                 String objectValue = attributeValue;
-                if (!objectValue.isEmpty() && objectValue.length() > 1
-                        && objectValue.startsWith(quote) && objectValue.endsWith(quote)) {
-                    objectValue = objectValue.substring(1, objectValue.length() - 1);
+                if (objectValue != null) {
+                    if (!objectValue.isEmpty() && objectValue.length() > 1
+                            && objectValue.startsWith(quote) && objectValue.endsWith(quote)) {
+                        objectValue = objectValue.substring(1, objectValue.length() - 1);
+                    }
+                    Object obj = getObject(conn, objectValue, oid, sqlType);
+                    attributeList.add(obj);
+                } else {
+                    attributeList.add(null);
                 }
-                Object obj = getObject(conn, objectValue, oid, sqlType);
-                attributeList.add(obj);
             }
         }
         return attributeList.toArray();
