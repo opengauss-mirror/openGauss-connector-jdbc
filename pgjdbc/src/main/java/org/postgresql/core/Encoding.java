@@ -120,9 +120,6 @@ public class Encoding {
    *     default JVM encoding if the specified encoding is unavailable.
    */
   public static Encoding getJVMEncoding(String jvmEncoding) {
-    if ("UTF-8".equals(jvmEncoding)) {
-      return new UTF8Encoding(jvmEncoding);
-    }
     if (Charset.isSupported(jvmEncoding)) {
       return new Encoding(jvmEncoding);
     } else {
