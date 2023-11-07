@@ -23,6 +23,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Properties;
 
 /**
@@ -98,7 +99,7 @@ public class DeepBatchedInsertStatementTest extends BaseTest4 {
       bqds = transformBQD(pstmt);
       assertEquals(3, getBatchSize(bqds));
 
-      BatchExecuteTest.assertSimpleInsertBatch(3, pstmt.executeBatch());
+      assertSimpleInsertBatchV2(3, pstmt.executeBatch());
       bqds = transformBQD(pstmt);
 
       assertEquals(0, getBatchSize(bqds));
@@ -122,7 +123,7 @@ public class DeepBatchedInsertStatementTest extends BaseTest4 {
       bqds = transformBQD(pstmt);
       assertEquals(3, getBatchSize(bqds));
 
-      BatchExecuteTest.assertSimpleInsertBatch(3, pstmt.executeBatch());
+      assertSimpleInsertBatchV2(3, pstmt.executeBatch());
 
       pstmt.setInt(1, 1);
       pstmt.setInt(2, 2);
@@ -147,7 +148,7 @@ public class DeepBatchedInsertStatementTest extends BaseTest4 {
       bqds = transformBQD(pstmt);
       assertEquals(4, getBatchSize(bqds));
 
-      BatchExecuteTest.assertSimpleInsertBatch(4, pstmt.executeBatch());
+      assertSimpleInsertBatchV2(4, pstmt.executeBatch());
 
       pstmt.setInt(1, 1);
       pstmt.setInt(2, 2);
@@ -166,7 +167,7 @@ public class DeepBatchedInsertStatementTest extends BaseTest4 {
       bqds = transformBQD(pstmt);
       assertEquals(3, getBatchSize(bqds));
 
-      BatchExecuteTest.assertSimpleInsertBatch(3, pstmt.executeBatch());
+      assertSimpleInsertBatchV2(3, pstmt.executeBatch());
 
       pstmt.setInt(1, 1);
       pstmt.setInt(2, 2);
@@ -185,7 +186,7 @@ public class DeepBatchedInsertStatementTest extends BaseTest4 {
       bqds = transformBQD(pstmt);
       assertEquals(3, getBatchSize(bqds));
 
-      BatchExecuteTest.assertSimpleInsertBatch(3, pstmt.executeBatch());
+      assertSimpleInsertBatchV2(3, pstmt.executeBatch());
 
       pstmt.setInt(1, 1);
       pstmt.setInt(2, 2);
@@ -198,7 +199,7 @@ public class DeepBatchedInsertStatementTest extends BaseTest4 {
       bqds = transformBQD(pstmt);
       assertEquals(2, getBatchSize(bqds));
 
-      BatchExecuteTest.assertSimpleInsertBatch(2, pstmt.executeBatch());
+      assertSimpleInsertBatchV2(2, pstmt.executeBatch());
     } finally {
       TestUtil.closeQuietly(pstmt);
     }
@@ -318,5 +319,11 @@ public class DeepBatchedInsertStatementTest extends BaseTest4 {
     Method mESN = clazz.getDeclaredMethod("getEncodedStatementName");
     mESN.setAccessible(true);
     return (byte[]) mESN.invoke(bqd);
+  }
+
+  private static void assertSimpleInsertBatchV2(int n, int[] actual) {
+    int[] expected = new int[n];
+    Arrays.fill(expected, 1);
+    BatchExecuteTest.assertBatchResult(n + " addBatch, 1 row each", expected, actual);
   }
 }

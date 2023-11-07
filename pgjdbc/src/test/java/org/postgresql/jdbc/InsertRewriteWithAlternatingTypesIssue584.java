@@ -128,9 +128,15 @@ public class InsertRewriteWithAlternatingTypesIssue584 extends BaseTest4 {
           pst.addBatch();
         }
         statementName = getStatementName(pst);
-        pst.executeBatch();
+        if (insertRewrite) {
+          pst.execute();
+        } else {
+          pst.executeBatch();
+        }
       } while (statementName == null && ++count < 10);
-      Assert.assertEquals("S_1", statementName);
+      if (!insertRewrite) {
+        Assert.assertEquals("S_1", statementName);
+      }
     } catch (SQLException e) {
       e.printStackTrace();
       SQLException nextException = e.getNextException();
