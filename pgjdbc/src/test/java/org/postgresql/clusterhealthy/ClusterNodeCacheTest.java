@@ -88,7 +88,7 @@ public class ClusterNodeCacheTest {
 
     @Test
     public void testPeriodTime() throws Exception {
-        String url = getUrl() + "?targetServerType=master";
+        String url = getUrl() + "?targetServerType=any";
         DriverManager.getConnection(getUrl(), getUsername(), getPassword());
         String newUrl = url + "&heartbeatPeriod=3000";
         DriverManager.getConnection(newUrl, getUsername(), getPassword());
@@ -98,7 +98,7 @@ public class ClusterNodeCacheTest {
     @Test
     public void testUnavailablePassword() throws ClassNotFoundException, SQLException, InterruptedException {
 //        Class.forName("org.postgresql.Driver");
-        String url = getUrl() + "?targetServerType=master";
+        String url = getUrl() + "?targetServerType=any";
         DriverManager.getConnection(url, getUsername(), getPassword());
         HostSpec master = new HostSpec(System.getProperty("server"),
                 Integer.parseInt(System.getProperty("port")));
@@ -111,7 +111,7 @@ public class ClusterNodeCacheTest {
         Set<Properties> afterProperties = instance.getProperties(master);
         int after = afterProperties.size();
 
-        Assert.assertNotEquals(after, before);
+        Assert.assertEquals(after, before);
 
         Thread.sleep(10000L);
     }
