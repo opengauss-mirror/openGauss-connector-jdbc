@@ -166,16 +166,18 @@ public class ServerErrorMessage implements Serializable {
     int scroffset = 0;
     String lineMess = queryStr;
     char[] chars = queryStr.toCharArray();
-    for (int i = 0; i <= errIndex; i++) {
+    // prevent array index overflow
+    int finalErrIndex = Math.min(queryStr.length() - 1, errIndex);
+    for (int i = 0; i <= finalErrIndex; i++) {
       char ch = chars[i];
       if (ch == '\n') {
         line++;
-        scroffset = errIndex - (i + 1);
+        scroffset = finalErrIndex - (i + 1);
         lineMess = lineMess.substring(lineMess.indexOf("\n") + 1);
       }
     }
     if (scroffset == 0) {
-      scroffset = errIndex;
+      scroffset = finalErrIndex;
     }
     if (lineMess.contains("\n")) {
       lineMess = lineMess.substring(0, lineMess.indexOf("\n"));
@@ -187,7 +189,8 @@ public class ServerErrorMessage implements Serializable {
     int line = 1;
     int scroffset = 0;
     String lineMess = null;
-    String errStr = message.substring(errIndex);
+    // prevent subString out of range
+    String errStr = errIndex > message.length() ? "" : message.substring(errIndex);
     message = message.trim();
     if (message.startsWith("DECLARE")) {
       message = message.substring(message.indexOf("DECLARE") + 7).trim();
