@@ -1651,7 +1651,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
      // Note: in batch prepared statements batchStatements == 1, and batchParameters is equal
      // to the number of addBatch calls
      // batchParameters might be empty in case of empty batch
-     if (batchParameters != null && batchParameters.size() > 1 && m_prepareThreshold > 0) {
+     if (batchParameters != null && batchParameters.size() >= 1 && m_prepareThreshold > 0) {
        // Use server-prepared statements when there's more than one statement in a batch
        // Technically speaking, it might cause to create a server-prepared statement
        // just for 2 executions even for prepareThreshold=5. That however should be

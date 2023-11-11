@@ -954,13 +954,12 @@ public class PgStatement implements Statement, BaseStatement {
       flags |= QueryExecutor.QUERY_EXECUTE_AS_SIMPLE;
     }
 
-    boolean sameQueryAhead = queries.length > 1 && queries[0] == queries[1];
+    boolean sameQueryAhead = (queries.length == 1) || (queries.length > 1 && queries[0] == queries[1]);
 
-    if (!sameQueryAhead
+    if (!sameQueryAhead || isOneShotQuery(null)) {
         // If executing the same query twice in a batch, make sure the statement
         // is server-prepared. In other words, "oneshot" only if the query is one in the batch
         // or the queries are different
-        || isOneShotQuery(null)) {
       flags |= QueryExecutor.QUERY_ONESHOT;
     } else {
       // If a batch requests generated keys and isn't already described,
