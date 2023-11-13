@@ -15,8 +15,10 @@ import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Basic query parser infrastructure.
@@ -28,6 +30,16 @@ import java.util.Locale;
 public class Parser {
   private static final int[] NO_BINDS = new int[0];
   private static final char[] chars = new char[]{' ','\n','\r','\t'};
+  private static final Set<String> FUNCTION_MATCH_FIRST = new HashSet<String>() {
+    {
+      add("BEGIN");
+    }
+  };
+  private static final Set<String> FUNCTION_SKIP_FIRST = new HashSet<String>() {
+    {
+      add("SELECT");
+    }
+  };
 
   /**
    * Parses JDBC query into PostgreSQL's native format. Several queries might be given if separated
@@ -640,7 +652,11 @@ public class Parser {
      * @return boolean
      */
     private static boolean isContainSpecialKeyword(final String[] queryArr) {
-        if (queryArr[0].toUpperCase(Locale.ENGLISH).equals("BEGIN")) {
+        String upperFirst = queryArr[0].toUpperCase(Locale.ENGLISH);
+        if (FUNCTION_SKIP_FIRST.contains(upperFirst)) {
+            return false;
+        }
+        if (FUNCTION_MATCH_FIRST.contains(upperFirst)) {
             return true;
         }
         boolean haveCreate = false;
