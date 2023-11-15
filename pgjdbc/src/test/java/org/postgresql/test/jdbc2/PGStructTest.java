@@ -297,4 +297,43 @@ public class PGStructTest extends BaseTest4 {
             TestUtil.closeQuietly(cmt);
         }
     }
+
+    @Test
+    public void testSpOutChar() throws SQLException {
+        Statement stmt = null;
+        CallableStatement cmt = null;
+        try {
+            // create sp
+            String procedureSql = "create or replace procedure test_sp_out_char(\n" +
+                    "\t pa in int4,\n" +
+                    "\t pb out varchar,\n" +
+                    "\t pc out int8)\n" +
+                    "IS \n" +
+                    "begin \n" +
+                    "pb := 'out1'; \n" +
+                    "pc := pa + 10; \n" +
+                    "end;";
+            stmt = con.createStatement();
+            stmt.execute(procedureSql);
+
+            // execute sp
+            String commandText = "{call test_sp_out_char(?, ?, ?)}";
+            cmt = con.prepareCall(commandText);
+            cmt.setInt(1, 1010);
+            cmt.registerOutParameter(2, Types.CHAR);
+            cmt.registerOutParameter(3, Types.BIGINT);
+            cmt.execute();
+
+            // get result set
+            Object pa = cmt.getObject(1);
+            String pb = cmt.getString(2);
+            long pc = cmt.getLong(3);
+            assertEquals(null, pa);
+            assertEquals("out1", pb);
+            assertEquals(1020, pc);
+        } finally {
+            TestUtil.closeQuietly(stmt);
+            TestUtil.closeQuietly(cmt);
+        }
+    }
 }
