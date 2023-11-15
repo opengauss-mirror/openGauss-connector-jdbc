@@ -297,4 +297,43 @@ public class PGStructTest extends BaseTest4 {
             TestUtil.closeQuietly(cmt);
         }
     }
+
+    @Test
+    public void testSpOutDouble() throws SQLException {
+        Statement stmt = null;
+        CallableStatement cmt = null;
+        try {
+            // create sp
+            String procedureSql = "create or replace procedure test_sp_out_double(\n" +
+                    "\t pa in int4,\n" +
+                    "\t pb out numeric,\n" +
+                    "\t pc out int8)\n" +
+                    "IS \n" +
+                    "begin \n" +
+                    "pb := 2.22; \n" +
+                    "pc := pa + 1024; \n" +
+                    "end;";
+            stmt = con.createStatement();
+            stmt.execute(procedureSql);
+
+            // execute sp
+            String commandText = "{call test_sp_out_double(?, ?, ?)}";
+            cmt = con.prepareCall(commandText);
+            cmt.setInt(1, 1024);
+            cmt.registerOutParameter(2, Types.DOUBLE);
+            cmt.registerOutParameter(3, Types.BIGINT);
+            cmt.execute();
+
+            // get result set
+            Object pa = cmt.getObject(1);
+            double pb = cmt.getDouble(2);
+            long pc = cmt.getLong(3);
+            assertEquals(null, pa);
+            assertEquals(2.22d, pb, 0.0001d);
+            assertEquals(2048, pc);
+        } finally {
+            TestUtil.closeQuietly(stmt);
+            TestUtil.closeQuietly(cmt);
+        }
+    }
 }
