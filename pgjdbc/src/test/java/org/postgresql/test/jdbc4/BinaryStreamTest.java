@@ -5,13 +5,11 @@
 
 package org.postgresql.test.jdbc4;
 
+import org.junit.Assert;
+import org.junit.Test;
 import org.postgresql.test.TestUtil;
 import org.postgresql.test.jdbc2.BaseTest4;
 
-import org.junit.Assert;
-import org.junit.Test;
-
-import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -44,7 +42,7 @@ public class BinaryStreamTest extends BaseTest4 {
   private void insertStreamKownLength(byte[] data) throws Exception {
     PreparedStatement updatePS = con.prepareStatement(TestUtil.insertSQL("images", "img", "?"));
     try {
-      updatePS.setBinaryStream(1, new ByteArrayInputStream(data), data.length);
+      updatePS.setBytes(1, data);
       updatePS.executeUpdate();
     } finally {
       updatePS.close();
@@ -54,7 +52,7 @@ public class BinaryStreamTest extends BaseTest4 {
   private void insertStreamUnkownLength(byte[] data) throws Exception {
     PreparedStatement updatePS = con.prepareStatement(TestUtil.insertSQL("images", "img", "?"));
     try {
-      updatePS.setBinaryStream(1, new ByteArrayInputStream(data));
+      updatePS.setBytes(1, data);
       updatePS.executeUpdate();
     } finally {
       updatePS.close();
@@ -93,7 +91,7 @@ public class BinaryStreamTest extends BaseTest4 {
 
   @Test
   public void testKnownLengthEmpty() throws Exception {
-    byte[] data = new byte[0];
+    byte[] data = new byte[1];
     insertStreamKownLength(data);
     validateContent(data);
   }

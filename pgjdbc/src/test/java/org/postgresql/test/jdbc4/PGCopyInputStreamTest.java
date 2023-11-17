@@ -52,9 +52,11 @@ public class PGCopyInputStreamTest {
     sut = new PGCopyInputStream((PGConnection) _conn,
         "COPY cpinstreamtest (i) TO STDOUT WITH " + copyParams);
 
-    byte[] buf = new byte[100]; // large enough to read everything on the next step
+    byte[] buf = new byte[2]; // large enough to read everything on the next step
     assertTrue(sut.read(buf) > 0);
-
+    while (sut.read(buf) > 0) {
+      continue;
+    }
     assertEquals(-1, sut.read(buf));
   }
 
@@ -84,7 +86,7 @@ public class PGCopyInputStreamTest {
     sut = new PGCopyInputStream((PGConnection) _conn,
         "COPY (select i from cpinstreamtest order by i asc) TO STDOUT WITH " + copyParams);
 
-    byte[] buff = new byte[100];
+    byte[] buff = new byte[2];
     while (sut.read(buff) > 0) {
       ;
     }
