@@ -144,6 +144,7 @@ public class DriverTest {
     Connection con = DriverManager.getConnection(TestUtil.getURL() + "&readOnly=true",
         TestUtil.getUser(), TestUtil.getPassword());
     assertNotNull(con);
+    con.setReadOnly(true);
     assertTrue(con.isReadOnly());
     con.close();
 

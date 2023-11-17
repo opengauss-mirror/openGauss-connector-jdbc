@@ -16,10 +16,7 @@ import org.postgresql.test.TestUtil;
 import org.junit.Assume;
 import org.junit.Test;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 
 /*
  * Tests for using server side prepared statements
@@ -154,7 +151,7 @@ public class ServerPreparedStmtTest extends BaseTest4 {
     ((PGStatement) pstmt).setUseServerPrepare(true);
     assertTrue(((PGStatement) pstmt).isUseServerPrepare());
 
-    pstmt.setObject(1, Boolean.FALSE, java.sql.Types.BIT);
+    pstmt.setObject(1, Boolean.FALSE, Types.BOOLEAN);
     ResultSet rs = pstmt.executeQuery();
     assertTrue(rs.next());
     assertEquals(9, rs.getInt(1));

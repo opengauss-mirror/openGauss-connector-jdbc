@@ -1,28 +1,20 @@
 package org.postgresql.test.jdbc2;
 
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.postgresql.test.TestUtil;
 
-import java.sql.CallableStatement;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Types;
+import java.sql.*;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
  * Adaptation overload function use case set.
  */
 public class ProcOutparamOverrideTest extends BaseTest4 {
-
     /**
      * The sql of the create proc.
      */

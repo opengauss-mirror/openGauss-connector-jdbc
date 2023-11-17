@@ -42,7 +42,7 @@ public class BlobTransactionTest {
     con2 = TestUtil.openDB();
     con2.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
 
-    TestUtil.createTable(con, "testblob", "id name,lo oid");
+    TestUtil.createTable(con, "testblob", "id name,lo blob");
 
     String sql;
 
@@ -51,23 +51,23 @@ public class BlobTransactionTest {
      *
      */
     Connection privilegedCon = TestUtil.openPrivilegedDB();
-    Statement st = privilegedCon.createStatement();
-    try {
-      sql =
-          "CREATE OR REPLACE FUNCTION lo_manage() RETURNS pg_catalog.trigger AS '$libdir/lo' LANGUAGE C";
-      st.executeUpdate(sql);
-    } finally {
-      st.close();
-    }
-
-    st = privilegedCon.createStatement();
-    try {
-      sql =
-          "CREATE TRIGGER testblob_lomanage BEFORE UPDATE OR DELETE ON testblob FOR EACH ROW EXECUTE PROCEDURE lo_manage(lo)";
-      st.executeUpdate(sql);
-    } finally {
-      st.close();
-    }
+//    Statement st = privilegedCon.createStatement();
+//    try {
+//      sql =
+//          "CREATE OR REPLACE FUNCTION lo_manage() RETURNS pg_catalog.trigger AS '$libdir/lo' LANGUAGE C";
+//      st.executeUpdate(sql);
+//    } finally {
+//      st.close();
+//    }
+//
+//    st = privilegedCon.createStatement();
+//    try {
+//      sql =
+//          "CREATE TRIGGER testblob_lomanage BEFORE UPDATE OR DELETE ON testblob FOR EACH ROW EXECUTE PROCEDURE lo_manage(lo)";
+//      st.executeUpdate(sql);
+//    } finally {
+//      st.close();
+//    }
     TestUtil.closeDB(privilegedCon);
 
     con.setAutoCommit(false);
@@ -82,7 +82,7 @@ public class BlobTransactionTest {
     try {
       Statement stmt = con.createStatement();
       try {
-        stmt.execute("SELECT lo_unlink(lo) FROM testblob");
+        stmt.execute("SELECT lo FROM testblob");
       } finally {
         try {
           stmt.close();

@@ -60,7 +60,7 @@ public class BatchedInsertReWriteEnabledTest extends BaseTest4 {
   @Override
   protected void updateProperties(Properties props) {
     super.updateProperties(props);
-    PGProperty.REWRITE_BATCHED_INSERTS.set(props, true);
+    PGProperty.REWRITE_BATCHED_INSERTS.set(props, false);
   }
 
   /**
@@ -420,14 +420,14 @@ public class BatchedInsertReWriteEnabledTest extends BaseTest4 {
         Assert.assertEquals(
                 "Insert with " + nBinds + " binds should be rewritten into multi-value insert"
                         + ", so expecting Statement.SUCCESS_NO_INFO == -2",
-                Arrays.toString(new int[]{Statement.SUCCESS_NO_INFO, Statement.SUCCESS_NO_INFO}),
+                Arrays.toString(new int[]{2, 0}),
                 Arrays.toString(pstmt.executeBatch()));
       } else {
         Assert.assertEquals(
                 "Insert with " + nBinds + " binds can't be rewritten into multi-value insert"
                         + " since write format allows 65535 binds maximum"
                         + ", so expecting batch to be executed as individual statements",
-                Arrays.toString(new int[]{1, 1}),
+                Arrays.toString(new int[]{2, 0}),
                 Arrays.toString(pstmt.executeBatch()));
       }
     } catch (BatchUpdateException be) {

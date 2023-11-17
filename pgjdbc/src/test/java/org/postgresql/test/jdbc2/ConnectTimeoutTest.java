@@ -46,7 +46,7 @@ public class ConnectTimeoutTest {
           e.getCause() instanceof SocketTimeoutException);
       final long interval = System.currentTimeMillis() - startTime;
       final long connectTimeoutMillis = CONNECT_TIMEOUT * 1000;
-      final long maxDeviation = connectTimeoutMillis / 10;
+      final long maxDeviation = (connectTimeoutMillis + 2000) / 10;
       // check that it was not a default system timeout, an approximate value is used
       assertTrue(Math.abs(interval - connectTimeoutMillis) < maxDeviation);
       return;

@@ -203,6 +203,7 @@ public class ConnectionTest {
 
   /*
    * Transaction Isolation Levels
+   * SERIALIZABLE：目前功能上不支持此隔离级别，等价于REPEATABLE READ。
    */
   @Test
   public void testTransactionIsolation() throws Exception {
@@ -222,7 +223,7 @@ public class ConnectionTest {
     assertEquals(defaultLevel, con.getTransactionIsolation());
 
     con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-    assertEquals(Connection.TRANSACTION_SERIALIZABLE, con.getTransactionIsolation());
+    assertEquals(Connection.TRANSACTION_REPEATABLE_READ, con.getTransactionIsolation());
 
     con.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
     assertEquals(Connection.TRANSACTION_READ_COMMITTED, con.getTransactionIsolation());
@@ -230,11 +231,11 @@ public class ConnectionTest {
     // Test if a change of isolation level before beginning the
     // transaction affects the isolation level inside the transaction.
     con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-    assertEquals(Connection.TRANSACTION_SERIALIZABLE, con.getTransactionIsolation());
+    assertEquals(Connection.TRANSACTION_REPEATABLE_READ, con.getTransactionIsolation());
     con.setAutoCommit(false);
-    assertEquals(Connection.TRANSACTION_SERIALIZABLE, con.getTransactionIsolation());
+    assertEquals(Connection.TRANSACTION_REPEATABLE_READ, con.getTransactionIsolation());
     con.setAutoCommit(true);
-    assertEquals(Connection.TRANSACTION_SERIALIZABLE, con.getTransactionIsolation());
+    assertEquals(Connection.TRANSACTION_REPEATABLE_READ, con.getTransactionIsolation());
     con.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
     assertEquals(Connection.TRANSACTION_READ_COMMITTED, con.getTransactionIsolation());
     con.setAutoCommit(false);

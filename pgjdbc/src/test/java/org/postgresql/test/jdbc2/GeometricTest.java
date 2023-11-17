@@ -9,6 +9,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import org.junit.Ignore;
 import org.postgresql.core.ServerVersion;
 import org.postgresql.geometric.PGbox;
 import org.postgresql.geometric.PGcircle;
@@ -35,7 +36,9 @@ import java.util.List;
 
 /*
  * Test case for geometric type I/O
+ * opengauss not support geometric type
  */
+@Ignore
 @RunWith(Parameterized.class)
 public class GeometricTest extends BaseTest4 {
 

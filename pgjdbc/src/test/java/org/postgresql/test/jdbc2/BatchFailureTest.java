@@ -139,6 +139,10 @@ public class BatchFailureTest extends BaseTest4 {
           for (AutoCommit autoCommit : AutoCommit.values()) {
             for (BinaryMode binaryMode : BinaryMode.values()) {
               for (boolean insertRewrite : booleans) {
+                if (insertRewrite) {
+                  // org.postgresql.util.PSQLException: batchMode and reWriteBatchedInserts can not both set true!
+                  continue;
+                }
                 ids.add(new Object[]{batchType, autoCommit, failMode, failPosition, binaryMode, insertRewrite});
               }
             }

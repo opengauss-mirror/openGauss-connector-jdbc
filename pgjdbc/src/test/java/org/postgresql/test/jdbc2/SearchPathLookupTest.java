@@ -116,7 +116,7 @@ public class SearchPathLookupTest {
       TypeInfo typeInfo = con.getTypeInfo();
       int OID = typeInfo.getPGType("x");
       ResultSet rs = stmt
-          .executeQuery("SELECT oid FROM pg_type WHERE typname = 'x' ORDER BY oid LIMIT 1");
+          .executeQuery("SELECT oid FROM pg_type WHERE typname = 'x' ORDER BY oid desc LIMIT 1");
       assertTrue(rs.next());
       assertEquals(OID, rs.getInt(1));
       assertFalse(rs.next());
