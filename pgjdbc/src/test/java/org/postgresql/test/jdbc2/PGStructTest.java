@@ -207,4 +207,133 @@ public class PGStructTest extends BaseTest4 {
             TestUtil.closeQuietly(cmt);
         }
     }
+
+    @Test
+    public void testCreateStructContainsNullAttribute() throws SQLException {
+        Statement stmt = null;
+        CallableStatement cmt = null;
+        try {
+            // Create display_emp and save it.
+            // The input and output parameters are both emp_obj_typ_v2 custom types.
+            String procedureSql = "create or replace PROCEDURE display_emp (a INOUT emp_obj_typ_v2)\n"
+                    + "  IS\n"
+                    + "  BEGIN\n"
+                    + "    a.empno:=1;\n"
+                    + "  END;";
+            stmt = con.createStatement();
+            stmt.execute(procedureSql);
+
+            // Create addr_object_type_v2 Struct object using jdbc connection
+            Struct address = con.createStruct("addr_object_type_v2",
+                    new Object[]{"123 MAIN STREET", null, "NJ", null});
+            // Use jdbc connection to create the emp_obj_typ_v2 Struct object
+            // and put addr_object_type_v2 into emp_obj_typ_v2.
+            Struct emp = con.createStruct("emp_obj_typ_v2", new Object[]{9001, null, address});
+
+            // set emp_obj_typ_v2 type param
+            String commandText = "{call display_emp(?)}";
+            cmt = con.prepareCall(commandText);
+            cmt.registerOutParameter(1, Types.STRUCT, schemaName + ".emp_obj_typ_v2");
+            cmt.setObject(1, emp);
+            cmt.execute();
+
+            emp = (Struct) cmt.getObject(1);
+            Object[] attrEmp = emp.getAttributes();
+            assertEquals(1, attrEmp[0]);
+            assertEquals(null, attrEmp[1]);
+            address = (Struct) attrEmp[2];
+            Object[] attrAddress = address.getAttributes();
+            assertEquals("123 MAIN STREET", attrAddress[0]);
+            assertEquals(null, attrAddress[1]);
+            assertEquals("NJ", attrAddress[2]);
+            assertEquals(null, attrAddress[3]);
+        } finally {
+            TestUtil.closeQuietly(stmt);
+            TestUtil.closeQuietly(cmt);
+        }
+    }
+
+    @Test
+    public void testCreateStructContainsNullStruct() throws SQLException {
+        Statement stmt = null;
+        CallableStatement cmt = null;
+        try {
+            // Create display_emp and save it.
+            // The input and output parameters are both emp_obj_typ_v2 custom types.
+            String procedureSql = "create or replace PROCEDURE display_emp (a INOUT emp_obj_typ_v2)\n"
+                    + "  IS\n"
+                    + "  BEGIN\n"
+                    + "    a.empno:=1;\n"
+                    + "  END;";
+            stmt = con.createStatement();
+            stmt.execute(procedureSql);
+
+            // Create addr_object_type_v2 Struct object using jdbc connection
+            Struct address = con.createStruct("addr_object_type_v2",
+                    new Object[]{"123 MAIN STREET", null, "NJ", 8817});
+            // Use jdbc connection to create the emp_obj_typ_v2 Struct object
+            // and put addr_object_type_v2 into emp_obj_typ_v2.
+            Struct emp = con.createStruct("emp_obj_typ_v2", new Object[]{9001, "JONES", null});
+
+            // set emp_obj_typ_v2 type param
+            String commandText = "{call display_emp(?)}";
+            cmt = con.prepareCall(commandText);
+            cmt.registerOutParameter(1, Types.STRUCT, schemaName + ".emp_obj_typ_v2");
+            cmt.setObject(1, emp);
+            cmt.execute();
+
+            emp = (Struct) cmt.getObject(1);
+            Object[] attrEmp = emp.getAttributes();
+            assertEquals(1, attrEmp[0]);
+            assertEquals("JONES", attrEmp[1]);
+            address = (Struct) attrEmp[2];
+            Object[] attrAddress = address.getAttributes();
+            assertEquals(null, attrAddress[0]);
+            assertEquals(null, attrAddress[1]);
+            assertEquals(null, attrAddress[2]);
+            assertEquals(null, attrAddress[3]);
+        } finally {
+            TestUtil.closeQuietly(stmt);
+            TestUtil.closeQuietly(cmt);
+        }
+    }
+
+    @Test
+    public void testSpOutDouble() throws SQLException {
+        Statement stmt = null;
+        CallableStatement cmt = null;
+        try {
+            // create sp
+            String procedureSql = "create or replace procedure test_sp_out_double(\n" +
+                    "\t pa in int4,\n" +
+                    "\t pb out numeric,\n" +
+                    "\t pc out int8)\n" +
+                    "IS \n" +
+                    "begin \n" +
+                    "pb := 2.22; \n" +
+                    "pc := pa + 1024; \n" +
+                    "end;";
+            stmt = con.createStatement();
+            stmt.execute(procedureSql);
+
+            // execute sp
+            String commandText = "{call test_sp_out_double(?, ?, ?)}";
+            cmt = con.prepareCall(commandText);
+            cmt.setInt(1, 1024);
+            cmt.registerOutParameter(2, Types.DOUBLE);
+            cmt.registerOutParameter(3, Types.BIGINT);
+            cmt.execute();
+
+            // get result set
+            Object pa = cmt.getObject(1);
+            double pb = cmt.getDouble(2);
+            long pc = cmt.getLong(3);
+            assertEquals(null, pa);
+            assertEquals(2.22d, pb, 0.0001d);
+            assertEquals(2048, pc);
+        } finally {
+            TestUtil.closeQuietly(stmt);
+            TestUtil.closeQuietly(cmt);
+        }
+    }
 }

@@ -119,7 +119,7 @@ public class AutoRollbackTestSuite extends BaseTest4 {
   private final TestStatement testSql;
   private final ReturnColumns cols;
 
-  private String INVALID_SQL_STATEMENT_NAME_STATE = "26010";
+    private static final String INVALID_SQL_STATEMENT_NAME_STATE = "26010";
 
   public AutoRollbackTestSuite(AutoSave autoSave, AutoCommit autoCommit,
       FailMode failMode, ContinueMode continueMode, boolean flushCacheOnDeallocate,
@@ -295,9 +295,7 @@ public class AutoRollbackTestSuite extends BaseTest4 {
                 INVALID_SQL_STATEMENT_NAME_STATE, e.getSQLState());
             return;
           }
-          if (failMode == FailMode.DEALLOCATE) {
-
-          } else {
+          if (failMode != FailMode.DEALLOCATE) {
             throw e;
           }
         }
@@ -352,9 +350,7 @@ public class AutoRollbackTestSuite extends BaseTest4 {
         } else {
           throw e;
         }
-      } else if (failMode == FailMode.DEALLOCATE) {
-
-      } else {
+      } else if (failMode != FailMode.DEALLOCATE) {
         throw e;
       }
     }
@@ -374,9 +370,7 @@ public class AutoRollbackTestSuite extends BaseTest4 {
                   + " error message is " + e.getMessage(),
               PSQLState.IN_FAILED_SQL_TRANSACTION.getState(), e.getSQLState());
         }
-      } else if (failMode == FailMode.DEALLOCATE) {
-
-      } else {
+      } else if (failMode != FailMode.DEALLOCATE) {
         throw e;
       }
     }

@@ -5,7 +5,12 @@ import org.junit.Before;
 import org.junit.Test;
 import org.postgresql.test.TestUtil;
 
-import java.sql.*;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;

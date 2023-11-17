@@ -16,8 +16,12 @@ import org.postgresql.test.TestUtil;
 import org.junit.Assume;
 import org.junit.Test;
 
-import java.sql.*;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 /*
  * Tests for using server side prepared statements
  */

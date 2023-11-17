@@ -17,11 +17,11 @@ public class BeginEndTest extends BaseTest4 {
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        TestUtil.createTable(con, TEST_TABLE_NAME, "ID INT PRIMARY KEY     NOT NULL,\n" +
-                "   NAME           TEXT    NOT NULL,\n" +
-                "   AGE            INT     NOT NULL,\n" +
-                "   ADDRESS        CHAR(50),\n" +
-                "   SALARY         REAL");
+        TestUtil.createTable(con, TEST_TABLE_NAME, "ID INT PRIMARY KEY     NOT NULL,\n"
+                + "   NAME           TEXT    NOT NULL,\n"
+                + "   AGE            INT     NOT NULL,\n"
+                + "   ADDRESS        CHAR(50),\n"
+                + "   SALARY         REAL");
     }
 
     @After
@@ -343,7 +343,8 @@ public class BeginEndTest extends BaseTest4 {
      ******************************************************************/
     @Test
     public void testCase12() throws SQLException {
-        Assume.assumeTrue("PSQLException:ERROR: Package only allowed create in A compatibility", DataBaseCompatibility.isADatabase(con));
+        Assume.assumeTrue("PSQLException:ERROR: Package only allowed create in A compatibility",
+                DataBaseCompatibility.isADatabase(con));
 
         Statement stmt = con.createStatement();
         CallableStatement cmt = null;
