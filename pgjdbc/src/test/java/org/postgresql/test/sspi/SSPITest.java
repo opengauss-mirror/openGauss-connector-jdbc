@@ -5,22 +5,20 @@
 
 package org.postgresql.test.sspi;
 
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.postgresql.test.TestUtil;
+import org.postgresql.util.PSQLException;
+
+import java.sql.Connection;
+import java.sql.Statement;
+import java.util.Properties;
+
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeThat;
-
-import org.postgresql.test.TestUtil;
-import org.postgresql.util.PSQLException;
-import org.postgresql.util.PSQLState;
-
-import org.junit.BeforeClass;
-import org.junit.Test;
-
-import java.sql.Connection;
-import java.sql.Statement;
-import java.util.Properties;
 
 /*
  * These tests require a working SSPI authentication setup
@@ -29,6 +27,7 @@ import java.util.Properties;
  * configuration.
  */
 public class SSPITest {
+    private static final String INVALID_AUTHORIZATION_SPECIFICATION_STATE = "28P01";
 
   /*
    * SSPI only exists on Windows.
@@ -69,7 +68,7 @@ public class SSPITest {
       TestUtil.closeDB(con);
       fail("Expected a PSQLException");
     } catch (PSQLException e) {
-      assertThat(e.getSQLState(), is(PSQLState.INVALID_AUTHORIZATION_SPECIFICATION.getState()));
+      assertThat(e.getSQLState(), is(INVALID_AUTHORIZATION_SPECIFICATION_STATE));
     }
   }
 

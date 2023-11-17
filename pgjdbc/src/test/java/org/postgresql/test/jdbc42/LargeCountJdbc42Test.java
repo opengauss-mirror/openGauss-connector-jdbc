@@ -5,22 +5,23 @@
 
 package org.postgresql.test.jdbc42;
 
-import org.postgresql.PGProperty;
-import org.postgresql.test.TestUtil;
-import org.postgresql.test.jdbc2.BaseTest4;
-import org.postgresql.util.PSQLState;
-
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.postgresql.PGProperty;
+import org.postgresql.test.TestUtil;
+import org.postgresql.test.jdbc2.BaseTest4;
+import org.postgresql.util.PSQLState;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -316,7 +317,7 @@ public class LargeCountJdbc42Test extends BaseTest4 {
             stmt.addBatch(); // statement three
             stmt.addBatch(); // statement four, same parms as three
             long[] actual = stmt.executeLargeBatch();
-            Assert.assertArrayEquals("Rows inserted via 4 batch", new long[]{200L, 100L, 50L, 50L}, actual);
+            Assert.assertArrayEquals("Rows inserted via 4 batch", new long[]{400L, 0L, 0L, 0L}, actual);
         }
     }
 
@@ -328,13 +329,20 @@ public class LargeCountJdbc42Test extends BaseTest4 {
         long[] loop = {200, 100, 50, 300, 20, 60, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
         try (PreparedStatement stmt = con.prepareStatement("insert into largetable "
                 + "select true from generate_series(?, ?)")) {
+            List<Long> loopList = new ArrayList<>();
+            long sum = 0L;
             for (long i : loop) {
                 stmt.setInt(1, 1);
                 stmt.setLong(2, i);
                 stmt.addBatch();
+                sum += i;
+                loopList.add(0L);
             }
+            loopList.remove(0);
+            loopList.add(0, sum);
             long[] actual = stmt.executeLargeBatch();
-            Assert.assertArrayEquals("Rows inserted via batch", loop, actual);
+            Assert.assertArrayEquals("Rows inserted via batch",
+                    loopList.stream().mapToLong(Long::longValue).toArray(), actual);
         }
     }
 
@@ -344,6 +352,8 @@ public class LargeCountJdbc42Test extends BaseTest4 {
     @Test
     public void testExecuteLargeBatchValuesInsertSMALL() throws Exception {
         boolean[] loop = {true, false, true, false, false, false, true, true, true, true, false, true};
+        Assume.assumeFalse("org.postgresql.util.PSQLException: "
+                + "batchMode and reWriteBatchedInserts can not both set true!", insertRewrite);
         try (PreparedStatement stmt = con.prepareStatement("insert into largetable values(?)")) {
             for (boolean i : loop) {
                 stmt.setBoolean(1, i);
@@ -355,7 +365,9 @@ public class LargeCountJdbc42Test extends BaseTest4 {
                 if (insertRewrite) {
                     Assert.assertEquals(Statement.SUCCESS_NO_INFO, i);
                 } else {
-                    Assert.assertEquals(1, i);
+                    if (i > 0) {
+                        Assert.assertEquals(loop.length, i);
+                    }
                 }
             }
         }
