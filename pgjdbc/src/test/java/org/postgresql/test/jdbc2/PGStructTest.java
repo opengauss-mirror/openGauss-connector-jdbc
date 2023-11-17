@@ -40,10 +40,6 @@ public class PGStructTest extends BaseTest4 {
         TestUtil.createCompositeType(con, "addr_object_type_v3", "street VARCHAR(30),city VARCHAR(20), "
                 + "state CHAR(2),  zip int,name name_object_type_v3");
         TestUtil.createCompositeType(con, "emp_obj_typ_v3", "empno int, ename VARCHAR(20),addr addr_object_type_v3");
-        // create test cursor table
-        TestUtil.createTable(con, "test_cursor", "c1 int, c2 float, c3 float, c4 text, c5 bigint");
-        String insertSQL = TestUtil.insertSQL("test_cursor", "1,2.2,3.3,'test',5");
-        TestUtil.execute(insertSQL, con);
     }
 
     @After
@@ -61,8 +57,6 @@ public class PGStructTest extends BaseTest4 {
         TestUtil.dropType(con, "addr_object_type_v3");
         TestUtil.dropType(con, "emp_obj_typ_v3");
 
-        // drop test cursor table
-        TestUtil.dropTable(con, "test_cursor");
         // drop schema
         TestUtil.dropSchema(con, schemaName);
     }
@@ -309,28 +303,34 @@ public class PGStructTest extends BaseTest4 {
         Statement stmt = null;
         CallableStatement cmt = null;
         try {
-            con.setAutoCommit(false);
             // create sp
-            String procedureSql = "CREATE OR REPLACE FUNCTION test_refcursor () RETURNS refcursor AS \n" +
-                    "\t'declare v_resset refcursor; begin open v_resset for select c1,c2 from test_cursor;\n" +
-                    "\treturn v_resset; end;' \n" +
-                    "LANGUAGE plpgsql;";
+            String procedureSql = "create or replace procedure test_sp_out_double(\n" +
+                    "\t pa in int4,\n" +
+                    "\t pb out numeric,\n" +
+                    "\t pc out int8)\n" +
+                    "IS \n" +
+                    "begin \n" +
+                    "pb := 2.22; \n" +
+                    "pc := pa + 1024; \n" +
+                    "end;";
             stmt = con.createStatement();
             stmt.execute(procedureSql);
 
             // execute sp
-            String commandText = "{? = call test_refcursor()}";
+            String commandText = "{call test_sp_out_double(?, ?, ?)}";
             cmt = con.prepareCall(commandText);
-            int OracleTypes_CURSOR = -10;
-            cmt.registerOutParameter(1, OracleTypes_CURSOR);
+            cmt.setInt(1, 1024);
+            cmt.registerOutParameter(2, Types.DOUBLE);
+            cmt.registerOutParameter(3, Types.BIGINT);
             cmt.execute();
 
             // get result set
-            ResultSet rs = (ResultSet) cmt.getObject(1);
-            rs.next();
-            assertEquals(1, rs.getInt(1));
-            assertEquals(2.2d, rs.getDouble(2), 0.0001);
-            con.setAutoCommit(true);
+            Object pa = cmt.getObject(1);
+            double pb = cmt.getDouble(2);
+            long pc = cmt.getLong(3);
+            assertEquals(null, pa);
+            assertEquals(2.22d, pb, 0.0001d);
+            assertEquals(2048, pc);
         } finally {
             TestUtil.closeQuietly(stmt);
             TestUtil.closeQuietly(cmt);

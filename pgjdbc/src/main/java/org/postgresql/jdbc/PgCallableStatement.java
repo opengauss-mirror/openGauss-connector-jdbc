@@ -268,9 +268,6 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
       case Types.NCHAR:
         sqlType = Types.CHAR;
         break;
-      case -10:
-        sqlType = Types.REF_CURSOR;
-        break;
       default:
         break;
     }
