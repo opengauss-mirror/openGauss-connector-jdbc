@@ -36,7 +36,7 @@ public class DatabaseMetaDataTest {
   public void tearDown() throws Exception {
     Statement stmt = _conn.createStatement();
     stmt.execute("DROP TABLE domtab");
-    stmt.execute("DROP DOMAIN mydom");
+    stmt.execute("DROP TYPE mydom CASCADE");
     TestUtil.closeDB(_conn);
   }
 

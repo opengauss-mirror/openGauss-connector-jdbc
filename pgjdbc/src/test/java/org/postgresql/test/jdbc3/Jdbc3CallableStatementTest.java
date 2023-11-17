@@ -287,9 +287,9 @@ public class Jdbc3CallableStatementTest extends BaseTest4 {
           + "insert_bit( inout IMAX boolean, inout IMIN boolean, inout INUL boolean)  as "
           + "'begin "
           + "insert into bit_tab values( imax, imin, inul);"
-          + "select max_val into imax from bit_tab;"
-          + "select min_val into imin from bit_tab;"
-          + "select null_val into inul from bit_tab;"
+          + "select max_val into imax from bit_tab limit 1;"
+          + "select min_val into imin from bit_tab limit 1;"
+          + "select null_val into inul from bit_tab limit 1;"
           + " end;' "
           + "language plpgsql;");
     } catch (Exception ex) {
@@ -298,12 +298,12 @@ public class Jdbc3CallableStatementTest extends BaseTest4 {
     }
     try {
       CallableStatement cstmt = con.prepareCall("{ call insert_bit(?,?,?) }");
-      cstmt.setObject(1, "true", Types.BIT);
-      cstmt.setObject(2, "false", Types.BIT);
-      cstmt.setNull(3, Types.BIT);
-      cstmt.registerOutParameter(1, Types.BIT);
-      cstmt.registerOutParameter(2, Types.BIT);
-      cstmt.registerOutParameter(3, Types.BIT);
+      cstmt.setObject(1, "true", Types.BOOLEAN);
+      cstmt.setObject(2, "false", Types.BOOLEAN);
+      cstmt.setNull(3, Types.BOOLEAN);
+      cstmt.registerOutParameter(1, Types.BOOLEAN);
+      cstmt.registerOutParameter(2, Types.BOOLEAN);
+      cstmt.registerOutParameter(3, Types.BOOLEAN);
       cstmt.executeUpdate();
 
       assertTrue(cstmt.getBoolean(1));
@@ -344,9 +344,9 @@ public class Jdbc3CallableStatementTest extends BaseTest4 {
     }
     try {
       CallableStatement cstmt = con.prepareCall("{ call update_bit(?,?,?) }");
-      cstmt.setObject(1, "true", Types.BIT);
-      cstmt.setObject(2, "false", Types.BIT);
-      cstmt.setNull(3, Types.BIT);
+      cstmt.setObject(1, "true", Types.BOOLEAN);
+      cstmt.setObject(2, "false", Types.BOOLEAN);
+      cstmt.setNull(3, Types.BOOLEAN);
       cstmt.executeUpdate();
       cstmt.close();
       ResultSet rs = con.createStatement().executeQuery("select * from bit_tab");

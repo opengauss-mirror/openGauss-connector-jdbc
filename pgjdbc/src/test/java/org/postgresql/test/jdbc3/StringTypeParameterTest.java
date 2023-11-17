@@ -13,6 +13,7 @@ import org.postgresql.core.ServerVersion;
 import org.postgresql.jdbc.PreferQueryMode;
 import org.postgresql.test.TestUtil;
 import org.postgresql.test.jdbc2.BaseTest4;
+import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLState;
 
 import org.junit.Assume;
@@ -140,7 +141,7 @@ public class StringTypeParameterTest extends BaseTest4 {
     // all good
 
     update.clearParameters();
-    update.setObject(1, "happy", Types.VARCHAR);
+    update.setObject(1, "happy", Types.OTHER);
     update.executeUpdate();
     // all good
     update.close();
@@ -149,14 +150,14 @@ public class StringTypeParameterTest extends BaseTest4 {
     query.setString(1, "happy");
     ResultSet rs = query.executeQuery();
     assertTrue(rs.next());
-    assertEquals("happy", rs.getObject("m"));
+    assertEquals("happy", ((PGobject) rs.getObject("m")).getValue());
     rs.close();
 
     query.clearParameters();
-    query.setObject(1, "happy", Types.VARCHAR);
+    query.setObject(1, "happy", Types.OTHER);
     rs = query.executeQuery();
     assertTrue(rs.next());
-    assertEquals("happy", rs.getObject("m"));
+    assertEquals("happy", ((PGobject) rs.getObject("m")).getValue());
 
     // all good
     rs.close();
