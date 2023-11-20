@@ -13,6 +13,7 @@ import org.postgresql.log.Log;
 import org.postgresql.log.Tracer;
 import org.postgresql.quickautobalance.ConnectionManager;
 import org.postgresql.quickautobalance.LoadBalanceHeartBeating;
+import org.postgresql.readwritesplitting.ReadWriteSplittingPgConnection;
 import org.postgresql.util.DriverInfo;
 import org.postgresql.util.GT;
 import org.postgresql.util.HostSpec;
@@ -561,6 +562,9 @@ public class Driver implements java.sql.Driver {
      */
     private static Connection makeConnection(String url, Properties props) throws SQLException {
         ConnectionManager.getInstance().setCluster(props);
+        if (PGProperty.ENABLE_STATEMENT_LOAD_BALANCE.getBoolean(props)) {
+            return new ReadWriteSplittingPgConnection(hostSpecs(props), props, user(props), database(props), url);
+        }
         PgConnection pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props, url);
         GlobalConnectionTracker.possessConnectionReference(pgConnection.getQueryExecutor(), props);
         LoadBalanceHeartBeating.setConnection(pgConnection, props);
