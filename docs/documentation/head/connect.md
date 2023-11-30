@@ -142,6 +142,10 @@ Connection conn = DriverManager.getConnection(url);
 
 	The driver supports the V3 frontend/backend protocols. The V3 protocol was introduced in 7.4 and
 	the driver will by default try to	connect using the V3 protocol.
+
+* **quoteReturningIdentifiers** = boolean
+
+	By default we double quote returning identifiers. Some ORM's alraedy allows quote them. Switch allows them to turn this off.
  
 * **loggerLevel** = String
 

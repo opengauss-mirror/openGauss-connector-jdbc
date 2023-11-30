@@ -243,7 +243,7 @@ public class ClientLogic {
         //Replace the query syntax from jdbc syntax with ? for bind parameters to $1 $2 ... $n
         List<NativeQuery> queries;
         try {
-            queries = Parser.parseJdbcSql(query, true, true, true, true);
+            queries = Parser.parseJdbcSql(query, true, true, true, true, true);
         } catch (SQLException e) {
             throw new ClientLogicException(ERROR_PARSER_FAILURE, ERROR_TEXT_PARSER_FAILURE, true);
         }
