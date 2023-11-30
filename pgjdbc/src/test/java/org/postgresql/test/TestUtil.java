@@ -387,6 +387,7 @@ public class TestUtil {
         props.put(PGProperty.PREFER_QUERY_MODE.getName(), value);
       }
     }
+    PGProperty.QUOTE_RETURNING_IDENTIFIERS.set(props, false);
     // Enable Base4 tests to override host,port,database
     String hostport = props.getProperty(SERVER_HOST_PORT_PROP, getServer() + ":" + getPort());
     String database = props.getProperty(DATABASE_PROP, getDatabase());

@@ -41,6 +41,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
   private TransactionState transactionState;
   private final boolean reWriteBatchedInserts;
   private final boolean columnSanitiserDisabled;
+  private final boolean isQuotedReturningIdentifiers;
   private final PreferQueryMode preferQueryMode;
   private AutoSave autoSave;
   private boolean flushCacheOnDeallocate = true;
@@ -64,22 +65,29 @@ public abstract class QueryExecutorBase implements QueryExecutor {
     this.cancelSignalTimeout = cancelSignalTimeout;
     this.reWriteBatchedInserts = PGProperty.REWRITE_BATCHED_INSERTS.getBoolean(info);
     this.columnSanitiserDisabled = PGProperty.DISABLE_COLUMN_SANITISER.getBoolean(info);
+    this.isQuotedReturningIdentifiers = PGProperty.QUOTE_RETURNING_IDENTIFIERS.getBoolean(info);
     String preferMode = PGProperty.PREFER_QUERY_MODE.get(info);
     this.preferQueryMode = PreferQueryMode.of(preferMode);
     this.autoSave = AutoSave.of(PGProperty.AUTOSAVE.get(info));
     this.cachedQueryCreateAction = new CachedQueryCreateAction(this);
     this.props = info;
     statementCache = new LruCache<Object, CachedQuery>(
-            Math.max(0, PGProperty.PREPARED_STATEMENT_CACHE_QUERIES.getInt(info)),
-            Math.max(0, PGProperty.PREPARED_STATEMENT_CACHE_SIZE_MIB.getInt(info) * 1024 * 1024),
-            false,
-            cachedQueryCreateAction,
-            new LruCache.EvictAction<CachedQuery>() {
-              @Override
-              public void evict(CachedQuery cachedQuery) throws SQLException {
-                cachedQuery.query.close();
-              }
-            });
+        Math.max(0, PGProperty.PREPARED_STATEMENT_CACHE_QUERIES.getInt(info)),
+        Math.max(0, PGProperty.PREPARED_STATEMENT_CACHE_SIZE_MIB.getInt(info) * 1024 * 1024),
+        false,
+        cachedQueryCreateAction,
+        new LruCache.EvictAction<CachedQuery>() {
+            @Override
+            public void evict(CachedQuery cachedQuery) throws SQLException {
+            cachedQuery.query.close();
+            if (!cachedQuery.isRewriteQueriesEmpty()) {
+                for (Query query : cachedQuery.getRewriteQueries()) {
+                    query.close();
+                }
+            cachedQuery.clearRewriteQueries();
+        }
+      }
+    });
   }
 
   protected abstract void sendCloseMessage() throws IOException;
@@ -259,6 +267,11 @@ public abstract class QueryExecutorBase implements QueryExecutor {
   @Override
   public synchronized boolean getStandardConformingStrings() {
     return standardConformingStrings;
+  }
+
+  @Override
+  public boolean getQuoteReturningIdentifiers() {
+    return isQuotedReturningIdentifiers;
   }
 
   @Override
