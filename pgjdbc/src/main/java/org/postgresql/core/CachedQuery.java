@@ -7,6 +7,8 @@ package org.postgresql.core;
 
 import org.postgresql.util.CanEstimateSize;
 
+import java.util.ArrayList;
+
 /**
  * Stores information on the parsed JDBC query. It is used to cut parsing overhead when executing
  * the same query through {@link java.sql.Connection#prepareStatement(String)}.
@@ -20,7 +22,8 @@ public class CachedQuery implements CanEstimateSize {
   public final boolean isFunction;
   public final boolean isACompatibilityFunction;
   private int executeCount;
-
+  // record queries after rewrite
+  private final ArrayList<Query> rewriteQueries = new ArrayList<>();
   public CachedQuery(Object key, Query query, boolean isFunction, boolean isACompatibilityFunction) {
     assert key instanceof String || key instanceof CanEstimateSize
         : "CachedQuery.key should either be String or implement CanEstimateSize."
@@ -66,6 +69,42 @@ public class CachedQuery implements CanEstimateSize {
         + 100L /* entry in hash map, CachedQuery wrapper, etc */;
   }
 
+  /**
+   * add rewrite query to list
+   *
+   * @param query the query to add
+   */
+  public void addRewriteQueries(Query query) {
+    rewriteQueries.add(query);
+  }
+
+  /**
+   * get rewrite queries list
+   *
+   * @return rewrite queries list
+   */
+  public ArrayList<Query> getRewriteQueries() {
+    return rewriteQueries;
+  }
+
+  /**
+   * check if rewrite queries list empty
+   *
+   * @return check result
+   */
+  public boolean isRewriteQueriesEmpty() {
+    return rewriteQueries.isEmpty();
+  }
+
+  /**
+   * clear rewrite queries
+   */
+  public void clearRewriteQueries() {
+    if (rewriteQueries.isEmpty()) {
+      return;
+    }
+    rewriteQueries.clear();
+  }
   @Override
   public String toString() {
     return "CachedQuery{"
