@@ -62,6 +62,17 @@ public enum PGProperty {
       false, "3"),
 
   /**
+   * Quote returning columns.
+   * There are some ORM's that quote everything, including returning columns
+   * If we quote them, then we end up sending ""colname"" to the backend
+   * which will not be found
+   */
+  QUOTE_RETURNING_IDENTIFIERS("quoteReturningIdentifiers",
+      "true",
+      "Quote identifiers provided in returning array",
+      false),
+
+  /**
    * <p>Logger level of the driver. Allowed values: {@code OFF}, {@code DEBUG} or {@code TRACE}.</p>
    *
    * <p>This enable the {@link java.util.logging.Logger} of the driver based on the following mapping

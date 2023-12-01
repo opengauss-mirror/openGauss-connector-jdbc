@@ -5,9 +5,9 @@
 
 package org.postgresql.core.v3;
 
+import org.postgresql.core.CachedQuery;
 import org.postgresql.core.NativeQuery;
 import org.postgresql.core.ParameterList;
-
 
 /**
  * Purpose of this object is to support batched query re write behaviour. Responsibility for
@@ -27,6 +27,8 @@ public class BatchedQuery extends SimpleQuery {
   private final int batchSize;
   private BatchedQuery[] blocks;
 
+    // record the origin query of the rewrite query
+    private CachedQuery originalPrepareQuery;
   public BatchedQuery(NativeQuery query, TypeTransferModeRegistry transferModeRegistry,
       int valuesBraceOpenPosition,
       int valuesBraceClosePosition, boolean sanitiserDisabled) {
@@ -83,6 +85,24 @@ public class BatchedQuery extends SimpleQuery {
     }
     sql = buildNativeSql(null);
     return sql;
+  }
+
+  /**
+   * get original prepareQuery
+   *
+   * @return the originalPrepareQuery
+   */
+  public CachedQuery getOriginalPrepareQuery() {
+    return originalPrepareQuery;
+  }
+
+  /**
+   * set original prepareQuery
+   *
+   * @param originalPrepareQuery the originalPrepareQuery to be set
+   */
+  public void setOriginalPrepareQuery(CachedQuery originalPrepareQuery) {
+    this.originalPrepareQuery = originalPrepareQuery;
   }
 
   private String buildNativeSql(ParameterList params) {
