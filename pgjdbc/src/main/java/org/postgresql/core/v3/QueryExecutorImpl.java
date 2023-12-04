@@ -10,6 +10,7 @@ import org.postgresql.PGProperty;
 import org.postgresql.copy.CopyIn;
 import org.postgresql.copy.CopyOperation;
 import org.postgresql.copy.CopyOut;
+import org.postgresql.core.CachedQuery;
 import org.postgresql.core.CommandCompleteParser;
 import org.postgresql.core.Encoding;
 import org.postgresql.core.EncodingPredictor;
@@ -270,7 +271,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   public Query createSimpleQuery(String sql) throws SQLException {
     List<NativeQuery> queries = Parser.parseJdbcSql(sql,
             getStandardConformingStrings(), false, true,
-            isReWriteBatchedInsertsEnabled());
+            isReWriteBatchedInsertsEnabled(), getQuoteReturningIdentifiers());
     return wrap(queries);
   }
 
@@ -1540,6 +1541,17 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     pendingDescribePortalQueue.add(sync);
   }
 
+  private void checkAndUpdateRewriteQueries(SimpleQuery query) {
+    if (!(query instanceof BatchedQuery)) {
+      return;
+    }
+    BatchedQuery batchedQuery = (BatchedQuery) query;
+    CachedQuery originalPrepareQuery = batchedQuery.getOriginalPrepareQuery();
+    if (originalPrepareQuery == null) {
+      return;
+    }
+    originalPrepareQuery.addRewriteQueries(batchedQuery);
+  }
   private void sendParse(SimpleQuery query, SimpleParameterList params, boolean oneShot)
           throws IOException {
     // Already parsed, or we have a Parse pending and the types are right?
@@ -1569,6 +1581,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       query.setStatementName(statementName, deallocateEpoch);
       query.setPrepareTypes(typeOIDs);
       registerParsedQuery(query, statementName);
+      checkAndUpdateRewriteQueries(query);
     }
 
     byte[] encodedStatementName = query.getEncodedStatementName();
