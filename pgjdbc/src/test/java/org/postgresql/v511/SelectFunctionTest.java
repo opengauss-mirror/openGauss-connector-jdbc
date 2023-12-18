@@ -11,10 +11,7 @@ import org.postgresql.util.ExecuteUtil;
 import org.postgresql.util.RsParser;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.LinkedList;
+import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Properties;
 
@@ -60,6 +57,60 @@ public class SelectFunctionTest {
         try (Connection conn = createConnection()) {
             List<Memory> results = ExecuteUtil.execute(conn, sql, new RsParser<Memory>() {});
             Assert.assertNotNull(results);
+        }
+    }
+
+    @Test
+    public void testTriggerQuery() throws Exception {
+        String sqlTable = "create table t_tinyint0006 (" + "id int primary key auto_increment,"
+            + "my_data tinyint" + ");";
+        String sqlTrigger = "create trigger trigger_tinyint0006 before insert on t_tinyint0006" + " for each row "
+            + "begin" + " update t_tinyint0006 set my_data=1;" + "end;";
+        try (Connection conn = createConnection()) {
+            ExecuteUtil.execute(conn, sqlTable);
+            ExecuteUtil.execute(conn, sqlTrigger);
+        }
+    }
+    
+    @Test
+    public void testReturningQuery() throws Exception {
+        String returnString = "INSERT INTO CIMMIT (DATA_ENABLE) VALUES (1)";
+        try (Connection conn = createConnection()) {
+            PreparedStatement st = conn.prepareStatement(returnString, new String[] {"ID"});
+            st.execute();
+        }
+    }
+
+    @Test
+    public void testBatchInsert() throws Exception {
+        Properties props = new Properties();
+        props.put("preparedStatementCacheQueries", "2");
+        props.put("prepareThreshold", "2");
+        props.put("fetchSize", "5");
+        props.put("batchMode", "OFF");
+        props.put("reWriteBatchedInserts", "true");
+        try (Connection conn = TestUtil.openDB(props)) {
+            for (int j = 1; j <= 1000; j++) {
+                ExecuteUtil.execute(conn, "set session_timeout = 0;");
+                ExecuteUtil.execute(conn, "drop table if exists t" + j);
+                ExecuteUtil.execute(conn, "create table t" + j
+                    + "(id int, id1 int, id2 int, id3 int, id4 int, id5 int, data varchar(2048));");
+                String batchInsert = "insert into t" + j + " values (?,?,?,?,?,?,?)";
+                PreparedStatement preparedStatement = conn.prepareStatement(batchInsert);
+                for (int i = 1; i <= 1000; i++) {
+                    preparedStatement.setInt(1, 1);
+                    preparedStatement.setInt(2, i);
+                    preparedStatement.setInt(3, i);
+                    preparedStatement.setInt(4, i);
+                    preparedStatement.setInt(5, i);
+                    preparedStatement.setInt(6, i);
+                    preparedStatement.setString(7, "Huawei");
+                    preparedStatement.addBatch();
+                }
+                preparedStatement.executeBatch();
+                preparedStatement.close();
+            }
+            // block
         }
     }
 

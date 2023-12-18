@@ -51,6 +51,7 @@ public class Parser {
    * @param withParameters            whether to replace ?, ? with $1, $2, etc
    * @param splitStatements           whether to split statements by semicolon
    * @param isBatchedReWriteConfigured whether re-write optimization is enabled
+   * @param isQuotedReturningIdentifiers whether to quote identifiers returned using returning clause
    * @param returningColumnNames      for simple insert, update, delete add returning with given column names
    * @return list of native queries
    * @throws SQLException if unable to add returning clause (invalid column names)
@@ -58,6 +59,7 @@ public class Parser {
   public static List<NativeQuery> parseJdbcSql(String query, boolean standardConformingStrings,
       boolean withParameters, boolean splitStatements,
       boolean isBatchedReWriteConfigured,
+      boolean isQuotedReturningIdentifiers,
       String... returningColumnNames) throws SQLException {
       int numOfOverSymble = 0;
       if(startWithComment(query)) {
@@ -151,8 +153,8 @@ public class Parser {
                   }
                   fragmentStart = i + 1;
                   if (nativeSql.length() > 0) {
-                      if (addReturning(
-                              nativeSql, currentCommandType, returningColumnNames, isReturningPresent)) {
+                      if (addReturning(nativeSql, currentCommandType, returningColumnNames, isReturningPresent,
+                          isQuotedReturningIdentifiers)) {
                           isReturningPresent = true;
                       }
 
@@ -256,7 +258,8 @@ public class Parser {
             }
             fragmentStart = i + 1;
             if (nativeSql.length() > 0) {
-              if (addReturning(nativeSql, currentCommandType, returningColumnNames, isReturningPresent)) {
+                if (addReturning(nativeSql, currentCommandType, returningColumnNames, isReturningPresent,
+                    isQuotedReturningIdentifiers)) {
                 isReturningPresent = true;
               }
 
@@ -378,7 +381,7 @@ public class Parser {
         if (inParen != 0 || aChar == ')') {
           // RETURNING and VALUES cannot be present in braces
         } else if (wordLength == 9 && parseReturningKeyword(aChars, keywordStart)) {
-          isReturningPresent = true;
+           isReturningPresent = true;
         } else if (wordLength == 6 && parseValuesKeyword(aChars, keywordStart)) {
           isValuesFound = true;
         }
@@ -416,7 +419,8 @@ public class Parser {
       return nativeQueries != null ? nativeQueries : Collections.<NativeQuery>emptyList();
     }
 
-    if (addReturning(nativeSql, currentCommandType, returningColumnNames, isReturningPresent)) {
+    if (addReturning(nativeSql, currentCommandType, returningColumnNames, isReturningPresent,
+        isQuotedReturningIdentifiers)) {
       isReturningPresent = true;
     }
 
@@ -525,8 +529,9 @@ public class Parser {
     return null;
   }
 
-  private static boolean addReturning(StringBuilder nativeSql, SqlCommandType currentCommandType,
-      String[] returningColumnNames, boolean isReturningPresent) throws SQLException {
+    private static boolean addReturning(StringBuilder nativeSql, SqlCommandType currentCommandType,
+        String[] returningColumnNames, boolean isReturningPresent, boolean isQuotedReturningIdentifiers)
+        throws SQLException {
     if (isReturningPresent || returningColumnNames.length == 0) {
       return false;
     }
@@ -547,7 +552,11 @@ public class Parser {
       if (col > 0) {
         nativeSql.append(", ");
       }
-      Utils.escapeIdentifier(nativeSql, columnName);
+      if (isQuotedReturningIdentifiers) {
+        Utils.escapeIdentifier(nativeSql, columnName);
+      } else {
+        nativeSql.append(columnName);
+      }
     }
     return true;
   }
@@ -670,6 +679,7 @@ public class Parser {
                 case "PROCEDURE":
                 case "FUNCTION":
                 case "DECLARE":
+                case "TRIGGER":
                     return true;
                 case "CREATE":
                     if (i == 0) {
@@ -896,6 +906,7 @@ public class Parser {
         && (query[offset + 7] | 32) == 'n'
         && (query[offset + 8] | 32) == 'g';
   }
+
 
   /**
    * Parse string to check presence of SELECT keyword regardless of case.

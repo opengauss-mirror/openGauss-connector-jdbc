@@ -1725,6 +1725,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
      }
      // Find appropriate batch for block count.
      BatchedQuery bq = originalQuery.deriveForMultiBatch(valueBlock);
+     bq.setOriginalPrepareQuery(preparedQuery);
      ParameterList newPl = bq.createParameterList();
      for (int j = 0; j < valueBlock; j++) {
        ParameterList pl = batchParameters.get(offset++);

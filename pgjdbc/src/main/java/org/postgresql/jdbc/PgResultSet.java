@@ -523,6 +523,20 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       return bytes;
   }
 
+    private String getBlobRaw(int i) throws SQLException {
+        Encoding encoding = connection.getEncoding();
+        try {
+            return trimString(i, encoding.decode(this_row[i - 1]));
+        } catch (IOException ioe) {
+            throw new PSQLException(
+                GT.tr("Invalid character data was found.  "
+                        + "This is most likely caused by stored data containing characters that are invalid for the "
+                        + "character set the database was created in.  The most common example of this is storing 8bit "
+                        + "data in a SQL_ASCII database."),
+                PSQLState.DATA_ERROR, ioe);
+        }
+    }
+
   public Blob getBlob(int i) throws SQLException {
     checkResultSet(i);
     if (wasNullFlag) {
@@ -538,7 +552,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     if (oid == Oid.BYTEA) {
         byt = trimBytes(i, PGbytea.toBytes(this_row[i - 1]));
     } else if (oid == Oid.BLOB || blobSet.contains(getPGType(i))) {
-        byt = toBytes(getString(i));
+        byt = toBytes(getBlobRaw(i));
     } else {
         byt = trimBytes(i, this_row[i - 1]);
     }
@@ -2080,7 +2094,16 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
     Encoding encoding = connection.getEncoding();
     try {
-      return trimString(columnIndex, encoding.decode(this_row[columnIndex - 1]));
+            String typeName = getPGType(columnIndex);
+            String result = trimString(columnIndex, encoding.decode(this_row[columnIndex - 1]));
+            if (("blob".equals(typeName))) {
+                if (connection.unwrap(PgConnection.class).isDolphinCmpt()) {
+                    return new String(toBytes(result));
+                }
+            } else if (blobSet.contains(typeName)) {
+        return new String(toBytes(result));
+      }
+      return result;
     } catch (IOException ioe) {
       throw new PSQLException(
           GT.tr(

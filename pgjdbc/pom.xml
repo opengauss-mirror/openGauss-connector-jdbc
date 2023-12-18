@@ -32,6 +32,7 @@
     <jdbc.specification.version.nodot>42</jdbc.specification.version.nodot>
     <skip.assembly>false</skip.assembly>
     <checkstyle.version>8.5</checkstyle.version>
+    <shardingsphere.version>5.4.0</shardingsphere.version>
   </properties>
 
   <dependencies>
@@ -45,6 +46,18 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
       <version>1.7.30</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.shardingsphere</groupId>
+      <artifactId>shardingsphere-parser-sql-engine</artifactId>
+      <version>${shardingsphere.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.shardingsphere</groupId>
+      <artifactId>shardingsphere-parser-sql-opengauss</artifactId>
+      <version>${shardingsphere.version}</version>
       <scope>provided</scope>
     </dependency>
   </dependencies>
