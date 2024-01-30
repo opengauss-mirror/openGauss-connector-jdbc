@@ -127,7 +127,7 @@ function install_jdbc()
     cd ${OUTPUT_DIR}
     rm -rf *.jar *.gz
     version=`awk '/<version>[^<]+<\/version>/{gsub(/<version>|<\/version>/,"",$1);print $1;exit;}' ${JDBC_DIR}/jdbc/pom.xml`
-    mv ${JDBC_DIR}/jdbc/target/opengauss-jdbc-${version}.jar ./postgresql.jar
+    mv ${JDBC_DIR}/jdbc/target/opengauss-jdbc-${version}.jar ./postgresql-${version}.jar
     echo "Successfully make postgresql.jar"
 
 #    rm -rf "${JDBC_DIR}/jdbc"
