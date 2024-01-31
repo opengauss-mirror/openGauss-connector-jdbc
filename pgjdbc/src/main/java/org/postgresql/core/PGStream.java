@@ -571,7 +571,13 @@ public class PGStream implements Closeable, Flushable {
   private static String getSocketAddressDescStr(SocketAddress address) {
     String strAddress = "af_unix";
     if (address != null) {
-      strAddress = address.toString().substring(1);
+        String s = address.toString();
+        int i = s.indexOf("/");
+        if (i > -1) {
+            s = s.substring(s.indexOf("/") + 1);
+        }
+        String pattern = "(\\d{1,3}\\.\\d{1,3}\\.)(\\d{1,3}\\.\\d{1,3})";
+        strAddress = s.replaceAll(pattern, "*.*.$2");
     }
     return strAddress;
   }
