@@ -39,6 +39,7 @@ public class Oid {
   public static final int BOOL = 16;
   public static final int BOOL_ARRAY = 1000;
   public static final int DATE = 1082;
+  public static final int YEAR = 16658;
   public static final int DATE_ARRAY = 1182;
   public static final int TIME = 1083;
   public static final int TIME_ARRAY = 1183;
