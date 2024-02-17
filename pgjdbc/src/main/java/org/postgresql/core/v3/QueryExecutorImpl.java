@@ -2885,6 +2885,10 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       int tableOid = pgStream.receiveInteger4();
       short positionInTable = (short) pgStream.receiveInteger2();
       int typeOid = pgStream.receiveInteger4();
+      if (typeOid == Oid.YEAR) {
+        //将year类型转为date类型，opengauss最新版内核支持year类型
+        typeOid = Oid.DATE;  
+      }
       int typeLength = pgStream.receiveInteger2();
       int typeModifier = pgStream.receiveInteger4();
       int formatType = pgStream.receiveInteger2();
