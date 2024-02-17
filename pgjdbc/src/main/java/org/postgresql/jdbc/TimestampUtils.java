@@ -216,7 +216,7 @@ public class TimestampUtils {
     // trailing whitespace
 
     try {
-      int start = skipWhitespace(s, 0); // Skip leading whitespace
+      int start = firstDigit(s, 0); // Skip leading whitespace
       int end = firstNonDigit(s, start);
       int num;
       char sep;
@@ -248,6 +248,11 @@ public class TimestampUtils {
         result.day = number(s, start, end);
 
         start = skipWhitespace(s, end); // Skip trailing whitespace
+      } else if (s.length == end) {
+        result.year = number(s, start, end);
+        result.month = 1;
+        result.day = 1;
+        return result;
       }
 
       // Possibly read time.
@@ -943,6 +948,16 @@ public class TimestampUtils {
     int slen = s.length;
     for (int i = start; i < slen; i++) {
       if (!Character.isSpace(s[i])) {
+        return i;
+      }
+    }
+    return slen;
+  }
+
+  private static int firstDigit(char[] s, int start) {
+    int slen = s.length;
+    for (int i = start; i < slen; i++) {
+      if (Character.isDigit(s[i])) {
         return i;
       }
     }
