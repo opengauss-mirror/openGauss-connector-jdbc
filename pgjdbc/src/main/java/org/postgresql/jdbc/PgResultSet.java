@@ -2051,27 +2051,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
     // varchar in binary is same as text, other binary fields are converted to their text format
     if (isBinary(columnIndex) && getSQLType(columnIndex) != Types.VARCHAR) {
-      Field field = fields[columnIndex - 1];
-      Object obj = internalGetObject(columnIndex, field);
-      if (obj == null) {
-        // internalGetObject() knows jdbc-types and some extra like hstore. It does not know of
-        // PGobject based types like geometric types but getObject does
-        obj = getObject(columnIndex);
-        if (obj == null) {
-          return null;
-        }
-        return obj.toString();
-      }
-      // hack to be compatible with text protocol
-      if (obj instanceof java.util.Date) {
-        int oid = field.getOID();
-        return connection.getTimestampUtils().timeToString((java.util.Date) obj,
-            oid == Oid.TIMESTAMPTZ || oid == Oid.TIMETZ);
-      }
-      if ("hstore".equals(getPGType(columnIndex))) {
-        return HStoreConverter.toString((Map<?, ?>) obj);
-      }
-      return trimString(columnIndex, obj.toString());
+      return binaryIndex(columnIndex);
     }
 
     Encoding encoding = connection.getEncoding();
@@ -2089,9 +2069,61 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     } catch (IOException ioe) {
       throw new PSQLException(
           GT.tr(
-              "Invalid character data was found.  This is most likely caused by stored data containing characters that are invalid for the character set the database was created in.  The most common example of this is storing 8bit data in a SQL_ASCII database."),
+                  "Invalid character data was found.  This is most likely caused by stored data containing characters that are invalid " +
+                      "for the character set the database was created in.  The most common example of this is storing 8bit data in a SQL_ASCII database."),
           PSQLState.DATA_ERROR, ioe);
     }
+  }
+
+  /**
+   * Processing of Blob related types
+   */
+  public String getBlobSetString(int columnIndex) throws SQLException {
+    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getString columnIndex: " + columnIndex);
+    checkResultSet(columnIndex);
+    if (wasNullFlag) {
+      return null;
+    }
+
+    // varchar in binary is same as text, other binary fields are converted to their text format
+    if (isBinary(columnIndex) && getSQLType(columnIndex) != Types.VARCHAR) {
+      return binaryIndex(columnIndex);
+    }
+
+    Encoding encoding = connection.getEncoding();
+    try {
+        return trimString(columnIndex, encoding.decode(this_row[columnIndex - 1]));
+    } catch (IOException ioe) {
+      throw new PSQLException(
+          GT.tr(
+                  "Invalid character data was found.  This is most likely caused by stored data containing characters that are invalid " +
+                      "for the character set the database was created in.  The most common example of this is storing 8bit data in a SQL_ASCII database."),
+          PSQLState.DATA_ERROR, ioe);
+    }
+  }
+
+  private String binaryIndex(int columnIndex) throws SQLException {
+    Field field = fields[columnIndex - 1];
+    Object obj = internalGetObject(columnIndex, field);
+    if (obj == null) {
+      // internalGetObject() knows jdbc-types and some extra like hstore. It does not know of
+      // PGobject based types like geometric types but getObject does
+      obj = getObject(columnIndex);
+      if (obj == null) {
+        return null;
+      }
+      return obj.toString();
+    }
+    // hack to be compatible with text protocol
+    if (obj instanceof java.util.Date) {
+      int oid = field.getOID();
+      return connection.getTimestampUtils().timeToString((java.util.Date) obj,
+              oid == Oid.TIMESTAMPTZ || oid == Oid.TIMETZ);
+    }
+    if ("hstore".equals(getPGType(columnIndex))) {
+      return HStoreConverter.toString((Map<?, ?>) obj);
+    }
+    return trimString(columnIndex, obj.toString());
   }
 
   /**
@@ -2752,7 +2784,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     }
 
     if(blobSet.contains(getPGType(columnIndex))){
-    	return toBytes(getString(columnIndex));
+    	return toBytes(getBlobSetString(columnIndex));
     }
 
     Object result = internalGetObject(columnIndex, field);
