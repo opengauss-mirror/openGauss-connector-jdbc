@@ -130,8 +130,14 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
   private static final String LONGBLOB_TYPNAME = "longblob";
 
+  private static final String BINARY = "binary";
+
+  private static final String VARBINARY = "varbinary";
+
   private static final Set<String> blobSet =
           new HashSet<>(Arrays.asList(TINYBLOB_TYPNAME, BLOB_TYPNAME, MEDIUMBLOB_TYPNAME, LONGBLOB_TYPNAME));
+
+  private static final Set<String> binarySet = new HashSet<>(Arrays.asList(BINARY, VARBINARY));
 
   protected ResultSetMetaData createMetaData() throws SQLException {
     return new PgResultSetMetaData(connection, fields);
@@ -2792,6 +2798,9 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       return result;
     }
 
+    if (binarySet.contains(getPGType(columnIndex))) {
+      return this_row[columnIndex - 1];
+    }
     if (isBinary(columnIndex)) {
       return connection.getObject(getPGType(columnIndex), null, this_row[columnIndex - 1]);
     }
