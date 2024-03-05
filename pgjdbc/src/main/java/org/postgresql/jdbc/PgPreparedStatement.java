@@ -1233,7 +1233,13 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
      return;
    }
 
-   String str = x.getSubString(1, (int) x.length());
+   String str = null;
+   long cloblen = x.length();
+   if (cloblen == 0L) {
+     str = "";
+   } else {
+     str = x.getSubString(1, (int) cloblen);
+   }
    setString(i, str, (connection.getStringVarcharFlag() ? Oid.VARCHAR : Oid.UNSPECIFIED));
 
  }
