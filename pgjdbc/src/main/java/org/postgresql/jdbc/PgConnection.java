@@ -194,6 +194,7 @@ public class PgConnection implements BaseConnection {
   private final String xmlFactoryFactoryClass;
   private PGXmlFactoryFactory xmlFactoryFactory;
   private String socketAddress;
+  private boolean isDolphinCmpt = false;
   final CachedQuery borrowQuery(String sql) throws SQLException {
     return queryExecutor.borrowQuery(sql);
   }
@@ -456,7 +457,7 @@ public class PgConnection implements BaseConnection {
         LOGGER.trace("WARNING, unrecognized batchmode type");
         batchInsert = false;
     }
-    
+
     initClientLogic(info);
   }
 
@@ -2079,4 +2080,22 @@ public class PgConnection implements BaseConnection {
     }
 
 
+    public boolean isDolphinCmpt() {
+        return isDolphinCmpt;
+    }
+
+    private void updateDolphinCmpt(boolean isDolphinCmpt) throws SQLException {
+        /* set parameter cannot use prepareStatement to set the value */
+        try (Statement stmt = createStatement()) {
+            String sql = "set dolphin.b_compatibility_mode to " + (isDolphinCmpt ? "on" : "off");
+            stmt.execute(sql);
+        } catch (SQLException e) {
+            throw e;
+        }
+    }
+    public void setDolphinCmpt(boolean isDolphinCmpt) throws SQLException {
+        checkClosed();
+        updateDolphinCmpt(isDolphinCmpt);
+        this.isDolphinCmpt = isDolphinCmpt;
+    }
 }
