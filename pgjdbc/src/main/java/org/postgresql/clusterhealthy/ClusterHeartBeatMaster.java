@@ -74,7 +74,7 @@ public class ClusterHeartBeatMaster extends ClusterHeartBeat {
                 super.cacheProcess(master, slaves, propertiesSet, null);
                 continue;
             }
-            LOGGER.debug("Information about the current connected node " + queryExecutor.getSocketAddress());
+            LOGGER.debug("Information about the current connected node " + queryExecutor.getSecSocketAddress());
             if (!super.nodeRoleIsMaster(queryExecutor)) {
                 LOGGER.debug(master + ":The host is degraded to the standby server.");
                 super.cacheProcess(master, slaves, propertiesSet, null);

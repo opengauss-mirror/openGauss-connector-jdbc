@@ -247,7 +247,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         // Establish a connection.
         //
         connectInfo = UUID.randomUUID().toString(); // this is used to trace the time taken to establish the connection.
-        LOGGER.info("[" + connectInfo + "] " + "Try to connect." + " IP: " + hostSpec.toString());
+        LOGGER.info("[" + connectInfo + "]" + " Try to connect." + " IP: " + hostSpec.toString());
         PGStream newStream = null;
         try {
           try {
@@ -303,8 +303,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
           } else {
             LOGGER.debug("integer cancelSignalTimeout is too large, it will occur error after multiply by 1000.");
           }
-          String socketAddress = newStream.getConnectInfo();
-          LOGGER.info("[" + socketAddress + "] " + "Connection is established. ID: " + connectInfo);
+          LOGGER.info("[" + newStream.getSecConnectInfo() + "]" + " Connection is established. ID: " + connectInfo);
           // Do final startup.
           QueryExecutor queryExecutor = new QueryExecutorImpl(newStream, user, database,
                   cancelSignalTimeout, info);
@@ -577,7 +576,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         details.append("=");
         details.append(params.get(i)[1]);
       }
-      LOGGER.debug("[" + connectInfo + "] " + " FE=> StartupPacket(" + details + ")");
+      LOGGER.debug("[" + connectInfo + "]" + " FE=> StartupPacket(" + details + ")");
     }
 
     // Precalculate message length and encode params.
@@ -632,7 +631,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
 
             ServerErrorMessage errorMsg =
                 new ServerErrorMessage(pgStream.receiveErrorString(l_elen - 4), pgStream.getConnectInfo());
-            LOGGER.trace("[" + connectInfo + "] " + " <=BE ErrorMessage(" + errorMsg + ")");
+            LOGGER.trace("[" + connectInfo + "]" + " <=BE ErrorMessage(" + errorMsg + ")");
             throw new PSQLException(errorMsg);
 
           case 'R':
@@ -648,7 +647,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
               case AUTH_REQ_MD5: {
                 byte[] md5Salt = pgStream.receive(4);
                 if (LOGGER.isDebugEnabled()) {
-                  LOGGER.debug("[" + connectInfo + "] " + " <=BE AuthenticationReqMD5(salt=" + Utils.toHexString(md5Salt) + ")");
+                  LOGGER.debug("[" + connectInfo + "]" + " <=BE AuthenticationReqMD5(salt=" + Utils.toHexString(md5Salt) + ")");
                 }
 
                 if (password == null) {
@@ -684,7 +683,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                   break;
               }
                 case AUTH_REQ_SM3: {
-                    LOGGER.trace("[" + connectInfo + "] " + "AUTH_REQ_SM3");
+                    LOGGER.trace("[" + connectInfo + "]" + " AUTH_REQ_SM3");
                     int passwordStoredMethod = pgStream.receiveInteger4();
                     if (password == null)
                         throw new PSQLException(
@@ -717,7 +716,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                     }
                 }
               case AUTH_REQ_SHA256: {
-                  LOGGER.trace("[" + connectInfo + "] " + "AUTH_REQ_SHA256");
+                  LOGGER.trace("[" + connectInfo + "]" + " AUTH_REQ_SHA256");
                   byte[] digest;
                   int passwordStoredMethod = pgStream.receiveInteger4();
                   if (password == null)
@@ -780,7 +779,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
 
 
               case AUTH_REQ_PASSWORD: {
-                LOGGER.debug("[" + connectInfo + "] " + "<=BE AuthenticationReqPassword" + " ID: " + connectInfo);
+                LOGGER.debug("[" + connectInfo + "]" + " <=BE AuthenticationReqPassword" + " ID: " + connectInfo);
 
                 if (password == null) {
                   throw new PSQLException(
@@ -814,20 +813,20 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                           PGProperty.JAAS_LOGIN.getBoolean(info));
                   if (LOGGER.isDebugEnabled()) {
                     if (areq == AUTH_REQ_GSS) {
-                        LOGGER.debug("[" + connectInfo + "] " + "AUTH_REQ_GSS");
+                        LOGGER.debug("[" + connectInfo + "]" + " AUTH_REQ_GSS");
                     } else {
-                        LOGGER.debug("[" + connectInfo + "] " + "AUTH_REQ_SSPI");
+                        LOGGER.debug("[" + connectInfo + "]" + " AUTH_REQ_SSPI");
                     }
                   }
                   break;
 
               case AUTH_REQ_OK:
                 /* Cleanup after successful authentication */
-                LOGGER.debug("[" + connectInfo + "] " + " <=BE AuthenticationOk");
+                LOGGER.debug("[" + connectInfo + "]" + " <=BE AuthenticationOk");
                 break authloop; // We're done.
 
               default:
-                LOGGER.trace("[" + connectInfo + "] " + " <=BE AuthenticationReq (unsupported type " + areq + ")");
+                LOGGER.trace("[" + connectInfo + "]" + " <=BE AuthenticationReq (unsupported type " + areq + ")");
                 throw new PSQLException(GT.tr(
                     "The authentication type {0} is not supported. Check that you have configured the pg_hba.conf file to include the client''s IP address or subnet, and that it is using an authentication scheme supported by the driver.",
                     areq), PSQLState.CONNECTION_REJECTED);
