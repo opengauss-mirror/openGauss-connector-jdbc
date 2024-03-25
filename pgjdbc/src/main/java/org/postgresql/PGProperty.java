@@ -591,7 +591,7 @@ public enum PGProperty {
      */
     OPTIONS("options", null, "Specify 'options' connection initialization parameter."),
 
-    B_CMPT_MODE("BCmptMode", "false", "Specify 'dolphin.b_compatibility_mode'"
+    B_CMPT_MODE("BCmptMode", "true", "Specify 'dolphin.b_compatibility_mode'"
             + " connection initialization parameter."),
   ;
 
