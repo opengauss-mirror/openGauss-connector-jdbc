@@ -571,13 +571,21 @@ public class PGStream implements Closeable, Flushable {
   private static String getSocketAddressDescStr(SocketAddress address) {
     String strAddress = "af_unix";
     if (address != null) {
-        String s = address.toString();
-        int i = s.indexOf("/");
-        if (i > -1) {
-            s = s.substring(s.indexOf("/") + 1);
-        }
-        String pattern = "(\\d{1,3}\\.\\d{1,3}\\.)(\\d{1,3}\\.\\d{1,3})";
-        strAddress = s.replaceAll(pattern, "*.*.$2");
+      strAddress = address.toString().substring(1);
+    }
+    return strAddress;
+  }
+
+  private static String getSecSocketAddressDescStr(SocketAddress address) {
+    String strAddress = "af_unix";
+    if (address != null) {
+      String s = address.toString();
+      int i = s.indexOf("/");
+      if (i > -1) {
+        s = s.substring(s.indexOf("/") + 1);
+      }
+      String pattern = "(\\d{1,3}\\.\\d{1,3}\\.)(\\d{1,3}\\.\\d{1,3})";
+      strAddress = s.replaceAll(pattern, "*.*.$2");
     }
     return strAddress;
   }
@@ -588,6 +596,12 @@ public class PGStream implements Closeable, Flushable {
   public String getConnectInfo() {
     String clientSocketAddress = getSocketAddressDescStr(connection.getLocalSocketAddress());
     String serverSocketAddress = getSocketAddressDescStr(connection.getRemoteSocketAddress());
+    return clientSocketAddress + "/" + serverSocketAddress;
+  }
+
+  public String getSecConnectInfo() {
+    String clientSocketAddress = getSecSocketAddressDescStr(connection.getLocalSocketAddress());
+    String serverSocketAddress = getSecSocketAddressDescStr(connection.getRemoteSocketAddress());
     return clientSocketAddress + "/" + serverSocketAddress;
   }
 

@@ -194,6 +194,7 @@ public class PgConnection implements BaseConnection {
   private final String xmlFactoryFactoryClass;
   private PGXmlFactoryFactory xmlFactoryFactory;
   private String socketAddress;
+  private String secSocketAddress;
   private boolean adaptiveSetSQLType = false;
     private boolean isDolphinCmpt = false;
   final CachedQuery borrowQuery(String sql) throws SQLException {
@@ -269,6 +270,7 @@ public class PgConnection implements BaseConnection {
     // Now make the initial connection and set up local state
     this.queryExecutor = ConnectionFactory.openConnection(hostSpecs, user, database, info);
     this.socketAddress = this.queryExecutor.getSocketAddress();
+    this.secSocketAddress = this.queryExecutor.getSecSocketAddress();
     // WARNING for unsupported servers (8.1 and lower are not supported)
     if (LOGGER.isWarnEnabled() && !haveMinimumServerVersion(ServerVersion.v8_2)) {
       LOGGER.warn("Unsupported Server Version: " + queryExecutor.getServerVersion());
@@ -2090,6 +2092,10 @@ public class PgConnection implements BaseConnection {
 
     public String getSocketAddress() {
         return this.socketAddress;
+    }
+
+    public String getSecSocketAddress() {
+        return this.secSocketAddress;
     }
 
     public AtomicReferenceFieldUpdater<PgStatement, TimerTask> getTimerUpdater() {

@@ -246,7 +246,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public java.net.URL getURL(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getURL columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getURL columnIndex: " + columnIndex);
     checkClosed();
     throw org.postgresql.Driver.notImplemented(this.getClass(), "getURL(int)");
   }
@@ -2067,7 +2067,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public String getString(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getString columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getString columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return null;
@@ -2103,7 +2103,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
    * Processing of Blob related types
    */
   public String getBlobSetString(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getString columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getString columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return null;
@@ -2174,7 +2174,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
    */
   @Override
   public boolean getBoolean(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getBoolean columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getBoolean columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return false; // SQL NULL
@@ -2194,7 +2194,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public Object getBit(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getBit columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getBit columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return null; // SQL NULL
@@ -2261,7 +2261,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
   @Override
   public short getShort(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getShort columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getShort columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return 0; // SQL NULL
@@ -2300,14 +2300,14 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       try {
         return getFastInt(columnIndex);
       } catch (NumberFormatException ex) {
-          connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "function getFastInt() failed.");
+          connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + "function getFastInt() failed.");
       }
     }
     return toInt(getFixedString(columnIndex));
   }
 
   public long getLong(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getLong columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getLong columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return 0; // SQL NULL
@@ -2327,7 +2327,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       try {
         return getFastLong(columnIndex);
       } catch (NumberFormatException ex) {
-          connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "function getFastLong() failed.");
+          connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " function getFastLong() failed.");
       }
     }
     return toLong(getFixedString(columnIndex));
@@ -2520,7 +2520,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public float getFloat(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getFloat columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getFloat columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return 0; // SQL NULL
@@ -2539,7 +2539,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public double getDouble(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getDouble columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getDouble columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return 0; // SQL NULL
@@ -2558,7 +2558,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getBigDecimal columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getBigDecimal columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return null;
@@ -2587,7 +2587,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
         res = scaleBigDecimal(res, scale);
         return res;
       } catch (NumberFormatException ex) {
-          connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "function getFastBigDecimal() failed.");
+          connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " function getFastBigDecimal() failed.");
       }
     }
 
@@ -2604,7 +2604,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
    * <p><b>Be warned</b> If the large object is huge, then you may run out of memory.</p>
    */
   public byte[] getBytes(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getBytes columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getBytes columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return null;
@@ -2625,22 +2625,22 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public java.sql.Date getDate(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getDate columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getDate columnIndex: " + columnIndex);
     return getDate(columnIndex, null);
   }
 
   public Time getTime(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getTime columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getTime columnIndex: " + columnIndex);
     return getTime(columnIndex, null);
   }
 
   public Timestamp getTimestamp(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getTimestamp columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getTimestamp columnIndex: " + columnIndex);
     return getTimestamp(columnIndex, null);
   }
 
   public InputStream getAsciiStream(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getAsciiStream columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getAsciiStream columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return null;
@@ -2661,7 +2661,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public InputStream getUnicodeStream(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getUnicodeStream columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getUnicodeStream columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return null;
@@ -2682,7 +2682,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public InputStream getBinaryStream(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getBinaryStream columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getBinaryStream columnIndex: " + columnIndex);
     checkResultSet(columnIndex);
     if (wasNullFlag) {
       return null;
@@ -2791,7 +2791,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public Object getObject(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getObject columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getObject columnIndex: " + columnIndex);
     Field field;
 
     checkResultSet(columnIndex);
@@ -3697,7 +3697,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public RowId getRowId(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getRowId columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getRowId columnIndex: " + columnIndex);
     throw org.postgresql.Driver.notImplemented(this.getClass(), "getRowId(int)");
   }
 
@@ -3754,7 +3754,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public NClob getNClob(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getNClob columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getNClob columnIndex: " + columnIndex);
     throw org.postgresql.Driver.notImplemented(this.getClass(), "getNClob(int)");
   }
 
@@ -3798,7 +3798,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public SQLXML getSQLXML(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getSQLXML columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getSQLXML columnIndex: " + columnIndex);
     String data = getString(columnIndex);
     if (data == null) {
       return null;
@@ -3828,7 +3828,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
   }
 
   public Reader getNCharacterStream(int columnIndex) throws SQLException {
-    connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "  getNCharacterStream columnIndex: " + columnIndex);
+    connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getNCharacterStream columnIndex: " + columnIndex);
     throw org.postgresql.Driver.notImplemented(this.getClass(), "getNCharacterStream(int)");
   }
 

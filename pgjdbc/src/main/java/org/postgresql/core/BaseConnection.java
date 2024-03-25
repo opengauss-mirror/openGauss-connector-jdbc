@@ -231,6 +231,12 @@ public interface BaseConnection extends PGConnection, Connection {
 
   public String getSocketAddress();
 
+
+  /**
+   * get security connection info 
+   */
+  public String getSecSocketAddress();
+
   /**
    * Gets the timertask atomic updater for a statement
    * @return AtomicReferenceFieldUpdater<PgStatement, TimerTask>

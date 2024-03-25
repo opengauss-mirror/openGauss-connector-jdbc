@@ -499,6 +499,8 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
 
   String getSocketAddress();
 
+  String getSecSocketAddress();
+
   void setGaussdbVersion(String gaussdbVersion);
 
   void setAvailability(boolean availability);

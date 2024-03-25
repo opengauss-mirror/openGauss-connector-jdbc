@@ -124,6 +124,8 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   private String socketAddress;
 
+  private String secSocketAddress; // 脱敏地址
+
   private String gaussdbVersion;
 
   private String compatibilityMode;
@@ -144,6 +146,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     this.allowEncodingChanges = PGProperty.ALLOW_ENCODING_CHANGES.getBoolean(info);
     this.replicationProtocol = new V3ReplicationProtocol(this, pgStream);
     this.socketAddress = pgStream.getConnectInfo();
+    this.secSocketAddress = pgStream.getSecConnectInfo();
     readStartupMessages();
   }
 
@@ -158,6 +161,10 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   public String getSocketAddress() {
     return this.socketAddress;
+  }
+
+  public String getSecSocketAddress() {
+    return this.secSocketAddress;
   }
 
   @Override
@@ -342,7 +349,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
                                    int maxRows, int fetchSize, int flags) throws SQLException {
     waitOnLock();
     if (LOGGER.isTraceEnabled()) {
-      LOGGER.trace("[" + socketAddress + "] " + "  simple execute, handler=" + handler + ", maxRows=" + maxRows + ", fetchSize=" + fetchSize + ", flags=" + flags);
+      LOGGER.trace("[" + secSocketAddress + "]" + " simple execute, handler=" + handler + ", maxRows=" + maxRows + ", fetchSize=" + fetchSize + ", flags=" + flags);
     }
 
     if (parameters == null) {
@@ -401,7 +408,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       String socketStatus = pgStream.getSocketStatus();
       abort();
       handler.handleError(
-              new PSQLException(GT.tr("[" + socketAddress + "] " + socketStatus + "An I/O error occured while sending to the backend." + "detail:" + e.getMessage() + "; "),
+              new PSQLException(GT.tr("[" + secSocketAddress + "] " + socketStatus + "An I/O error occured while sending to the backend." + "detail:" + e.getMessage() + "; "),
                       PSQLState.CONNECTION_FAILURE, e));
     }
 
@@ -503,7 +510,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
                                    BatchResultHandler batchHandler, int maxRows, int fetchSize, int flags) throws SQLException {
     waitOnLock();
     if (LOGGER.isTraceEnabled()) {
-      LOGGER.trace("[" + socketAddress + "] " + "  batch execute " + queries.length + " queries, handler=" + batchHandler + ", maxRows=" + maxRows + ", fetchSize=" + fetchSize + ", flags=" + flags);
+      LOGGER.trace("[" + secSocketAddress + "]" + " batch execute " + queries.length + " queries, handler=" + batchHandler + ", maxRows=" + maxRows + ", fetchSize=" + fetchSize + ", flags=" + flags);
     }
 
     flags = updateQueryMode(flags);
@@ -553,7 +560,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       String socketStatus = pgStream.getSocketStatus();
       abort();
       handler.handleError(
-              new PSQLException(GT.tr("[" + socketAddress + "] " + socketStatus + "An I/O error occured while sending to the backend." + "detail:" + e.getMessage() + "; "),
+              new PSQLException(GT.tr("[" + secSocketAddress + "] " + socketStatus + "An I/O error occured while sending to the backend." + "detail:" + e.getMessage() + "; "),
                       PSQLState.CONNECTION_FAILURE, e));
     }
 
@@ -576,7 +583,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     waitOnLock();
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace(
-              "[" + socketAddress + "] " + "  batch execute " + queries.length + " queries, handler=" + batchHandler + ", maxRows=" + maxRows + ", fetchSize=" + fetchSize + ", flags=" + flags);
+              "[" + secSocketAddress + "]" + " batch execute " + queries.length + " queries, handler=" + batchHandler + ", maxRows=" + maxRows + ", fetchSize=" + fetchSize + ", flags=" + flags);
     }
 
     flags = updateQueryMode(flags);
@@ -616,7 +623,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       abort();
       handler.handleError(
               new PSQLException(
-                      GT.tr("[" + socketAddress + "] " + socketStatus + "An I/O error occured while sending to the backend." + "detail:" + e.getMessage() + "; "),
+                      GT.tr("[" + secSocketAddress + "] " + socketStatus + "An I/O error occured while sending to the backend." + "detail:" + e.getMessage() + "; "),
                       PSQLState.CONNECTION_FAILURE,
                       e));
     }
@@ -855,7 +862,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       }
     } catch (SocketTimeoutException ioe) {
       // No notifications this time...
-      LOGGER.trace("[" + socketAddress + "] " + "Catch SocketTimeoutException. ", ioe);
+      LOGGER.trace("[" + secSocketAddress + "]" + " Catch SocketTimeoutException. ", ioe);
     } catch (IOException ioe) {
       throw new PSQLException(GT.tr("An I/O error occured while sending to the backend."),
               PSQLState.CONNECTION_FAILURE, ioe);
@@ -1544,7 +1551,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   //
 
   private void sendSync() throws IOException {
-    LOGGER.debug("[" + socketAddress + "] " + " FE=> Sync");
+    LOGGER.debug("[" + secSocketAddress + "]" + " FE=> Sync");
 
     pgStream.sendChar('S'); // Sync
     pgStream.sendInteger4(4); // Length
@@ -1641,7 +1648,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
         }
       }
       sbuf.append("})");
-      LOGGER.trace("[" + socketAddress + "] " + sbuf.toString());
+      LOGGER.trace("[" + secSocketAddress + "] " + sbuf.toString());
     }
 
     //
@@ -1707,7 +1714,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
                 .append(">,type=").append(Oid.toString(params.getTypeOID(i)));
       }
       sbuf.append(")");
-      LOGGER.trace("[" + socketAddress + "] " + sbuf.toString());
+      LOGGER.trace("[" + secSocketAddress + "] " + sbuf.toString());
     }
 
     // Total size = 4 (size field) + N + 1 (destination portal)
@@ -1994,7 +2001,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     // Send Describe.
     //
 
-    LOGGER.trace("[" + socketAddress + "] " + " FE=> Describe(portal=" + portal + ")");
+    LOGGER.trace("[" + secSocketAddress + "]" + " FE=> Describe(portal=" + portal + ")");
 
     byte[] encodedPortalName = (portal == null ? null : portal.getEncodedPortalName());
 
@@ -2017,7 +2024,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
                                      boolean describeOnly) throws IOException {
     // Send Statement Describe
 
-    LOGGER.trace("[" + socketAddress + "] " + " FE=> Describe(statement=" + query.getStatementName() + ")");
+    LOGGER.trace("[" + secSocketAddress + "]" + " FE=> Describe(statement=" + query.getStatementName() + ")");
 
     byte[] encodedStatementName = query.getEncodedStatementName();
 
@@ -2046,7 +2053,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     // Send Execute.
     //
     if (LOGGER.isTraceEnabled()) {
-      LOGGER.trace("[" + socketAddress + "] " + " FE=> Execute(portal=" + portal + ",limit=" + limit + ")");
+      LOGGER.trace("[" + secSocketAddress + "]" + " FE=> Execute(portal=" + portal + ",limit=" + limit + ")");
     }
 
     byte[] encodedPortalName = (portal == null ? null : portal.getEncodedPortalName());
@@ -2069,7 +2076,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     // Send Close.
     //
 
-    LOGGER.trace("[" + socketAddress + "] " + " FE=> ClosePortal(" + portalName + ")");
+    LOGGER.trace("[" + secSocketAddress + "]" + " FE=> ClosePortal(" + portalName + ")");
 
     byte[] encodedPortalName = (portalName == null ? null : Utils.encodeUTF8(portalName, getClientEncoding()));
     int encodedSize = (encodedPortalName == null ? 0 : encodedPortalName.length);
@@ -2089,7 +2096,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     // Send Close.
     //
 
-    LOGGER.trace("[" + socketAddress + "] " + " FE=> CloseStatement(" + statementName + ")");
+    LOGGER.trace("[" + secSocketAddress + "]" + " FE=> CloseStatement(" + statementName + ")");
 
     byte[] encodedStatementName = Utils.encodeUTF8(statementName, getClientEncoding());
 
@@ -2307,7 +2314,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   private void sendSimpleQuery(SimpleQuery query, SimpleParameterList params) throws IOException {
     String nativeSql = query.toString(params);
 
-    LOGGER.trace("[" + socketAddress + "] " + " FE=> SimpleQuery(query=\"" + nativeSql + "\")");
+    LOGGER.trace("[" + secSocketAddress + "]" + " FE=> SimpleQuery(query=\"" + nativeSql + "\")");
     Encoding encoding = pgStream.getEncoding();
 
     byte[] encoded = encoding.encode(nativeSql);
@@ -2435,14 +2442,14 @@ public class QueryExecutorImpl extends QueryExecutorBase {
             SimpleQuery parsedQuery = pendingParseQueue.removeFirst();
             String parsedStatementName = parsedQuery.getStatementName();
 
-            LOGGER.trace("[" + socketAddress + "] " + " <=BE ParseComplete [" + parsedStatementName + "]");
+            LOGGER.trace("[" + secSocketAddress + "]" + " <=BE ParseComplete [" + parsedStatementName + "]");
 
             break;
 
           case 't': { // ParameterDescription
             pgStream.receiveInteger4(); // len, discarded
 
-            LOGGER.trace("[" + socketAddress + "] " + " <=BE ParameterDescription");
+            LOGGER.trace("[" + secSocketAddress + "]" + " <=BE ParameterDescription");
 
 
             DescribeRequest describeData = pendingDescribeStatementQueue.getFirst();
@@ -2482,19 +2489,19 @@ public class QueryExecutorImpl extends QueryExecutorBase {
             pgStream.receiveInteger4(); // len, discarded
 
             Portal boundPortal = pendingBindQueue.removeFirst();
-            LOGGER.trace("[" + socketAddress + "] " + " <=BE BindComplete [" + boundPortal + "]");
+            LOGGER.trace("[" + secSocketAddress + "]" + " <=BE BindComplete [" + boundPortal + "]");
 
             registerOpenPortal(boundPortal);
             break;
 
           case '3': // Close Complete (response to Close)
             pgStream.receiveInteger4(); // len, discarded
-            LOGGER.trace("[" + socketAddress + "] " + " <=BE CloseComplete");
+            LOGGER.trace("[" + secSocketAddress + "]" + " <=BE CloseComplete");
             break;
 
           case 'n': // No Data (response to Describe)
             pgStream.receiveInteger4(); // len, discarded
-            LOGGER.trace("[" + socketAddress + "] " + " <=BE NoData");
+            LOGGER.trace("[" + secSocketAddress + "]" + " <=BE NoData");
 
             pendingDescribePortalQueue.removeFirst();
 
@@ -2517,7 +2524,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
             // Must be a SELECT if we suspended, so don't worry about it.
 
             pgStream.receiveInteger4(); // len, discarded
-            LOGGER.trace("[" + socketAddress + "] " + " <=BE PortalSuspended");
+            LOGGER.trace("[" + secSocketAddress + "]" + " <=BE PortalSuspended");
 
 
             ExecuteRequest executeData = pendingExecuteQueue.removeFirst();
@@ -2655,7 +2662,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
             // Error Response (response to pretty much everything; backend then skips until Sync)
             SQLException error = receiveErrorResponse();
             if (LOGGER.isDebugEnabled()) {
-              LOGGER.debug("[" + socketAddress + "] " + error.getMessage());
+              LOGGER.debug("[" + secSocketAddress + "] " + error.getMessage());
             }
             handler.handleError(error);
             if (willHealViaReparse(error)) {
@@ -2815,7 +2822,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     } catch(IOException e) {
       LOGGER.error("IO Exception.recieved packetType:" + recievedPacketType + "last PacketType:" + lastPacketType
-              + "connection info:" + this.getSocketAddress() + "buffer :\n" + pgStream.getInputBufferByHex());
+              + "connection info:" + secSocketAddress + "buffer :\n" + pgStream.getInputBufferByHex());
       throw e;
     } finally {
       lastPacketType = recievedPacketType;
@@ -2877,7 +2884,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     Field[] fields = new Field[size];
 
     if (LOGGER.isTraceEnabled()) {
-      LOGGER.trace("[" + socketAddress + "] " + " <=BE RowDescription(" + size + ")");
+      LOGGER.trace("[" + secSocketAddress + "]" + " <=BE RowDescription(" + size + ")");
     }
 
     for (int i = 0; i < fields.length; i++) {
@@ -2896,7 +2903,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
               typeOid, typeLength, typeModifier, tableOid, positionInTable);
       fields[i].setFormat(formatType);
 
-      LOGGER.trace("[" + socketAddress + "] " + "        " + fields[i]);
+      LOGGER.trace("[" + secSocketAddress + "]" + "  " + fields[i]);
     }
 
     return fields;
@@ -2922,7 +2929,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     int elen = pgStream.receiveInteger4();
     EncodingPredictor.DecodeResult totalMessage = pgStream.receiveErrorString(elen - 4);
-    ServerErrorMessage errorMsg = new ServerErrorMessage(totalMessage, socketAddress);
+    ServerErrorMessage errorMsg = new ServerErrorMessage(totalMessage, secSocketAddress);
 
     if (LOGGER.isTraceEnabled()) {
       int size = pendingParseQueue.size();
@@ -2958,7 +2965,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     ServerErrorMessage warnMsg = new ServerErrorMessage(message);
 
     if (LOGGER.isTraceEnabled()) {
-      LOGGER.trace("[" + socketAddress + "] " + " <=BE NoticeResponse(" + warnMsg.toString() + ")");
+      LOGGER.trace("[" + secSocketAddress + "]" + " <=BE NoticeResponse(" + warnMsg.toString() + ")");
     }
 
     return new PSQLWarning(warnMsg);
@@ -2972,7 +2979,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     // now read and discard the trailing \0
     pgStream.receiveChar(); // Receive(1) would allocate new byte[1], so avoid it
 
-    LOGGER.trace("[" + socketAddress + "] " + " <=BE CommandStatus(" + status + ")");
+    LOGGER.trace("[" + secSocketAddress + "]" + " <=BE CommandStatus(" + status + ")");
 
     return status;
   }
@@ -3004,12 +3011,12 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     if (receiveInteger4Value == 6) {
       int charRecivedExtra = pgStream.receiveChar();
       if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("[" + socketAddress + "] " + " <=BE ReadyForQuery client encryption extra byte code(" + charRecivedExtra + ")");
+        LOGGER.debug("[" + secSocketAddress + "]" + " <=BE ReadyForQuery client encryption extra byte code(" + charRecivedExtra + ")");
       }
     }
 
     if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("[" + socketAddress + "] " + " <=BE ReadyForQuery(" + tStatus + ")");
+      LOGGER.debug("[" + secSocketAddress + "]" + " <=BE ReadyForQuery(" + tStatus + ")");
     }
 
     // Update connection state.
@@ -3058,7 +3065,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
           int ckey = pgStream.receiveInteger4();
 
           if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace("[" + socketAddress + "] " + " <=BE BackendKeyData(pid=" + pid + ",ckey=" + ckey + ")");
+            LOGGER.trace("[" + secSocketAddress + "]" + " <=BE BackendKeyData(pid=" + pid + ",ckey=" + ckey + ")");
           }
 
           setBackendKeyData(pid, ckey);
@@ -3081,7 +3088,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
         default:
           if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace("[" + socketAddress + "] " + "  invalid message type=" + (char) beresp);
+            LOGGER.trace("[" + secSocketAddress + "]" + " invalid message type=" + (char) beresp);
           }
           throw new PSQLException(GT.tr("Protocol error.  Session setup failed."),
                   PSQLState.PROTOCOL_VIOLATION);
