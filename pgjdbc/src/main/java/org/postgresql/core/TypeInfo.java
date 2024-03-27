@@ -36,6 +36,13 @@ public interface TypeInfo {
   int getSQLType(String pgTypeName) throws SQLException;
 
   /**
+   * init all types from table pg_type.
+   *
+   * @throws SQLException if an error occurs when retrieving sql type
+   */
+  void setPGTypes() throws SQLException;
+
+  /**
    * Look up the oid for a given postgresql type name. This is the inverse of
    * {@link #getPGType(int)}.
    *

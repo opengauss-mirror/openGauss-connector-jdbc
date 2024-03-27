@@ -37,6 +37,7 @@ import org.postgresql.core.v3.replication.V3ReplicationProtocol;
 import org.postgresql.jdbc.AutoSave;
 import org.postgresql.jdbc.BatchResultHandler;
 import org.postgresql.jdbc.TimestampUtils;
+import org.postgresql.jdbc.TypeInfoCache;
 import org.postgresql.log.Log;
 import org.postgresql.log.Logger;
 import org.postgresql.util.GT;
@@ -54,16 +55,7 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
-import java.util.TimeZone;
+import java.util.*;
 
 
 /**
@@ -2886,13 +2878,14 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("[" + secSocketAddress + "]" + " <=BE RowDescription(" + size + ")");
     }
+    Map<Integer, String> pgTypes =  TypeInfoCache.getPGTypes();
 
     for (int i = 0; i < fields.length; i++) {
       String columnLabel = pgStream.receiveString();
       int tableOid = pgStream.receiveInteger4();
       short positionInTable = (short) pgStream.receiveInteger2();
       int typeOid = pgStream.receiveInteger4();
-      if (typeOid == Oid.YEAR) {
+      if ("year".equals(pgTypes.get(typeOid))) {
         //将year类型转为date类型，opengauss最新版内核支持year类型
         typeOid = Oid.DATE;  
       }

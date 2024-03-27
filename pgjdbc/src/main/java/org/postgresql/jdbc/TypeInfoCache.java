@@ -66,6 +66,8 @@ public class TypeInfoCache implements TypeInfo {
   // cache the subscript of the current custom type in the statement and the struct of the custom type
   private ConcurrentHashMap<Integer, List<Object[]>> compositeTypeStructMap = new ConcurrentHashMap<>();
 
+  private static ConcurrentHashMap<Integer, String> pgTypes = new ConcurrentHashMap<>();
+
   // basic pg types info:
   // 0 - type name
   // 1 - type oid
@@ -375,6 +377,28 @@ public class TypeInfoCache implements TypeInfo {
     names[0] = schema;
     names[1] = name;
     return names;
+  }
+
+  public synchronized void setPGTypes() throws SQLException {
+    String sql = "SELECT t.oid, t.typname FROM pg_catalog.pg_type t where t.typname = 'year';";
+    PreparedStatement pgTypeStatement = _conn.prepareStatement(sql);
+    // Go through BaseStatement to avoid transaction start.
+    if (!((BaseStatement) pgTypeStatement).executeWithFlags(QueryExecutor.QUERY_SUPPRESS_BEGIN)) {
+      throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
+    }
+    ResultSet rs = pgTypeStatement.getResultSet();
+    if (rs == null) {
+      return;
+    }
+    while (rs.next()) {
+      Integer oid = (int) rs.getLong(1);
+      String typeName = rs.getString(2);
+      pgTypes.put(oid, typeName);
+    }
+  }
+
+  public static Map<Integer, String> getPGTypes() {
+    return pgTypes;
   }
   
   public synchronized int getPGType(String pgTypeName) throws SQLException {
