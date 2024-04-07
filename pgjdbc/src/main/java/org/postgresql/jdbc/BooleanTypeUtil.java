@@ -11,6 +11,8 @@ import org.postgresql.util.PSQLState;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
 
+import java.math.BigInteger;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -28,6 +30,12 @@ class BooleanTypeUtil {
   private static final Set<String> TRUE_SETS = Arrays.stream(new String[]{"1", "true", "t", "yes", "y", "on"}).collect(Collectors.toSet());
   private static final Set<String> FALSE_SETS = Arrays.stream(new String[]{"0", "false", "f", "no", "n", "off"}).collect(Collectors.toSet());
 
+  public static final int MAX_SIGNED_LONG_LEN = 20;
+
+  public static final BigInteger BIG_INTEGER_ZERO = BigInteger.valueOf(0);
+
+  public static final BigInteger BIG_INTEGER_NEGATIVE_ONE = BigInteger.valueOf(-1);
+
   private BooleanTypeUtil() {
   }
 
@@ -38,7 +46,7 @@ class BooleanTypeUtil {
    * @return boolean value corresponding to the cast of the object
    * @throws PSQLException PSQLState.CANNOT_COERCE
    */
-  static boolean castToBoolean(final Object in) throws PSQLException {
+  static boolean castToBoolean(final Object in) throws SQLException {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Cast to boolean: \"" + String.valueOf(in) + "\"");
     }
@@ -57,14 +65,32 @@ class BooleanTypeUtil {
     throw new PSQLException("Cannot cast to boolean", PSQLState.CANNOT_COERCE);
   }
 
-  private static boolean fromString(final String strval) throws PSQLException {
+  private static boolean fromString(String strval) throws SQLException {
     // Leading or trailing whitespace is ignored, and case does not matter.
-    final String val = strval.trim();
-    if (isTrueStr(val)) {
-      return true;
-    }
-    if (isFalseStr(val)) {
+    strval = strval.trim();
+    if (strval.isEmpty()) {
       return false;
+    }
+    byte[] newBytes = strval.getBytes();
+
+    if (strval.equalsIgnoreCase("Y") || strval.equalsIgnoreCase("yes")
+            || strval.equalsIgnoreCase("T") || strval.equalsIgnoreCase("true")) {
+      return true;
+    } else if (strval.equalsIgnoreCase("N") || strval.equalsIgnoreCase("no")
+            || strval.equalsIgnoreCase("F") || strval.equalsIgnoreCase("false")) {
+      return false;
+    } else if (strval.contains("e") || strval.contains("E") || strval.matches("-?\\d*\\.\\d*")) {
+      // double、float
+      double d = Double.parseDouble(strval);
+      return d > 0 || d == -1.0d;
+    } else if (strval.matches("-?\\d+")) {
+      // integer
+      if (strval.charAt(0) == '-' || strval.length() < MAX_SIGNED_LONG_LEN && newBytes[0] >= '0' && newBytes[0] <= '8') {
+        long l = PgResultSet.toLong(strval);
+        return l == -1 || l > 0;
+      }
+      BigInteger bi = new BigInteger(strval);
+      return bi.compareTo(BIG_INTEGER_ZERO) > 0 || bi.compareTo(BIG_INTEGER_NEGATIVE_ONE) == 0;
     }
     throw cannotCoerceException(strval);
   }
