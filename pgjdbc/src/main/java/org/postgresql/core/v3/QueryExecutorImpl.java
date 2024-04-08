@@ -131,6 +131,32 @@ public class QueryExecutorImpl extends QueryExecutorBase {
    */
   private final CommandCompleteParser commandCompleteParser = new CommandCompleteParser();
 
+  private static final String PROC_OUTPARAM_OVERRIDE = "proc_outparam_override";
+
+  private static final String BEHAVIOR_COMPAT_OPTIONS = "behavior_compat_options";
+
+  private static final String CLIENT_ENCODING = "client_encoding";
+
+  private static final String DATE_STYLE = "DateStyle";
+
+  private static final String STANDARD_CONFORMING_STRINGS = "standard_conforming_strings";
+
+  private static final String TIME_ZONE = "TimeZone";
+
+  private static final String APPLICATION_NAME = "application_name";
+
+  private static final String APPLICATION_TYPE = "application_type";
+
+  private static final String SERVER_VERSION_NUM = "server_version_num";
+
+  private static final String SERVER_VERSION = "server_version";
+
+  private static final String INTEGER_DATETIMES = "integer_datetimes";
+
+  private static final String ON = "on";
+
+  private static final String OFF = "off";
+
   public QueryExecutorImpl(PGStream pgStream, String user, String database,
                            int cancelSignalTimeout, Properties info) throws SQLException, IOException {
     super(pgStream, user, database, cancelSignalTimeout, info);
@@ -3097,7 +3123,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     String name = pgStream.receiveString();
     String value = pgStream.receiveString();
 
-    if (name.equals("client_encoding")) {
+    if (name.equals(CLIENT_ENCODING)) {
       if (allowEncodingChanges) {
         if (!value.equalsIgnoreCase("UTF8") && !value.equalsIgnoreCase("GBK")) {
           LOGGER.debug("pgjdbc expects client_encoding to be UTF8 for proper operation. Actual encoding is " + value);
@@ -3112,7 +3138,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       }
     }
 
-    if (name.equals("DateStyle") && !value.startsWith("ISO")
+    if (name.equals(DATE_STYLE) && !value.startsWith("ISO")
             && !value.toUpperCase().startsWith("ISO")) {
       close(); // we're screwed now; we can't trust any subsequent date.
       throw new PSQLException(GT.tr(
@@ -3120,7 +3146,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
               value), PSQLState.CONNECTION_FAILURE);
     }
 
-    if (name.equals("standard_conforming_strings")) {
+    if (name.equals(STANDARD_CONFORMING_STRINGS)) {
       if (value.equals("on")) {
         setStandardConformingStrings(true);
       } else if (value.equals("off")) {
@@ -3135,32 +3161,44 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       return;
     }
 
-    if ("TimeZone".equals(name)) {
+    if (TIME_ZONE.equals(name)) {
       setTimeZone(TimestampUtils.parseBackendTimeZone(value));
-    } else if ("application_name".equals(name)) {
+    } else if (APPLICATION_NAME.equals(name)) {
       setApplicationName(value);
-    } else if ("application_type".equals(name)) {
+    } else if (APPLICATION_TYPE.equals(name)) {
       setApplicationType(value);
-    } else if ("server_version_num".equals(name)) {
+    } else if (SERVER_VERSION_NUM.equals(name)) {
       setServerVersionNum(Integer.parseInt(value));
-    } else if ("server_version".equals(name)) {
+    } else if (SERVER_VERSION.equals(name)) {
       setServerVersion(value);
-    }  else if ("integer_datetimes".equals(name)) {
-      if ("on".equals(value)) {
+    }  else if (INTEGER_DATETIMES.equals(name)) {
+      if (ON.equals(value)) {
         setIntegerDateTimes(true);
-      } else if ("off".equals(value)) {
+      } else if (OFF.equals(value)) {
         setIntegerDateTimes(false);
       } else {
         throw new PSQLException(GT.tr("Protocol error.  Session setup failed."),
                 PSQLState.PROTOCOL_VIOLATION);
       }
-    } else if ("behavior_compat_options".equals(name)) {
-      if (value != null && value.contains("proc_outparam_override")) {
+    } else if (BEHAVIOR_COMPAT_OPTIONS.equals(name)) {
+      List<String> vs = strSplit(value);
+      if (value != null && vs.contains(PROC_OUTPARAM_OVERRIDE)) {
         setEnableOutparamOveride(true);
       } else {
         setEnableOutparamOveride(false);
       }
     }
+  }
+
+  private List<String> strSplit(String value) {
+    if (value == null) {
+      return new ArrayList<>();
+    }
+    List<String> vs = Arrays.asList(value.split(","));
+    for (int i = 0; i < vs.size(); i++) {
+      vs.set(i, vs.get(i).trim());
+    }
+    return vs;
   }
 
   public void setTimeZone(TimeZone timeZone) {
