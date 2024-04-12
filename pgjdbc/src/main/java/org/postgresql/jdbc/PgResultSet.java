@@ -2080,14 +2080,18 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
     Encoding encoding = connection.getEncoding();
     try {
-            String typeName = getPGType(columnIndex);
-            String result = trimString(columnIndex, encoding.decode(this_row[columnIndex - 1]));
-            if (("blob".equals(typeName))) {
-                if (connection.unwrap(PgConnection.class).isDolphinCmpt()) {
-                    return new String(toBytes(result));
-                }
-            } else if (blobSet.contains(typeName)) {
+      String typeName = getPGType(columnIndex);
+      String result = trimString(columnIndex, encoding.decode(this_row[columnIndex - 1]));
+      if (("blob".equals(typeName))) {
+        if (connection.unwrap(PgConnection.class).isDolphinCmpt()) {
+          return new String(toBytes(result));
+        }
+      } else if (blobSet.contains(typeName)) {
         return new String(toBytes(result));
+      } else if ("time".equals(typeName)) {
+        java.util.Calendar cal = getDefaultCalendar();
+        Time time = connection.getTimestampUtils().toTime(cal, result);
+        return String.valueOf(time);
       }
       return result;
     } catch (IOException ioe) {
