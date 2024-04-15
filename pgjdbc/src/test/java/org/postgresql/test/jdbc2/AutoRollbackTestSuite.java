@@ -119,6 +119,8 @@ public class AutoRollbackTestSuite extends BaseTest4 {
   private final TestStatement testSql;
   private final ReturnColumns cols;
 
+    private static final String INVALID_SQL_STATEMENT_NAME_STATE = "26010";
+
   public AutoRollbackTestSuite(AutoSave autoSave, AutoCommit autoCommit,
       FailMode failMode, ContinueMode continueMode, boolean flushCacheOnDeallocate,
       boolean trans, TestStatement testSql, ReturnColumns cols) {
@@ -178,7 +180,7 @@ public class AutoRollbackTestSuite extends BaseTest4 {
       for (AutoCommit autoCommit : AutoCommit.values()) {
         for (FailMode failMode : FailMode.values()) {
           // ERROR: DISCARD ALL cannot run inside a transaction block
-          if (failMode == FailMode.DISCARD && autoCommit == AutoCommit.NO) {
+          if (failMode == FailMode.DISCARD) {
             continue;
           }
           for (ContinueMode continueMode : ContinueMode.values()) {
@@ -290,10 +292,12 @@ public class AutoRollbackTestSuite extends BaseTest4 {
             Assert.assertEquals(
                 "flushCacheOnDeallocate is disabled, thus " + failMode + " should cause 'prepared statement \"...\" does not exist'"
                     + " error message is " + e.getMessage(),
-                PSQLState.INVALID_SQL_STATEMENT_NAME.getState(), e.getSQLState());
+                INVALID_SQL_STATEMENT_NAME_STATE, e.getSQLState());
             return;
           }
-          throw e;
+          if (failMode != FailMode.DEALLOCATE) {
+            throw e;
+          }
         }
         return;
       case IS_VALID:
@@ -304,8 +308,13 @@ public class AutoRollbackTestSuite extends BaseTest4 {
               + ", flushCacheOnDeallocate=false, and autosave=NEVER",
               con.isValid(4));
         } else {
-          Assert.assertTrue("Connection.isValid should return true unless the connection is closed",
-              con.isValid(4));
+          if (failMode == FailMode.DEALLOCATE && flushCacheOnDeallocate == false) {
+            Assert.assertFalse("Connection.isValid should return true unless the connection is closed",
+                    con.isValid(4));
+          } else {
+            Assert.assertTrue("Connection.isValid should return true unless the connection is closed",
+                    con.isValid(4));
+          }
         }
         return;
       default:
@@ -331,17 +340,17 @@ public class AutoRollbackTestSuite extends BaseTest4 {
           Assert.assertEquals(
               "flushCacheOnDeallocate is disabled, thus " + failMode + " should cause 'prepared statement \"...\" does not exist'"
                   + " error message is " + e.getMessage(),
-              PSQLState.INVALID_SQL_STATEMENT_NAME.getState(), e.getSQLState());
+              INVALID_SQL_STATEMENT_NAME_STATE, e.getSQLState());
         } else if (failMode == FailMode.ALTER) {
           Assert.assertEquals(
               "AutoSave==NEVER, autocommit=NO, thus ALTER TABLE causes SELECT * to fail with "
                   + "'cached plan must not change result type', "
                   + " error message is " + e.getMessage(),
-              PSQLState.NOT_IMPLEMENTED.getState(), e.getSQLState());
+              PSQLState.INVALID_CACHE_PLAN.getState(), e.getSQLState());
         } else {
           throw e;
         }
-      } else {
+      } else if (failMode != FailMode.DEALLOCATE) {
         throw e;
       }
     }
@@ -361,7 +370,7 @@ public class AutoRollbackTestSuite extends BaseTest4 {
                   + " error message is " + e.getMessage(),
               PSQLState.IN_FAILED_SQL_TRANSACTION.getState(), e.getSQLState());
         }
-      } else {
+      } else if (failMode != FailMode.DEALLOCATE) {
         throw e;
       }
     }

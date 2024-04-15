@@ -9,20 +9,32 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.Ignore;
+
 import org.postgresql.PGConnection;
 import org.postgresql.PGNotification;
 import org.postgresql.core.ServerVersion;
 import org.postgresql.test.TestUtil;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+@Ignore
+/**
+ * GAUSS-04517: “NOFITY statement is not yet supported.”
+ * SQLSTATE: 0A000
+ * 错误原因：特性不支持。
+ * 解决办法：不建议使用。
+ * GAUSS-04518: “LISTEN statement is not yet supported.”
+ * SQLSTATE: 0A000
+ * 错误原因：特性不支持。
+ * 解决办法：不建议使用。
+ */
 public class NotifyTest {
   private Connection conn;
 

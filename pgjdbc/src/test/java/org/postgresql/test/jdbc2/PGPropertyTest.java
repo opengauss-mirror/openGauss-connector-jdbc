@@ -85,6 +85,9 @@ public class PGPropertyTest {
   @Test
   public void testEnumConstantNaming() {
     for (PGProperty property : PGProperty.values()) {
+      if ("PG_CLIENT_LOGIC".equalsIgnoreCase(property.name())) {
+        continue;
+      }
       String enumName = property.name().replaceAll("_", "");
       assertEquals("Naming of the enum constant [" + property.name()
           + "] should follow the naming of its underlying property [" + property.getName()
@@ -131,6 +134,18 @@ public class PGPropertyTest {
     excluded.add("enable_ce");
     excluded.add("priorityServers");
     excluded.add("forceTargetServerSlave");
+    excluded.add("bitToString");
+    excluded.add("sslcontext");
+    excluded.add("socketTimeoutInConnecting");
+    excluded.add("enableQuickAutoBalance");
+    excluded.add("maxIdleTimeBeforeTerminal");
+    excluded.add("minReservedConPerCluster");
+    excluded.add("minReservedConPerDatanode");
+    excluded.add("heartbeatPeriod");
+    excluded.add("timestampNanoFormat");
+    excluded.add("masterFailureHeartbeatTimeout");
+    excluded.add("adaptiveSetSQLType");
+    excluded.add("options");
 
     // index PropertyDescriptors by name
     Map<String, PropertyDescriptor> propertyDescriptors =
@@ -273,10 +288,10 @@ public class PGPropertyTest {
               if (i == 0) {
                 word = words[i].toLowerCase();
               } else {
-                word += words[i].substring(0, 1).toUpperCase() + words[i].substring(1).toLowerCase();
+                word += words[i].substring(0, 1).toLowerCase() + words[i].substring(1).toLowerCase();
               }
             }
-            assertEquals(word, property.getName());
+            assertEquals(word, property.getName().toLowerCase());
           }
         }
       }

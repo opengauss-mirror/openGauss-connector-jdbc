@@ -591,18 +591,18 @@ public class PreparedStatementTest extends BaseTest4 {
     // Test TRUE values
     pstmt.setBoolean(1, true);
     pstmt.setObject(1, Boolean.TRUE);
-    pstmt.setNull(2, Types.BIT);
-    pstmt.setObject(3, 't', Types.BIT);
-    pstmt.setObject(3, 'T', Types.BIT);
-    pstmt.setObject(3, "t", Types.BIT);
-    pstmt.setObject(4, "true", Types.BIT);
-    pstmt.setObject(5, 'y', Types.BIT);
-    pstmt.setObject(5, 'Y', Types.BIT);
-    pstmt.setObject(5, "Y", Types.BIT);
-    pstmt.setObject(6, "YES", Types.BIT);
-    pstmt.setObject(7, "On", Types.BIT);
-    pstmt.setObject(8, '1', Types.BIT);
-    pstmt.setObject(8, "1", Types.BIT);
+    pstmt.setNull(2, Types.BOOLEAN);
+    pstmt.setObject(3, 't', Types.BOOLEAN);
+    pstmt.setObject(3, 'T', Types.BOOLEAN);
+    pstmt.setObject(3, "t", Types.BOOLEAN);
+    pstmt.setObject(4, "true", Types.BOOLEAN);
+    pstmt.setObject(5, 'y', Types.BOOLEAN);
+    pstmt.setObject(5, 'Y', Types.BOOLEAN);
+    pstmt.setObject(5, "Y", Types.BOOLEAN);
+    pstmt.setObject(6, "YES", Types.BOOLEAN);
+    pstmt.setObject(7, "On", Types.BOOLEAN);
+    pstmt.setObject(8, '1', Types.BOOLEAN);
+    pstmt.setObject(8, "1", Types.BOOLEAN);
     assertEquals("one row inserted, true values", 1, pstmt.executeUpdate());
     // Test FALSE values
     pstmt.setBoolean(1, false);
@@ -1053,7 +1053,12 @@ public class PreparedStatementTest extends BaseTest4 {
   @Test
   public void testSetBooleanDecimal() throws SQLException {
     PreparedStatement pstmt = con.prepareStatement(
-        "CREATE temp TABLE DECIMAL_TAB (max_val numeric(30,15), min_val numeric(30,15), null_val numeric(30,15))");
+            "DROP TABLE if exists DECIMAL_TAB");
+    pstmt.executeUpdate();
+    pstmt.close();
+
+    pstmt = con.prepareStatement(
+        "CREATE TABLE DECIMAL_TAB (max_val numeric(30,15), min_val numeric(30,15), null_val numeric(30,15))");
     pstmt.executeUpdate();
     pstmt.close();
 

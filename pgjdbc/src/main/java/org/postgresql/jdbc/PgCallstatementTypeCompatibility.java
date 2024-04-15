@@ -42,8 +42,6 @@ public class PgCallstatementTypeCompatibility {
         }
     };
 
-    private static TypeConvert numeric2Float = input -> Double.parseDouble(input.toString());
-
     private static TypeConvert smallint2Tinyint = input -> {
         int bit;
         int result = 0;

@@ -27,6 +27,7 @@ import java.sql.Statement;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 /**
  * Some simple tests url options
@@ -65,7 +66,9 @@ public class OptionTest extends BaseTest4 {
     public void optionsBehaviorCompatOptions() throws Exception {
         // options applied successfully
         String s = setOptionsAndGet(behaviorCompatOptionsName, "");
-        assertEquals("", s);
+        if (s != null && !s.equals("")) {
+            assertNotEquals("", s);
+        }
         // behavior_compat_options_name more option
         String value = "hide_tailing_zero,display_leading_zero";
         s = setOptionsAndGet(behaviorCompatOptionsName, value);

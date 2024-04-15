@@ -58,12 +58,57 @@ public class PgCallableStatementTest extends BaseTest4 {
                 "'21:21:21',\n" +
                 "'2003-04-12 04:05:06',\n" +
                 "'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'"), con);
+
+        TestUtil.createTable(con, "test_tbl_err_2", "col_id SERIAL NOT null,\n"
+                + "col_str varchar(26),\n"
+                + "col_bool bool,\n"
+                + "col_byte TINYINT,\n"
+                + "col_short smallint,\n"
+                + "col_int int,\n"
+                + "col_long  bigint,\n"
+                + "col_float real,\n"
+                + "col_doule DOUBLE PRECISION,\n"
+                + "col_bigDecimal number,\n"
+                + "col_bytes bytea,\n"
+                + "col_date date,\n"
+                + "col_time time,\n"
+                + "col_timestamp timestamp,\n"
+                + "col_object varchar(52)");
+        TestUtil.execute(TestUtil.insertSQL("test_tbl_err_2", "col_str ,\n" +
+                        "col_bool ,\n" +
+                        "col_byte ,\n" +
+                        "col_short ,\n" +
+                        "col_int ,\n" +
+                        "col_long  ,\n" +
+                        "col_float ,\n" +
+                        "col_doule ,\n" +
+                        "col_bigDecimal ,\n" +
+                        "col_bytes ,\n" +
+                        "col_date ,\n" +
+                        "col_time ,\n" +
+                        "col_timestamp ,\n" +
+                        "col_object ",
+                "'test',\n" +
+                        "1,\n" +
+                        "2,\n" +
+                        "3,\n" +
+                        "4,\n" +
+                        "5,\n" +
+                        "6,\n" +
+                        "7,\n" +
+                        "8,\n" +
+                        "'ss',\n" +
+                        "current_date,\n" +
+                        "current_time, \n" +
+                        "current_timestamp, \n" +
+                        "'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'"), con);
     }
 
     @After
     public void tearDown() throws SQLException {
         TestUtil.dropType(con, "compfoos");
         TestUtil.dropTable(con, "test_user_type");
+        TestUtil.dropTable(con, "test_tbl_err_2");
         // drop schema
         TestUtil.dropSchema(con, schemaName);
     }

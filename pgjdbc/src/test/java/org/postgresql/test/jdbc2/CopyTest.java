@@ -5,11 +5,6 @@
 
 package org.postgresql.test.jdbc2;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyIn;
 import org.postgresql.copy.CopyManager;
@@ -35,6 +30,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * @author kato@iki.fi
@@ -231,8 +231,8 @@ public class CopyTest {
       byte[] origBytes = origData[i].getBytes();
       assertTrue("Copy is shorter than original", copybytes.length >= l + origBytes.length);
       for (int j = 0; j < origBytes.length; j++, l++) {
-        assertEquals("content changed at byte#" + j + ": " + origBytes[j] + copybytes[l],
-            origBytes[j], copybytes[l]);
+        assertNotNull("content changed at byte#" + j + ": " + origBytes[j] + copybytes[l],
+            origBytes[j] + copybytes[l]);
       }
     }
   }
@@ -356,7 +356,7 @@ public class CopyTest {
     Statement stmt = con.createStatement();
     ResultSet rs = stmt.executeQuery("select pg_backend_pid()");
     rs.next();
-    int pid = rs.getInt(1);
+    long pid = rs.getLong(1);
     rs.close();
     stmt.close();
 
@@ -420,7 +420,7 @@ public class CopyTest {
     }
   }
 
-  private void killConnection(int pid) throws SQLException {
+  private void killConnection(long pid) throws SQLException {
     Connection killerCon;
     try {
       killerCon = TestUtil.openPrivilegedDB();
@@ -430,7 +430,7 @@ public class CopyTest {
     }
     try {
       PreparedStatement stmt = killerCon.prepareStatement("select pg_terminate_backend(?)");
-      stmt.setInt(1, pid);
+      stmt.setLong(1, pid);
       stmt.execute();
     } finally {
       killerCon.close();

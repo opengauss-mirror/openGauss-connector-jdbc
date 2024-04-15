@@ -1,26 +1,33 @@
 package org.postgresql.test.jdbc2;
 
 import org.junit.After;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.postgresql.test.TestUtil;
+import org.postgresql.util.DataBaseCompatibility;
 
 import java.sql.CallableStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-import static org.junit.Assert.assertEquals;
-
 public class BeginEndTest extends BaseTest4 {
+    private static final String TEST_TABLE_NAME = "COMPANY";
+
     @Before
     public void setUp() throws Exception {
         super.setUp();
+        TestUtil.createTable(con, TEST_TABLE_NAME, "ID INT PRIMARY KEY     NOT NULL,\n"
+                + "   NAME           TEXT    NOT NULL,\n"
+                + "   AGE            INT     NOT NULL,\n"
+                + "   ADDRESS        CHAR(50),\n"
+                + "   SALARY         REAL");
     }
 
     @After
     public void tearDown() throws SQLException {
-
+        TestUtil.dropTable(con, TEST_TABLE_NAME);
+        super.tearDown();
     }
 
     /*****************************************************************
@@ -209,11 +216,11 @@ public class BeginEndTest extends BaseTest4 {
                     "     my_var VARCHAR2(30);  \n" +
                     "BEGIN      \n" +
                     "     my_var :='world';     \n" +
-                    "     dbe_output.print_line('hello'||my_var); \n" +
+                    "     RAISE NOTICE '%', 'hello'||my_var; \n" +
                     "END \n" +
                     " /");
             stmt.execute("BEGIN\n" +
-                    "     dbe_output.print_line('hello world!'); \n" +
+                    "     RAISE NOTICE '%', 'hello world!'; \n" +
                     "END; \n" +
                     "/");
         } finally {
@@ -239,7 +246,7 @@ public class BeginEndTest extends BaseTest4 {
                     "DECLARE\n" +
                     "v_num INTEGER := 1;\n" +
                     "BEGIN\n" +
-                    "dbe_output.print_line(v_num);\n" +
+                    "RAISE NOTICE '%', v_num;\n" +
                     "RETURN;  --返回语句\n" +
                     "END $$ /\n");
         } finally {
@@ -317,7 +324,7 @@ public class BeginEndTest extends BaseTest4 {
                     "     my_var VARCHAR2(30);  \n" +
                     "BEGIN      \n" +
                     "     my_var :='world';     \n" +
-                    "     dbe_output.print_line('hello'||my_var); \n" +
+                    "     RAISE NOTICE '%', 'hello'||my_var; \n" +
                     "END \n" +
                     " /" +
                     "");
@@ -336,6 +343,9 @@ public class BeginEndTest extends BaseTest4 {
      ******************************************************************/
     @Test
     public void testCase12() throws SQLException {
+        Assume.assumeTrue("PSQLException:ERROR: Package only allowed create in A compatibility",
+                DataBaseCompatibility.isADatabase(con));
+
         Statement stmt = con.createStatement();
         CallableStatement cmt = null;
         try {
@@ -371,11 +381,11 @@ public class BeginEndTest extends BaseTest4 {
                     "FOR I IN 1..10 LOOP\n" +
                     "ARRINT(I) := I;\n" +
                     "END LOOP;\n" +
-                    "DBE_OUTPUT.PRINT_LINE(ARRINT.COUNT);\n" +
-                    "DBE_OUTPUT.PRINT_LINE(ARRINT(1));\n" +
-                    "DBE_OUTPUT.PRINT_LINE(ARRINT(10));\n" +
-                    "DBE_OUTPUT.PRINT_LINE(ARRINT(ARRINT.FIRST));\n" +
-                    "DBE_OUTPUT.PRINT_LINE(ARRINT(ARRINT.last));\n" +
+                    "RAISE NOTICE '%', ARRINT.COUNT;\n" +
+                    "RAISE NOTICE '%', ARRINT(1);\n" +
+                    "RAISE NOTICE '%', ARRINT(10);\n" +
+                    "RAISE NOTICE '%', ARRINT(ARRINT.FIRST);\n" +
+                    "RAISE NOTICE '%', ARRINT(ARRINT.last);\n" +
                     "END;\n" +
                     "/");
         } finally {
