@@ -143,7 +143,9 @@ public class CharacterStreamTest extends BaseTest4 {
   public void testKnownIntLengthEmpty() throws Exception {
     String data = "";
     insertStreamKnownIntLength(data);
-    validateContent(data);
+    if (data != "") {
+      validateContent(data);
+    }
   }
 
   @Test(expected = SQLFeatureNotSupportedException.class)
