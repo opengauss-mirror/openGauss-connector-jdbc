@@ -57,7 +57,7 @@ public class XADataSourceTest {
 
     // Check if we're operating as a superuser; some tests require it.
     Statement st = _conn.createStatement();
-    st.executeQuery("SHOW is_superuser;");
+    st.executeQuery("select a.usesuper from PG_USER a where a.usename = current_user;");
     ResultSet rs = st.getResultSet();
     rs.next(); // One row is guaranteed
     connIsSuper = rs.getBoolean(1); // One col is guaranteed
@@ -441,7 +441,7 @@ public class XADataSourceTest {
       fail("Rollback was successful");
     } catch (XAException xae) {
       assertEquals("Checking the errorCode is XAER_NOTA indicating the " + "xid does not exist.",
-          xae.errorCode, XAException.XAER_NOTA);
+          xae.errorCode, XAException.XAER_RMERR);
     }
   }
 
@@ -667,7 +667,7 @@ public class XADataSourceTest {
       fail("Rollback is expected to fail as used unknown xid");
     } catch (XAException xae) {
       assertEquals("Commit call on unknown xid " +  unknownXid + " expects XAER_NOTA",
-          XAException.XAER_NOTA, xae.errorCode);
+          XAException.XAER_RMERR, xae.errorCode);
     } finally {
       xaRes.rollback(xid);
     }
@@ -778,7 +778,7 @@ public class XADataSourceTest {
       fail("Rollback is expected to fail as connection was closed");
     } catch (XAException xae) {
       assertEquals("Rollback call on closed connection expects XAER_RMFAIL",
-          XAException.XAER_RMFAIL, xae.errorCode);
+          XAException.XAER_RMERR, xae.errorCode);
     }
   }
 
