@@ -103,6 +103,8 @@ public class PgConnection implements BaseConnection {
       CONNECTION_INFO_REPORT_BLACK_LIST.put("PGPORT","");
       CONNECTION_INFO_REPORT_BLACK_LIST.put("PGHOST","");
       CONNECTION_INFO_REPORT_BLACK_LIST.put("PGDBNAME","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("sslenccert","");
+      CONNECTION_INFO_REPORT_BLACK_LIST.put("sslenckey","");
   }
 
     /**set

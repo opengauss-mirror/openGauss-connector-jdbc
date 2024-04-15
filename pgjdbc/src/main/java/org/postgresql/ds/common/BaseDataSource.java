@@ -536,6 +536,26 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
   }
 
   /**
+   * @return true if TLCP is enabled
+   * @see PGProperty#SSL_TLCP
+   */
+  public boolean getSslTlcp() {
+    return PGProperty.SSL_TLCP.getBoolean(properties);
+  }
+
+  /**
+   * @param enabled if SSL_TLCP is enabled
+   * @see PGProperty#SSL_TLCP
+   */
+  public void setTlcp(boolean enabled) {
+    if (enabled) {
+      PGProperty.SSL_TLCP.set(properties, true);
+    } else {
+      PGProperty.SSL_TLCP.set(properties, false);
+    }
+  }
+
+  /**
    * @param classname SSL factory class name
    * @see PGProperty#SSL_FACTORY
    */
@@ -616,7 +636,23 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
   }
 
   /**
-   * @return SSL certificate
+   * @return TLCP encrypt certificate file path
+   * @see PGProperty#SSL_ENC_CERT
+   */
+  public String getSslEncCert() {
+    return PGProperty.SSL_ENC_CERT.get(properties);
+  }
+
+  /**
+   * @param file TLCP encrypt certificate
+   * @see PGProperty#SSL_ENC_CERT
+   */
+  public void setSslEncCert(String file) {
+    PGProperty.SSL_ENC_CERT.set(properties, file);
+  }
+
+  /**
+   * @return SSL key file path
    * @see PGProperty#SSL_KEY
    */
   public String getSslKey() {
@@ -629,6 +665,22 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
    */
   public void setSslKey(String file) {
     PGProperty.SSL_KEY.set(properties, file);
+  }
+
+  /**
+   * @return TLCP encrypt key file path
+   * @see PGProperty#SSL_ENC_KEY
+   */
+  public String getSslEncKey() {
+    return PGProperty.SSL_ENC_KEY.get(properties);
+  }
+
+  /**
+   * @param file TLCP encrypt key
+   * @see PGProperty#SSL_ENC_KEY
+   */
+  public void setSslEncKey(String file) {
+    PGProperty.SSL_ENC_KEY.set(properties, file);
   }
 
   /**

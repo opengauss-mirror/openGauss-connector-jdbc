@@ -202,6 +202,11 @@ public enum PGProperty {
   SSL("ssl", null, "Control use of SSL (any non-null value causes SSL to be required)"),
 
   /**
+   * Control use of TLCP
+   */
+  SSL_TLCP("tlcp", null, "Control use of TLCP"),
+
+  /**
    * Parameter governing the use of SSL. The allowed values are {@code disable}, {@code allow},
    * {@code prefer}, {@code require}, {@code verify-ca}, {@code verify-full}.
    * If {@code ssl} property is empty or set to {@code true} it implies {@code verify-full}.
@@ -242,10 +247,24 @@ public enum PGProperty {
   SSL_CERT("sslcert", null, "The location of the client's SSL certificate"),
 
   /**
+   * File containing the TLCP encrypt Certificate, this property is only used in tlcp enabled.
+   * Default will be the file {@code postgresql_enc.crt} in {@code $HOME/.postgresql} (*nix) or
+   * {@code %APPDATA%\postgresql} (windows).
+   */
+  SSL_ENC_CERT("sslenccert", null, "The location of the client's TLCP encrypt certificate"),
+
+  /**
    * File containing the SSL Key. Default will be the file {@code postgresql.pk8} in {@code
    * $HOME/.postgresql} (*nix) or {@code %APPDATA%\postgresql} (windows).
    */
   SSL_KEY("sslkey", null, "The location of the client's PKCS#8 SSL key"),
+
+  /**
+   * File containing the TLCP encrypt Key, this property is only used in tlcp enabled.
+   * Default will be the file {@code postgresql_enc.pk8} in {@code $HOME/.postgresql} (*nix) or
+   * {@code %APPDATA%\postgresql} (windows).
+   */
+  SSL_ENC_KEY("sslenckey", null, "The location of the client's PKCS#8 TLCP encrypt key"),
 
   /**
    * File containing the root certificate when validating server ({@code sslmode} = {@code
