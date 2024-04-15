@@ -30,8 +30,20 @@ public class MakeSSL extends ObjectFactory {
       throws PSQLException, IOException {
     LOGGER.debug("converting regular socket connection to ssl");
 
-    SSLSocketFactory factory = SocketFactoryFactory.getSslSocketFactory(info);
+    SSLSocketFactory factory;
     SSLSocket newConnection;
+    boolean isTlcp = PGProperty.SSL_TLCP.getBoolean(info);
+    if (isTlcp) {
+      try {
+        Class.forName("org.openeuler.BGMProvider");
+      } catch (ClassNotFoundException ex) {
+        throw new PSQLException(GT.tr("Could not found bgmProvider, please load bgmProvider jar package manually, and make sure the version is at least v1.1."),
+          PSQLState.CONNECTION_FAILURE, ex);
+      }
+      factory = new LibPQTlcpFactory(info);
+    } else {
+      factory = SocketFactoryFactory.getSslSocketFactory(info);
+    }
     try {
       newConnection = (SSLSocket) factory.createSocket(stream.getSocket(),
           stream.getHostSpec().getHost(), stream.getHostSpec().getPort(), true);
@@ -39,9 +51,15 @@ public class MakeSSL extends ObjectFactory {
       newConnection.setUseClientMode(true);
 
       //set supported Cipher suites before SSL handshake
-      String[] suppoertedCiphersSuites = getSupportedCiphersSuites(info);
-      if (suppoertedCiphersSuites != null) {
-          newConnection.setEnabledCipherSuites(suppoertedCiphersSuites);
+      if (isTlcp) {
+        newConnection.setEnabledProtocols(new String[]{"GMTLS"});
+        String[] tlcpCipherSuites = new String[] {"ECDHE_SM4_SM3", "ECDHE_SM4_GCM_SM3", "ECC_SM4_SM3", "ECC_SM4_GCM_SM3"};
+        newConnection.setEnabledCipherSuites(tlcpCipherSuites);
+      } else {
+        String[] suppoertedCiphersSuites = getSupportedCiphersSuites(info);
+        if (suppoertedCiphersSuites != null) {
+            newConnection.setEnabledCipherSuites(suppoertedCiphersSuites);
+        }
       }
 
       newConnection.startHandshake();
