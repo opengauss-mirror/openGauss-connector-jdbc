@@ -9,6 +9,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import org.junit.Ignore;
 import org.postgresql.core.ServerVersion;
 import org.postgresql.test.TestUtil;
 
@@ -26,6 +27,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/**
+ * org.postgresql.util.PSQLException:[xxxx] ERROR: openGauss does not support large object yet
+ * 详细：The feature is not currently supported
+ * 在位置：referenced column: data
+ */
+@Ignore
 public class Jdbc3BlobTest {
   private static final String TABLE = "blobtest";
   private static final String INSERT = "INSERT INTO " + TABLE + " VALUES (1, lo_creat(-1))";
