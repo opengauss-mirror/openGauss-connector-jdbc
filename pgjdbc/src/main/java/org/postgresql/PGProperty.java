@@ -564,7 +564,7 @@ public enum PGProperty {
           "if the active node is down, set the timeout threshold for searching for the active node. If the active node is not detected within this timeout period, " +
           "the cluster is considered to have no active node and no maintenance is performed on the current cluster. This time should include the RTO time of the active node."),
 
-    B_CMPT_MODE("BCmptMode", "false", "Specify 'dolphin.b_compatibility_mode'"
+    B_CMPT_MODE("BCmptMode", "true", "Specify 'dolphin.b_compatibility_mode'"
             + " connection initialization parameter.")
   ;
 
