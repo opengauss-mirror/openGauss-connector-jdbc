@@ -18,6 +18,7 @@
 #############################################################################
 set -e
 
+PKG_VERSION=5.0.2
 BUILD_FAILED=1
 JDBC_DIR=$(dirname $(readlink -f $0))
 LOG_FILE=$JDBC_DIR/logfile
@@ -113,7 +114,7 @@ function install_jdbc()
     export COMMIT=$(git rev-parse --short HEAD)
     export OPENGAUSS_PACKAGE_NAME="org.opengauss";
 
-    export GS_VERSION="compiled at $(date +%Y-%m-%d-%H:%M:%S) build ${COMMIT}"
+    export GS_VERSION="openGauss ${PKG_VERSION} build ${COMMIT} compiled at $(date '+%Y-%m-%d %H:%M:%S')"
     export OUTPUT_DIR="${JDBC_DIR}/output"
     echo "Begin make jdbc..."
     export CLASSPATH=".:${JAVA_HOME}/lib/dt.jar:${JAVA_HOME}/lib/tools.jar"
