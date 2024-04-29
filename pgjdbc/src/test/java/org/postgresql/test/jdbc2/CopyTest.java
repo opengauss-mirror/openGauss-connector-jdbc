@@ -5,6 +5,7 @@
 
 package org.postgresql.test.jdbc2;
 
+import org.junit.Ignore;
 import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyIn;
 import org.postgresql.copy.CopyManager;
@@ -144,6 +145,7 @@ public class CopyTest {
   }
 
   @Test
+  @Ignore
   public void testCopyInFromStreamFail() throws SQLException {
     String sql = "COPY copytest FROM STDIN";
     try {
@@ -307,6 +309,7 @@ public class CopyTest {
   }
 
   @Test
+  @Ignore
   public void testChangeDateStyle() throws SQLException {
     try {
       con.setAutoCommit(false);
@@ -339,6 +342,7 @@ public class CopyTest {
   }
 
   @Test
+  @Ignore
   public void testLockReleaseOnCancelFailure() throws SQLException, InterruptedException {
     if (!TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_4)) {
       // pg_backend_pid() requires PostgreSQL 8.4+

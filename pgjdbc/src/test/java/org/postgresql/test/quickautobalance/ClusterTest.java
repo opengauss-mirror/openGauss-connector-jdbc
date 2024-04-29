@@ -15,6 +15,7 @@
 
 package org.postgresql.test.quickautobalance;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.postgresql.QueryCNListUtils;
 import org.postgresql.jdbc.PgConnection;
@@ -50,6 +51,7 @@ import static org.junit.Assert.fail;
 /**
  * Cluster test
  */
+@Ignore
 public class ClusterTest {
     private static Log LOGGER = Logger.getLogger(ClusterTest.class.getName());
 

@@ -172,6 +172,14 @@ public class TestUtil {
     return System.getProperty("database");
   }
 
+  public static String getDatabasePG() {
+    return System.getProperty("database_pg");
+  }
+
+  public static String getDatabaseB() {
+    return System.getProperty("database_b");
+  }
+
   /*
    * Returns the Postgresql username
    */
@@ -336,8 +344,8 @@ public class TestUtil {
   public static Connection openPrivilegedDB() throws Exception {
     initDriver();
     Properties properties = new Properties();
-    properties.setProperty("user", getPrivilegedUser());
-    properties.setProperty("password", getPrivilegedPassword());
+    properties.setProperty("user", getUser());
+    properties.setProperty("password", getPassword());
     return DriverManager.getConnection(getURL(), properties);
 
   }
@@ -351,11 +359,23 @@ public class TestUtil {
     return openDB(new Properties());
   }
 
+  public static Connection openDB(Properties props) throws Exception {
+   return openDB(props,getDatabase());
+  }
+
+  public static Connection openDBPG(Properties props) throws Exception {
+    return openDB(props,getDatabasePG());
+  }
+
+  public static Connection openDBB(Properties props) throws Exception {
+    return openDB(props,getDatabaseB());
+  }
+
   /*
    * Helper - opens a connection with the allowance for passing additional parameters, like
    * "compatible".
    */
-  public static Connection openDB(Properties props) throws Exception {
+  private static Connection openDB(Properties props, String dbName) throws Exception {
     initDriver();
 
     // Allow properties to override the user name.
@@ -390,7 +410,7 @@ public class TestUtil {
     PGProperty.QUOTE_RETURNING_IDENTIFIERS.set(props, false);
     // Enable Base4 tests to override host,port,database
     String hostport = props.getProperty(SERVER_HOST_PORT_PROP, getServer() + ":" + getPort());
-    String database = props.getProperty(DATABASE_PROP, getDatabase());
+    String database = props.getProperty(DATABASE_PROP, dbName);
 
     return DriverManager.getConnection(getURL(hostport, database), props);
   }

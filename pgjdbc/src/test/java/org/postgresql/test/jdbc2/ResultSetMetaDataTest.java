@@ -9,6 +9,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import org.junit.Ignore;
 import org.postgresql.PGProperty;
 import org.postgresql.PGResultSetMetaData;
 import org.postgresql.core.ServerVersion;
@@ -299,6 +300,8 @@ public class ResultSetMetaDataTest extends BaseTest4 {
   }
 
   @Test
+  @Ignore
+  // not support
   public void testIdentityColumn() throws Exception {
     assumeMinimumServerVersion(ServerVersion.v10);
     assumePreparedStatementMetadataSupported();

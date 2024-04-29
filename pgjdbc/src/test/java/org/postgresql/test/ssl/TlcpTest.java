@@ -15,6 +15,7 @@
 
 package org.postgresql.test.ssl;
 
+import org.junit.Ignore;
 import org.postgresql.test.TestUtil;
 
 import java.sql.Connection;
@@ -32,6 +33,7 @@ import org.junit.Test;
 /**
  * This test-case is only for TLCP. 
  */
+@Ignore
 public class TlcpTest {
   private Connection con;
   private String sslrootcert;

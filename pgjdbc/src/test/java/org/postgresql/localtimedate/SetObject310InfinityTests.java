@@ -15,6 +15,7 @@ import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.postgresql.test.jdbc2.BaseTest4;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

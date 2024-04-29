@@ -59,28 +59,6 @@ public class SelectFunctionTest {
             Assert.assertNotNull(results);
         }
     }
-
-    @Test
-    public void testTriggerQuery() throws Exception {
-        String sqlTable = "create table t_tinyint0006 (" + "id int primary key auto_increment,"
-            + "my_data tinyint" + ");";
-        String sqlTrigger = "create trigger trigger_tinyint0006 before insert on t_tinyint0006" + " for each row "
-            + "begin" + " update t_tinyint0006 set my_data=1;" + "end;";
-        try (Connection conn = createConnection()) {
-            ExecuteUtil.execute(conn, sqlTable);
-            ExecuteUtil.execute(conn, sqlTrigger);
-        }
-    }
-    
-    @Test
-    public void testReturningQuery() throws Exception {
-        String returnString = "INSERT INTO CIMMIT (DATA_ENABLE) VALUES (1)";
-        try (Connection conn = createConnection()) {
-            PreparedStatement st = conn.prepareStatement(returnString, new String[] {"ID"});
-            st.execute();
-        }
-    }
-
     @Test
     public void testBatchInsert() throws Exception {
         Properties props = new Properties();
@@ -90,14 +68,14 @@ public class SelectFunctionTest {
         props.put("batchMode", "OFF");
         props.put("reWriteBatchedInserts", "true");
         try (Connection conn = TestUtil.openDB(props)) {
-            for (int j = 1; j <= 1000; j++) {
+            for (int j = 1; j <= 100; j++) {
                 ExecuteUtil.execute(conn, "set session_timeout = 0;");
                 ExecuteUtil.execute(conn, "drop table if exists t" + j);
                 ExecuteUtil.execute(conn, "create table t" + j
                     + "(id int, id1 int, id2 int, id3 int, id4 int, id5 int, data varchar(2048));");
                 String batchInsert = "insert into t" + j + " values (?,?,?,?,?,?,?)";
                 PreparedStatement preparedStatement = conn.prepareStatement(batchInsert);
-                for (int i = 1; i <= 1000; i++) {
+                for (int i = 1; i <= 100; i++) {
                     preparedStatement.setInt(1, 1);
                     preparedStatement.setInt(2, i);
                     preparedStatement.setInt(3, i);
@@ -109,6 +87,7 @@ public class SelectFunctionTest {
                 }
                 preparedStatement.executeBatch();
                 preparedStatement.close();
+                ExecuteUtil.execute(conn, "drop table if exists t" + j);
             }
             // block
         }

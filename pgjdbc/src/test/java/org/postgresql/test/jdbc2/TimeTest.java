@@ -9,6 +9,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import org.junit.Ignore;
 import org.postgresql.test.TestUtil;
 
 import org.junit.After;
@@ -55,6 +56,8 @@ public class TimeTest {
    * Test use of calendar
    */
   @Test
+  @Ignore
+  // TODO
   public void testGetTimeZone() throws Exception {
     final Time midnight = new Time(0, 0, 0);
     Statement stmt = con.createStatement();

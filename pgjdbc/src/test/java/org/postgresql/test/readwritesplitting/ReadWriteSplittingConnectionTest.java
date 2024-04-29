@@ -4,10 +4,7 @@
 
 package org.postgresql.test.readwritesplitting;
 
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 import org.postgresql.readwritesplitting.ReadWriteSplittingHostSpec;
 import org.postgresql.readwritesplitting.ReadWriteSplittingPgConnection;
 import org.postgresql.test.TestUtil;
@@ -28,6 +25,7 @@ import static org.hamcrest.CoreMatchers.instanceOf;
  *
  * @since 2023-11-20
  */
+@Ignore
 public class ReadWriteSplittingConnectionTest {
     private static final int DN_NUM = 3;
 

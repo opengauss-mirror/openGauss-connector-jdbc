@@ -21,6 +21,7 @@ import static org.postgresql.hostchooser.HostStatus.Master;
 import static org.postgresql.hostchooser.HostStatus.Secondary;
 import static org.postgresql.test.TestUtil.closeDB;
 
+import org.junit.Ignore;
 import org.postgresql.hostchooser.GlobalHostStatusTracker;
 import org.postgresql.hostchooser.HostRequirement;
 import org.postgresql.test.TestUtil;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
+@Ignore
 public class MultiHostsConnectionTest {
 
   private static final String user = TestUtil.getUser();

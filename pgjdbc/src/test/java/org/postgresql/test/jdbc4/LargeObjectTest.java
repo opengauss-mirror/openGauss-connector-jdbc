@@ -31,7 +31,7 @@ import java.sql.Statement;
  * {@link org.postgresql.test.jdbc2.BlobTest} for base tests concerning blobs
  */
 @Ignore
-public class BlobTest {
+public class LargeObjectTest {
 
   private Connection _conn;
 

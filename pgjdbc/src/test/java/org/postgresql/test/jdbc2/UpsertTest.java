@@ -7,6 +7,7 @@ package org.postgresql.test.jdbc2;
 
 import static org.junit.Assert.assertEquals;
 
+import org.postgresql.PGProperty;
 import org.postgresql.core.ServerVersion;
 import org.postgresql.test.TestUtil;
 
@@ -21,6 +22,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Properties;
 
 
 /**

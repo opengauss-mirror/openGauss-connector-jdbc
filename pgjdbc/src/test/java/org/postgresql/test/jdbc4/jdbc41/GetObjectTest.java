@@ -734,7 +734,6 @@ public class GetObjectTest {
    *
    * <p>The test is ignored as it is locale-dependent.</p>
    */
-  @Ignore
   @Test
   public void testGetMoney() throws SQLException {
     Statement stmt = _conn.createStatement();
