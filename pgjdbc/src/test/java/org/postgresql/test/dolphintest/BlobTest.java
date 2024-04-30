@@ -5,10 +5,11 @@
 package org.postgresql.test.dolphintest;
 
 import org.junit.Test;
+import org.postgresql.core.ServerVersion;
 import org.postgresql.core.types.PGBlob;
 import org.postgresql.jdbc.PgConnection;
 import org.postgresql.test.TestUtil;
-import org.postgresql.test.jdbc2.BaseTest4;
+import org.postgresql.test.jdbc2.BaseTest4B;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -20,7 +21,27 @@ import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
 
-public class BlobTest extends BaseTest4 {
+public class BlobTest extends BaseTest4B {
+
+    protected void updateProperties(Properties props) {
+        super.updateProperties(props);
+        props.put("blobMode", "ON");
+        props.put("binaryTransfer", "true");
+    }
+
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
+        assumeMiniOgVersion("opengauss 6.0.0",6,0,0);
+        TestUtil.createTable(con, "test_blob_b", "id int, data1 tinyblob, data2 blob, data3 mediumblob, data4 longblob");
+    }
+
+    @Override
+    public void tearDown() throws SQLException {
+        TestUtil.dropTable(con, "test_blob_b");
+        super.tearDown();
+    }
+
     public static void executeSql(Connection connection, String sql) throws SQLException {
         try (PreparedStatement st = connection.prepareStatement(sql)) {
             st.execute();
@@ -29,75 +50,39 @@ public class BlobTest extends BaseTest4 {
 
     @Test
     public void test1() throws Exception {
-        String sqlCreate = "create table if not exists t1"
-                            + "(id int, data1 tinyblob, data2 blob, data3 mediumblob, data4 longblob);";
-        String sqlDrop = "drop table if exists t1;";
-        String sqlDropUser = "drop user test_user cascade;";
-        String sqlQuery = "select * from t1";
-        String sqlInsert = "insert into t1 values (?, ?, ?, ?, ?);";
-        String sqlCreateUser = "CREATE USER test_user with password 'openGauss@123'";
-        String sqlGrantUser = "GRANT ALL PRIVILEGES TO test_user";
-        Properties props = new Properties();
-        props.put("blobMode", "ON");
-        props.put("binaryTransfer", "true");
+        String sqlQuery = "select * from test_blob_b";
+        String sqlInsert = "insert into test_blob_b values (?, ?, ?, ?, ?);";
 
-        /* test about not b_comp */
-        try (Connection con1 = TestUtil.openDB(props)) {
-            /* cannot create the table */
-            executeSql(con1, sqlCreate);
-            executeSql(con1, sqlDropUser);
-            executeSql(con1, sqlCreateUser);
-            executeSql(con1, sqlGrantUser);
+        con.unwrap(PgConnection.class).setDolphinCmpt(true);
+        try (PreparedStatement ps = con.prepareStatement(sqlInsert)) {
+            ps.setInt(1, 1);
+            PGBlob blob = new PGBlob();
+            blob.setBytes(1, "abcdefgh\0ijklmn".getBytes(StandardCharsets.UTF_8));
+            ps.setBlob(2, blob);
+            ps.setBlob(3, blob);
+            ps.setBlob(4, blob);
+            ps.setBlob(5, blob);
+            ps.execute();
+        }
+        Statement statement = con.createStatement();
+        ResultSet set = statement.executeQuery(sqlQuery);
+        while (set.next()) {
+            assertEquals("abcdefgh\0ijklmn", new String(set.getBlob(2).getBytes(1, 15), StandardCharsets.UTF_8));
+            assertEquals("abcdefgh\0ijklmn", new String(set.getBlob(3).getBytes(1, 15), StandardCharsets.UTF_8));
+            assertEquals("abcdefgh\0ijklmn", new String(set.getBlob(4).getBytes(1, 15), StandardCharsets.UTF_8));
+            assertEquals("abcdefgh\0ijklmn", new String(set.getBlob(5).getBytes(1, 15), StandardCharsets.UTF_8));
         }
 
-        /* test about b_comp but don't have dolphin plugin */
-        props.put("username", "test_user");
-        props.put("password", "openGauss@123");
-        try (Connection con1 = TestUtil.openDB(props)) {
-            /* cannot create the table */
-            executeSql(con1, sqlCreate);
-        }
-
-        Properties props1 = new Properties();
-        props1.put("blobMode", "ON");
-        props1.put("binaryTransfer", "true");
-        props1.put("database", "test_db");
-        try (Connection con1 = TestUtil.openDB(props1)) {
-            con1.unwrap(PgConnection.class).setDolphinCmpt(true);
-            executeSql(con1, sqlDrop);
-            executeSql(con1, sqlCreate);
-            try (PreparedStatement ps = con1.prepareStatement(sqlInsert)) {
-                ps.setInt(1, 1);
-                PGBlob blob = new PGBlob();
-                blob.setBytes(1, "abcdefgh\0ijklmn".getBytes(StandardCharsets.UTF_8));
-                ps.setBlob(2, blob);
-                ps.setBlob(3, blob);
-                ps.setBlob(4, blob);
-                ps.setBlob(5, blob);
-                ps.execute();
-            }
-            Statement statement = con1.createStatement();
-            ResultSet set = statement.executeQuery(sqlQuery);
-            while (set.next()) {
-                assertEquals("abcdefgh\0ijklmn", new String(set.getBlob(2).getBytes(1, 15), StandardCharsets.UTF_8));
-                assertEquals("abcdefgh\0ijklmn", new String(set.getBlob(3).getBytes(1, 15), StandardCharsets.UTF_8));
-                assertEquals("abcdefgh\0ijklmn", new String(set.getBlob(4).getBytes(1, 15), StandardCharsets.UTF_8));
-                assertEquals("abcdefgh\0ijklmn", new String(set.getBlob(5).getBytes(1, 15), StandardCharsets.UTF_8));
-            }
-        }
     }
+
     @Test
     public void test2() throws Exception {
-        Properties props1 = new Properties();
-        props1.put("blobMode", "ON");
-        props1.put("binaryTransfer", "true");
-        props1.put("database", "test_db");
-        String sqlQuery = "select * from t1";
+        String sqlQuery = "select * from test_blob_b";
         ResultSet set1 = null;
         ResultSet set2 = null;
-        try (Connection con1 = TestUtil.openDB(props1)) {
-            con1.unwrap(PgConnection.class).setDolphinCmpt(true);
-            Statement statement = con1.createStatement();
+        try {
+            con.unwrap(PgConnection.class).setDolphinCmpt(true);
+            Statement statement = con.createStatement();
             set1 = statement.executeQuery(sqlQuery);
             while (set1.next()) {
                 assertEquals("abcdefgh\0ijklmn", set1.getString(2));
@@ -105,7 +90,7 @@ public class BlobTest extends BaseTest4 {
                 assertEquals("abcdefgh\0ijklmn", set1.getString(4));
                 assertEquals("abcdefgh\0ijklmn", set1.getString(5));
             }
-            con1.unwrap(PgConnection.class).setDolphinCmpt(false);
+            con.unwrap(PgConnection.class).setDolphinCmpt(false);
             set2 = statement.executeQuery(sqlQuery);
             while (set2.next()) {
                 assertEquals("abcdefgh\0ijklmn", set2.getString(2));

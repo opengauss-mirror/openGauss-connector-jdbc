@@ -5,6 +5,7 @@
 
 package org.postgresql.test.jdbc2;
 
+import com.vdurmont.semver4j.Semver;
 import org.postgresql.PGConnection;
 import org.postgresql.PGProperty;
 import org.postgresql.core.Version;
@@ -16,9 +17,13 @@ import org.junit.Assume;
 import org.junit.Before;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class BaseTest4 {
 
@@ -38,6 +43,9 @@ public class BaseTest4 {
     UNSPECIFIED, VARCHAR;
   }
 
+  private Semver dbVersion = null;
+  private String dbVendor = "";
+
   protected Connection con;
   private BinaryMode binaryMode;
   private ReWriteBatchedInserts reWriteBatchedInserts;
@@ -54,6 +62,10 @@ public class BaseTest4 {
     if (stringType != null) {
       PGProperty.STRING_TYPE.set(props, stringType.name().toLowerCase());
     }
+  }
+
+  protected void openDB(Properties props) throws Exception{
+    con = TestUtil.openDB(props);
   }
 
   protected void forceBinary(Properties props) {
@@ -81,9 +93,10 @@ public class BaseTest4 {
   public void setUp() throws Exception {
     Properties props = new Properties();
     updateProperties(props);
-    con = TestUtil.openDB(props);
+    openDB(props);
     PGConnection pg = con.unwrap(PGConnection.class);
     preferQueryMode = pg == null ? PreferQueryMode.EXTENDED : pg.getPreferQueryMode();
+    getDBVersion();
   }
 
   @After
@@ -139,5 +152,77 @@ public class BaseTest4 {
       }
     }
     return sb.toString();
+  }
+  public static boolean isEmpty(String value) {
+    return value == null || value.isEmpty();
+  }
+
+  // Minimal opengauss that version
+  public void assumeMiniOgVersion(String message, int major, int minor, int micro) throws SQLException {
+    Assume.assumeTrue(message, isDBVendor("opengauss") && isVersionAtLeast(major,minor,micro));
+  }
+
+  public void getDBVersion() throws SQLException {
+    String serverVersion = null;
+    if (dbVersion == null) {
+      PreparedStatement ps = con.prepareStatement("SELECT version()");
+      ResultSet rs = ps.executeQuery();
+      while (rs.next()) {
+        serverVersion = rs.getString(1);
+      }
+      if (isEmpty(serverVersion)) {
+        return;
+      }
+      try {
+        Matcher matcher = Pattern.compile("(openGauss|MogDB) ([0-9\\.]+)").matcher(serverVersion);
+        if (matcher.find()) {
+          dbVendor=matcher.group(1);
+          String versionStr = matcher.group(2);
+          if (!isEmpty(versionStr)) {
+            dbVersion = new Semver(versionStr);
+          }
+        }
+      } catch (Exception e) {
+        dbVersion = new Semver("0.0.0");
+      }
+    }
+  }
+  public boolean isVersionLt(int major, int minor, int micro) {
+    if (dbVersion == null) {
+      return false;
+    }
+    if (dbVersion.getMajor() < major) {
+      return true;
+    }
+    if (dbVersion.getMajor() == major) {
+      if (dbVersion.getMinor() < minor) {
+        return true;
+      } else if (dbVersion.getMinor() == minor) {
+        return dbVersion.getPatch() < micro;
+      }
+    }
+    return false;
+  }
+  public boolean isVersionAtLeast(int major, int minor, int micro) {
+    if (dbVersion == null) {
+      return false;
+    }
+    if (dbVersion.getMajor() > major) {
+      return true;
+    }
+    if (dbVersion.getMajor() == major) {
+      if (dbVersion.getMinor() > minor) {
+        return true;
+      } else if (dbVersion.getMinor() == minor) {
+        return dbVersion.getPatch() >= micro;
+      }
+    }
+    return false;
+  }
+  public boolean isDBVendor(String s) {
+    if (dbVendor == null) {
+      return false;
+    }
+    return s.equalsIgnoreCase(dbVendor);
   }
 }

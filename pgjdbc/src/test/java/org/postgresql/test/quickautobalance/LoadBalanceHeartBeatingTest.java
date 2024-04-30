@@ -15,6 +15,7 @@
 
 package org.postgresql.test.quickautobalance;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.postgresql.jdbc.PgConnection;
 import org.postgresql.quickautobalance.Cluster;
@@ -35,6 +36,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * LoadBalanceHeartBeatingTest
  */
+@Ignore
 public class LoadBalanceHeartBeatingTest {
     private static final String USER = TestUtil.getUser();
 

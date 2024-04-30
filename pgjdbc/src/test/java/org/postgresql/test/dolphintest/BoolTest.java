@@ -1,9 +1,10 @@
-package org.postgresql.test.jdbc4;
+package org.postgresql.test.dolphintest;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.postgresql.test.TestUtil;
+import org.postgresql.test.jdbc2.BaseTest4B;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -18,20 +19,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * This test-case is only for JDBC4 boolean methods. Take a look at
  */
-public class BoolTest {
-
-  private Connection con;
-
-  @Before
-  public void setUp() throws Exception {
-    con = TestUtil.openDB();
-  }
-
-  @After
-  public void tearDown() throws Exception {
-    TestUtil.closeDB(con);
-  }
-
+public class BoolTest extends BaseTest4B {
   /*
    * Tests int to boolean methods in ResultSet
    */
@@ -83,6 +71,7 @@ public class BoolTest {
    */
   @Test
   public void testBit1ToBoolean() throws Exception {
+    assumeMiniOgVersion("opengauss 6.0.0",6,0,0);
     TestUtil.createTable(con, "test_bool", "id bit(1)");
 
     PreparedStatement pstmt1 = con.prepareStatement("INSERT INTO test_bool VALUES (1)");
@@ -112,6 +101,7 @@ public class BoolTest {
    */
   @Test
   public void testBit4ToBoolean() throws Exception {
+    assumeMiniOgVersion("opengauss 6.0.0",6,0,0);
     TestUtil.createTable(con, "test_bool", "id bit(4)");
 
     PreparedStatement pstmt1 = con.prepareStatement("INSERT INTO test_bool VALUES (0011)");

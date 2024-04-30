@@ -11,6 +11,8 @@ import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.postgresql.test.jdbc2.BaseTest4;
+import org.postgresql.test.jdbc2.BaseTest4PG;
 
 import java.lang.reflect.Field;
 import java.sql.PreparedStatement;
@@ -24,7 +26,7 @@ import java.util.Arrays;
 import java.util.Collection;
 
 @RunWith(Parameterized.class)
-public class GetObject310InfinityTests extends BaseTest4 {
+public class GetObject310InfinityTests extends BaseTest4PG {
   private final String expression;
   private final String pgType;
   private final Class<?> klass;

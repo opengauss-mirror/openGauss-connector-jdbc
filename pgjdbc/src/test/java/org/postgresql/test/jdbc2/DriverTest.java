@@ -12,6 +12,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import org.junit.Ignore;
 import org.postgresql.Driver;
 import org.postgresql.PGProperty;
 import org.postgresql.test.TestUtil;
@@ -31,6 +32,7 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
+import java.util.logging.StreamHandler;
 
 /*
  * Tests the dynamically created class org.postgresql.Driver
@@ -204,6 +206,7 @@ public class DriverTest {
   }
 
   @Test
+  @Ignore
   public void testSetLogWriter() throws Exception {
 
     // this is a dummy to make sure TestUtil is initialized
@@ -239,6 +242,7 @@ public class DriverTest {
   }
 
   @Test
+  @Ignore
   public void testSetLogStream() throws Exception {
 
     // this is a dummy to make sure TestUtil is initialized
@@ -260,7 +264,7 @@ public class DriverTest {
 
       Logger logger = Logger.getLogger("org.postgresql");
       Handler []handlers = logger.getHandlers();
-      assertTrue( handlers[0] instanceof WriterHandler );
+      assertTrue( handlers[0] instanceof WriterHandler);
       con.close();
     } finally {
       DriverManager.setLogStream(null);

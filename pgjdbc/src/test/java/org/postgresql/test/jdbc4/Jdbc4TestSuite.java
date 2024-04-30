@@ -20,7 +20,7 @@ import org.junit.runners.Suite;
         IsValidTest.class,
         ClientInfoTest.class,
         PGCopyInputStreamTest.class,
-        BlobTest.class,
+        LargeObjectTest.class,
         BinaryStreamTest.class,
         CharacterStreamTest.class,
         UUIDTest.class,

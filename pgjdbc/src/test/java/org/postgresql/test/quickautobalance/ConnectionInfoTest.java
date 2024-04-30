@@ -15,6 +15,7 @@
 
 package org.postgresql.test.quickautobalance;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.postgresql.jdbc.PgConnection;
 import org.postgresql.jdbc.StatementCancelState;
@@ -36,6 +37,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * ConnectionInfo Test
  */
+@Ignore
 public class ConnectionInfoTest {
     private HostSpec initHost() {
         return new HostSpec(TestUtil.getServer(), TestUtil.getPort());

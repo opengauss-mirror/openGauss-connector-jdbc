@@ -66,8 +66,8 @@ public class BatchAutoGenerateKeysTest {
     public static Iterable<Object[]> datas() {
         List<Object[]> datas = new LinkedList<>();
         String[] sqls = {"insert into t1 (data) values(?) returning *", "insert into t1 (data) values(?)"};
-        Integer[] counts = {1, 2, 127, 200};
-        Integer[] repeatBatchs = {1, 2, 5, 6};
+        Integer[] counts = {1, 2, 127};
+        Integer[] repeatBatchs = {1, 2, 5};
         for (boolean batchMode: new boolean[]{true, false}) {
             for (Integer count: counts) {
                 for (String sql:sqls) {

@@ -1,9 +1,10 @@
-package org.postgresql.test.jdbc4;
+package org.postgresql.test.dolphintest;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.postgresql.test.TestUtil;
+import org.postgresql.test.jdbc2.BaseTest4B;
 
 import java.sql.*;
 
@@ -15,20 +16,7 @@ import static org.junit.Assert.assertTrue;
  * This test-case is only for JDBC4 time methods. Take a look at
  * {@link org.postgresql.test.jdbc2.TimeTest} for base tests concerning blobs
  */
-public class TimeTest {
-
-    private Connection con;
-
-    @Before
-    public void setUp() throws Exception {
-        con = TestUtil.openDB();
-    }
-
-    @After
-    public void tearDown() throws Exception {
-        TestUtil.closeDB(con);
-    }
-
+public class TimeTest extends BaseTest4B {
     @Test
     public void testIntToTime() throws SQLException {
         TestUtil.createTable(con, "test_time", "id int");

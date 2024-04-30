@@ -88,6 +88,9 @@ public class PGPropertyTest {
       if ("PG_CLIENT_LOGIC".equalsIgnoreCase(property.name())) {
         continue;
       }
+      if ("SSL_TLCP".equalsIgnoreCase(property.name())) {
+        continue;
+      }
       String enumName = property.name().replaceAll("_", "");
       assertEquals("Naming of the enum constant [" + property.name()
           + "] should follow the naming of its underlying property [" + property.getName()
@@ -146,6 +149,10 @@ public class PGPropertyTest {
     excluded.add("masterFailureHeartbeatTimeout");
     excluded.add("adaptiveSetSQLType");
     excluded.add("options");
+    excluded.add("tlcp");
+    excluded.add("enableStatementLoadBalance");
+    excluded.add("writeDataSourceAddress");
+    excluded.add("BCmptMode");
 
     // index PropertyDescriptors by name
     Map<String, PropertyDescriptor> propertyDescriptors =
@@ -275,6 +282,7 @@ public class PGPropertyTest {
     excluded.add("SSL_PRIVATEKEY_FACTORY"); // ssl[p]rivatekey[f]actory
     excluded.add("APPLICATION_TYPE"); // [A]pplication[T]ype
     excluded.add("TLS_CIPHERS_SUPPERTED"); // [TLS]CiphersSupperted
+    excluded.add("SSL_TLCP"); // [TLS]CiphersSupperted
 
     for (PGProperty property : PGProperty.values()) {
       if (!property.name().startsWith("PG")) { // Ignore all properties that start with PG

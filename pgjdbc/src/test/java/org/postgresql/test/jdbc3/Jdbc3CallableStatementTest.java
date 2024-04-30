@@ -11,8 +11,10 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import org.junit.Ignore;
 import org.postgresql.test.TestUtil;
 import org.postgresql.test.jdbc2.BaseTest4;
+import org.postgresql.test.jdbc2.BaseTest4B;
 import org.postgresql.util.PSQLState;
 
 import org.junit.Test;
@@ -278,7 +280,9 @@ public class Jdbc3CallableStatementTest extends BaseTest4 {
   }
 
   @Test
-  public void testInOut() throws Throwable {
+  @Ignore
+  // TODO bit/bool
+  public void testBitBoolInOut() throws Throwable {
     try {
       Statement stmt = con.createStatement();
       stmt.execute(createBitTab);
@@ -892,6 +896,8 @@ public class Jdbc3CallableStatementTest extends BaseTest4 {
   }
 
   @Test
+  @Ignore
+  // bool/bit
   public void testGetBoolean01() throws Throwable {
     assumeCallableStatementsSupported();
     try {

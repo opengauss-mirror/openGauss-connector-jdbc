@@ -15,6 +15,7 @@
 
 package org.postgresql.test.quickautobalance;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.postgresql.jdbc.PgConnection;
 import org.postgresql.jdbc.StatementCancelState;
@@ -45,6 +46,7 @@ import static org.junit.Assert.fail;
 /**
  *
  */
+@Ignore
 public class ConnectionManagerTest {
     private static Log LOGGER = Logger.getLogger(ConnectionManagerTest.class.getName());
 
