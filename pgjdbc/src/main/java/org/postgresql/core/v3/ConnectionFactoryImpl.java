@@ -75,21 +75,6 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   private int protocolVerion = PROTOCOL_VERSION_351;
   private String connectInfo = "";
 
-  /**
-   * Whitelist of supported client_encoding
-   */
-  public static final HashMap<String, String> CLIENT_ENCODING_WHITELIST = new HashMap<>();
-
-  static {
-    CLIENT_ENCODING_WHITELIST.put("UTF8", "UTF8");
-    CLIENT_ENCODING_WHITELIST.put("UTF-8", "UTF-8");
-    CLIENT_ENCODING_WHITELIST.put("GBK", "GBK");
-    CLIENT_ENCODING_WHITELIST.put("GB18030", "GB18030");
-    CLIENT_ENCODING_WHITELIST.put("LATIN1", "LATIN1");
-  }
-//  public static void setStaticClientEncoding(String client) {
-//      this.CLIENT_ENCODING = client;
-//  }
   public void setClientEncoding(String client) {
      this.CLIENT_ENCODING = client;
   }
@@ -179,13 +164,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   public QueryExecutor openConnectionImpl(HostSpec[] hostSpecs, String user, String database,
                                           Properties info) throws SQLException {
     if (info.getProperty("characterEncoding") != null) {
-      if (CLIENT_ENCODING_WHITELIST.containsKey((info.getProperty("characterEncoding")).toUpperCase(Locale.ENGLISH))) {
-        setClientEncoding(info.getProperty("characterEncoding").toUpperCase(Locale.ENGLISH));
-      } else {
-        LOGGER.warn("unsupported client_encoding: " + info.getProperty(
-                "characterEncoding") + ", to ensure correct operation, please use the specified range " +
-                "of client_encoding.");
-      }
+      setClientEncoding(info.getProperty("characterEncoding").toUpperCase(Locale.ENGLISH));
     }
 
     if (info.getProperty("use_boolean") != null) {
