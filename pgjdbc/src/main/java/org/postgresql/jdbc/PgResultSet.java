@@ -2089,9 +2089,9 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       } else if (blobSet.contains(typeName)) {
         return new String(toBytes(result));
       } else if ("time".equals(typeName)) {
-        java.util.Calendar cal = getDefaultCalendar();
-        Time time = connection.getTimestampUtils().toTime(cal, result);
-        return String.valueOf(time);
+        char[] cs = result.toCharArray();
+        int start = TimestampUtils.firstDigit(cs, 0);
+        result = result.substring(start);
       }
       return result;
     } catch (IOException ioe) {

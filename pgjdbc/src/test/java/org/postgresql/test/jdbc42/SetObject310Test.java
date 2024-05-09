@@ -291,8 +291,6 @@ public class SetObject310Test extends BaseTest4PG {
   }
 
   @Test
-  @Ignore
-  // TODO
   public void testTimeStampRounding() throws SQLException {
     LocalTime time = LocalTime.parse("23:59:59.999999500");
     Time actual = insertThenReadWithoutType(time, "time_without_time_zone_column", Time.class);
@@ -300,8 +298,6 @@ public class SetObject310Test extends BaseTest4PG {
   }
 
   @Test
-  @Ignore
-  // TODO
   public void testTimeStampRoundingWithType() throws SQLException {
     LocalTime time = LocalTime.parse("23:59:59.999999500");
     Time actual =
