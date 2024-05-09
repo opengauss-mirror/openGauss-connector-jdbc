@@ -564,21 +564,8 @@ public enum PGProperty {
           "if the active node is down, set the timeout threshold for searching for the active node. If the active node is not detected within this timeout period, " +
           "the cluster is considered to have no active node and no maintenance is performed on the current cluster. This time should include the RTO time of the active node."),
 
-    /**
-     * Adaptively modify the inconsistent set sqlType in batch mode. If the first set sqlType is INTEGER and
-     * the second set is LONG, the first one will be automatically modify to LONG
-     */
-    ADAPTIVE_SET_SQL_TYPE("adaptiveSetSQLType", "false", "Adaptively modify the inconsistent set sqlType in batch mode. If the first set sqlType is INTEGER and" +
-        " the second set is LONG, the first one will be automatically modify to LONG"),
-
-    /**
-     * Specify 'options' connection initialization parameter.
-     * The value of this parameter may contain spaces and other special characters or their URL representation.
-     */
-    OPTIONS("options", null, "Specify 'options' connection initialization parameter."),
-
     B_CMPT_MODE("BCmptMode", "true", "Specify 'dolphin.b_compatibility_mode'"
-            + " connection initialization parameter."),
+            + " connection initialization parameter.")
   ;
 
   private String _name;
