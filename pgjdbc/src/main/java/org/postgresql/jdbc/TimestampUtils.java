@@ -954,7 +954,13 @@ public class TimestampUtils {
     return slen;
   }
 
-  private static int firstDigit(char[] s, int start) {
+  /**
+   * format timestamp
+   * @param s
+   * @param start
+   * @return
+   */
+  public static int firstDigit(char[] s, int start) {
     int slen = s.length;
     for (int i = start; i < slen; i++) {
       if (Character.isDigit(s[i])) {
