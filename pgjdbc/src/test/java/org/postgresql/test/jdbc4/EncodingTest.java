@@ -4,6 +4,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.postgresql.test.TestUtil;
+import org.postgresql.test.jdbc2.BaseTest4;
 
 import java.sql.*;
 import java.util.Properties;
@@ -11,21 +12,15 @@ import java.util.Properties;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 
-public class EncodingTest {
-
-    private Connection con;
-
-    @After
-    public void tearDown() throws Exception {
-        TestUtil.closeDB(con);
-    }
-
+public class EncodingTest extends BaseTest4 {
     /*
      * Tests encoding change
      */
     @Test
     public void testEncodingChange() throws Exception {
         Properties properties = new Properties();
+        properties.put("preferQueryMode", "simple");
+        properties.put("allowEncodingChanges", "true");
         properties.put("characterEncoding", "SQL_ASCII");
         con = TestUtil.openDB(properties);
 
