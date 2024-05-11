@@ -45,6 +45,7 @@ public class EncodingTest extends BaseTest4 {
         TestUtil.dropTable(con, "test_encode");
 
         Properties properties2 = new Properties();
+        properties2.put("allowEncodingChanges", "true");
         properties2.put("characterEncoding", "GBK");
         con = TestUtil.openDB(properties2);
 
@@ -57,6 +58,7 @@ public class EncodingTest extends BaseTest4 {
         assertEquals("GBK", e2);
 
         Properties properties3 = new Properties();
+        properties3.put("allowEncodingChanges", "true");
         properties3.put("characterEncoding", "LATIN2");
         con = TestUtil.openDB(properties3);
 
