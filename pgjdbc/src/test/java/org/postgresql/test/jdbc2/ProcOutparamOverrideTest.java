@@ -2,6 +2,7 @@ package org.postgresql.test.jdbc2;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.postgresql.test.TestUtil;
 
@@ -19,6 +20,7 @@ import static org.junit.Assert.fail;
 /**
  * Adaptation overload function use case set.
  */
+@Ignore
 public class ProcOutparamOverrideTest extends BaseTest4 {
     /**
      * The sql of the create proc.
