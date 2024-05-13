@@ -458,6 +458,9 @@ public class PgConnection implements BaseConnection {
         batchInsert = false;
     }
 
+    /* set dolphin.b_compatibility_mode to the value of PGProperty.B_CMPT_MODE */
+    this.setDolphinCmpt(PGProperty.B_CMPT_MODE.getBoolean(info));
+    
     initClientLogic(info);
   }
 
