@@ -100,8 +100,6 @@ public class GetObject310Test extends BaseTest4 {
    * Test the behavior getObject for time columns.
    */
   @Test
-  @Ignore
-  // TODO
   public void testGetLocalTime() throws SQLException {
     Statement stmt = con.createStatement();
     stmt.executeUpdate(TestUtil.insertSQL("table1","time_without_time_zone_column","TIME '04:05:06.123456'"));
