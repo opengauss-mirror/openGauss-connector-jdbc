@@ -61,6 +61,8 @@ public class TypeInfoCache implements TypeInfo {
   private PreparedStatement _getArrayDelimiterStatement;
   private PreparedStatement _getTypeInfoStatement;
 
+  public static final int bIntegerType = 95;
+
   // basic pg types info:
   // 0 - type name
   // 1 - type oid
@@ -76,7 +78,7 @@ public class TypeInfoCache implements TypeInfo {
       {"uint1", Oid.UNSPECIFIED, Types.SMALLINT, "java.lang.Integer", Oid.INT1_ARRAY},
       {"uint2", Oid.UNSPECIFIED, Types.INTEGER, "java.lang.Integer", Oid.INT2_ARRAY},
       {"uint4", Oid.UNSPECIFIED, Types.BIGINT, "java.lang.Long", Oid.INT4_ARRAY},
-      {"uint8", Oid.UNSPECIFIED, Types.NUMERIC, "java.math.BigDecimal", Oid.INT8_ARRAY},
+      {"uint8", Oid.UNSPECIFIED, bIntegerType, "java.math.BigInteger", Oid.INT8_ARRAY},
       {"money", Oid.MONEY, Types.DOUBLE, "java.lang.Double", Oid.MONEY_ARRAY},
       {"numeric", Oid.NUMERIC, Types.NUMERIC, "java.math.BigDecimal", Oid.NUMERIC_ARRAY},
       {"float4", Oid.FLOAT4, Types.REAL, "java.lang.Float", Oid.FLOAT4_ARRAY},
