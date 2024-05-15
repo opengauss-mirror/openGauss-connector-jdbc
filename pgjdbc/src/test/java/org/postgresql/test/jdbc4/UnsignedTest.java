@@ -23,11 +23,11 @@ public class UnsignedTest extends BaseTest4 {
         TestUtil.createTable(con, "test_unit8", "id uint8");
 
         PreparedStatement pstmt = con.prepareStatement("INSERT INTO test_unit8 VALUES (?)");
-        BigDecimal b = new BigDecimal("9223372036859999999");
+        BigInteger b = new BigInteger("9223372036859999999");
         pstmt.setObject(1, b, Types.NUMERIC);
         pstmt.executeUpdate();
 
-        BigDecimal b2 = new BigDecimal("15223372036859999999");
+        BigInteger b2 = new BigInteger("15223372036859999999");
         pstmt.setObject(1, b2, Types.NUMERIC);
         pstmt.executeUpdate();
 
