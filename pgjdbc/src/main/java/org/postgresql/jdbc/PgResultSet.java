@@ -270,6 +270,8 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
         return getInt(columnIndex);
       case Types.BIGINT:
         return getLong(columnIndex);
+      case TypeInfoCache.bIntegerType:
+        return getBigInteger(columnIndex);
       case Types.NUMERIC:
       case Types.DECIMAL:
         return getBigDecimal(columnIndex,
@@ -2335,6 +2337,19 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       }
     }
     return toLong(getFixedString(columnIndex));
+  }
+
+  public BigInteger getBigInteger(int columnIndex) throws SQLException {
+    String stringVal = getString(columnIndex);
+    if (stringVal == null) {
+      return null;
+    }
+    try {
+      return new BigInteger(stringVal);
+    } catch (NumberFormatException ex) {
+      connection.getLogger().trace("[" + connection.getSocketAddress() + "] " + "format BigInteger failed.");
+    }
+    return null;
   }
 
   /**
