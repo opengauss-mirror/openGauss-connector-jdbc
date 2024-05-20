@@ -70,6 +70,10 @@ public class TypeInfoCache implements TypeInfo {
 
   public static final int bIntegerType = 1324;
 
+  public static String sqlCompatibility = "A";
+
+  public static String dolphinMode = "off";
+
   // basic pg types info:
   // 0 - type name
   // 1 - type oid
@@ -429,7 +433,42 @@ public class TypeInfoCache implements TypeInfo {
   public static Map<Integer, String> getPGTypes() {
     return pgTypes;
   }
-  
+
+  public void setDBType() throws SQLException {
+    String compatibilitySql = "show sql_compatibility;";
+    String compatibility = getDBParam(compatibilitySql);
+    if (compatibility != null) {
+      sqlCompatibility = compatibility;
+      if ("B".equals(compatibility)) {
+        String dolphinSql = "show dolphin.b_compatibility_mode;";
+        String dolphin = getDBParam(dolphinSql);
+        if (dolphin != null) {
+          dolphinMode = dolphin;
+        }
+      }
+    }
+  }
+
+  private String getDBParam(String sql) throws SQLException {
+    PreparedStatement dbStatement = _conn.prepareStatement(sql);
+    if (!((BaseStatement) dbStatement).executeWithFlags(QueryExecutor.QUERY_SUPPRESS_BEGIN)) {
+      throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
+    }
+    ResultSet rs = dbStatement.getResultSet();
+    if (rs != null && rs.next()) {
+      return rs.getString(1);
+    }
+    return null;
+  }
+
+  public static String getDolphinMode(){
+    return dolphinMode;
+  }
+
+  public static String getSqlCompatibility(){
+    return sqlCompatibility;
+  }
+
   public synchronized int getPGType(String pgTypeName) throws SQLException {
     Integer oid = _pgNameToOid.get(pgTypeName);
     if (oid != null) {
