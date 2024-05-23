@@ -27,6 +27,14 @@ public class Oid {
   public static final int INT4 = 23;
   public static final int INT4_ARRAY = 1007;
   public static final int INT8 = 20;
+  public static int UINT1 = 4401;
+  public static int UINT1_ARRAY = 3001;
+  public static int UINT2 = 4403;
+  public static int UINT2_ARRAY = 3002;
+  public static int UINT4 = 4405;
+  public static int UINT4_ARRAY = 3003;
+  public static int UINT8 = 4407;
+  public static int UINT8_ARRAY = 3004;
   public static final int INT8_ARRAY = 1016;
   public static final int TEXT = 25;
   public static final int TEXT_ARRAY = 1009;

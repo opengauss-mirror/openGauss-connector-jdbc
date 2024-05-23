@@ -498,7 +498,7 @@ public class ArrayTest extends BaseTest4 {
     Object[] in = new Object[1];
     in[0] = cc;
 
-    Array arr = _conn.createArrayOf("evil.table", in);
+    Array arr = _conn.createArrayOf("\"evil.table\"", in);
     PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::\"evil.table\"[]");
     pstmt.setArray(1, arr);
     ResultSet rs = pstmt.executeQuery();

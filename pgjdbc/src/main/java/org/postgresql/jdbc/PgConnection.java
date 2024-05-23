@@ -326,6 +326,7 @@ public class PgConnection implements BaseConnection {
 
     // Initialize object handling
     _typeCache = createTypeInfo(this, unknownLength);
+    _typeCache.setPGTypes();
     initObjectTypes(info);
 
     if (PGProperty.LOG_UNCLOSED_CONNECTIONS.getBoolean(info)) {

@@ -61,7 +61,7 @@ public class TypeInfoCache implements TypeInfo {
   private PreparedStatement _getArrayDelimiterStatement;
   private PreparedStatement _getTypeInfoStatement;
 
-  public static final int bIntegerType = 95;
+  public static final int bIntegerType = 1324;
 
   // basic pg types info:
   // 0 - type name
@@ -75,10 +75,10 @@ public class TypeInfoCache implements TypeInfo {
       {"int4", Oid.INT4, Types.INTEGER, "java.lang.Integer", Oid.INT4_ARRAY},
       {"oid", Oid.OID, Types.BIGINT, "java.lang.Long", Oid.OID_ARRAY},
       {"int8", Oid.INT8, Types.BIGINT, "java.lang.Long", Oid.INT8_ARRAY},
-      {"uint1", Oid.UNSPECIFIED, Types.SMALLINT, "java.lang.Integer", Oid.INT1_ARRAY},
-      {"uint2", Oid.UNSPECIFIED, Types.INTEGER, "java.lang.Integer", Oid.INT2_ARRAY},
-      {"uint4", Oid.UNSPECIFIED, Types.BIGINT, "java.lang.Long", Oid.INT4_ARRAY},
-      {"uint8", Oid.UNSPECIFIED, bIntegerType, "java.math.BigInteger", Oid.INT8_ARRAY},
+      {"uint1", Oid.UINT1, Types.SMALLINT, "java.lang.Integer", Oid.UINT1_ARRAY},
+      {"uint2", Oid.UINT2, Types.INTEGER, "java.lang.Integer", Oid.UINT2_ARRAY},
+      {"uint4", Oid.UINT4, Types.BIGINT, "java.lang.Long", Oid.UINT4_ARRAY},
+      {"uint8", Oid.UINT8, bIntegerType, "java.math.BigInteger", Oid.UINT8_ARRAY},
       {"money", Oid.MONEY, Types.DOUBLE, "java.lang.Double", Oid.MONEY_ARRAY},
       {"numeric", Oid.NUMERIC, Types.NUMERIC, "java.math.BigDecimal", Oid.NUMERIC_ARRAY},
       {"float4", Oid.FLOAT4, Types.REAL, "java.lang.Float", Oid.FLOAT4_ARRAY},
@@ -380,6 +380,45 @@ public class TypeInfoCache implements TypeInfo {
     rs.close();
 
     return oid;
+  }
+
+  public synchronized void setPGTypes() throws SQLException {
+    String sql = "SELECT t.oid, t.typname FROM pg_catalog.pg_type t "
+            + " where t.typname = 'uint1'"
+            + " or t.typname = 'uint2'"
+            + " or t.typname = 'uint4'"
+            + " or t.typname = 'uint8'"
+            + " or t.typname = '_uint1'"
+            + " or t.typname = '_uint2'"
+            + " or t.typname = '_uint4'"
+            + " or t.typname = '_uint8';";
+
+    PreparedStatement pgTypeStatement = _conn.prepareStatement(sql);
+    // Go through BaseStatement to avoid transaction start.
+    if (!((BaseStatement) pgTypeStatement).executeWithFlags(QueryExecutor.QUERY_SUPPRESS_BEGIN)) {
+      throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
+    }
+    ResultSet rs = pgTypeStatement.getResultSet();
+    if (rs == null) {
+      return;
+    }
+    while (rs.next()) {
+      Integer oid = (int) rs.getLong(1);
+      String typeName = rs.getString(2);
+      _pgNameToOid.put(typeName, oid);
+      _oidToPgName.put(oid, typeName);
+      if (typeName.startsWith("_")) {
+        String arrType = typeName.substring(1) + "[]";
+        _pgNameToOid.put(arrType, oid);
+      }
+
+      Character delim = ',';
+      _arrayOidToDelimiter.put(oid, delim);
+    }
+    _pgArrayToPgType.put(_pgNameToOid.get("_uint1"), _pgNameToOid.get("uint1"));
+    _pgArrayToPgType.put(_pgNameToOid.get("_uint2"), _pgNameToOid.get("uint2"));
+    _pgArrayToPgType.put(_pgNameToOid.get("_uint4"), _pgNameToOid.get("uint4"));
+    _pgArrayToPgType.put(_pgNameToOid.get("_uint8"), _pgNameToOid.get("uint8"));
   }
 
   public synchronized String getPGType(int oid) throws SQLException {

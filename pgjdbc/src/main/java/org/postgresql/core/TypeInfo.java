@@ -55,6 +55,13 @@ public interface TypeInfo {
   String getPGType(int oid) throws SQLException;
 
   /**
+   * init all types from table pg_type.
+   *
+   * @throws SQLException if an error occurs when retrieving sql type
+   */
+  void setPGTypes() throws SQLException;
+
+  /**
    * Look up the oid of an array's base type given the array's type oid.
    *
    * @param oid the array type's OID
