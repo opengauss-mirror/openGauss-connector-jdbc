@@ -47,6 +47,7 @@ public class PGStream implements Closeable, Flushable {
   private Encoding encoding;
   private Writer encodingWriter;
 
+  private final int MAX_PARAMS_NUM = 65535;
   /**
    * Constructor: Connect to the PostgreSQL back end and return a stream connection.
    *
@@ -233,8 +234,8 @@ public class PGStream implements Closeable, Flushable {
    * @throws IOException if an I/O error occurs or {@code val} cannot be encoded in 2 bytes
    */
   public void sendInteger2(int val) throws IOException {
-    if (val < Short.MIN_VALUE || val > Short.MAX_VALUE) {
-      throw new IOException("Tried to send an out-of-range integer as a 2-byte value: " + val);
+    if (val < 0 || val > MAX_PARAMS_NUM) {
+      throw new IllegalArgumentException("Tried to send an out-of-range integer as a 2-byte unsigned int value: " + val);
     }
 
     _int2buf[0] = (byte) (val >>> 8);
