@@ -43,6 +43,13 @@ public interface TypeInfo {
   void setPGTypes() throws SQLException;
 
   /**
+   * cache db type, A/B/C/PG
+   * cache b_compatibility_mode, on or off
+   * @return
+   */
+  void setDBType() throws SQLException;
+
+  /**
    * Look up the oid for a given postgresql type name. This is the inverse of
    * {@link #getPGType(int)}.
    *

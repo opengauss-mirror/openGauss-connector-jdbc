@@ -332,6 +332,7 @@ public class PgConnection implements BaseConnection {
     // Initialize object handling
     _typeCache = createTypeInfo(this, unknownLength);
     _typeCache.setPGTypes();
+    _typeCache.setDBType();
     initObjectTypes(info);
 
     if (PGProperty.LOG_UNCLOSED_CONNECTIONS.getBoolean(info)) {
