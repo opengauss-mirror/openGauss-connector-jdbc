@@ -2890,6 +2890,9 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       }
       int typeLength = pgStream.receiveInteger2();
       int typeModifier = pgStream.receiveInteger4();
+      if (typeOid == Oid.INT1 && typeModifier == 1) {
+        typeOid = Oid.BIT;
+      }
       int formatType = pgStream.receiveInteger2();
       fields[i] = new Field(columnLabel,
               typeOid, typeLength, typeModifier, tableOid, positionInTable);
