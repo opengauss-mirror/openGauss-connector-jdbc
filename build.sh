@@ -28,6 +28,7 @@ bit=$(getconf LONG_BIT)
 if [ "$bit" -eq 64 ]; then
    PLATFORM=64
 fi
+PKG_VERSION=3.0.5
 #get OS distributed version.
 kernel=""
 version=""
@@ -113,7 +114,7 @@ function install_jdbc()
     export COMMIT=$(git rev-parse --short HEAD)
     export OPENGAUSS_PACKAGE_NAME="org.opengauss";
 
-    export GS_VERSION="compiled at $(date +%Y-%m-%d-%H:%M:%S) build ${COMMIT}"
+    export GS_VERSION="openGauss-JDBC ${PKG_VERSION} build ${COMMIT} compiled at $(date '+%Y-%m-%d %H:%M:%S')"
     export OUTPUT_DIR="${JDBC_DIR}/output"
     echo "Begin make jdbc..."
     export CLASSPATH=".:${JAVA_HOME}/lib/dt.jar:${JAVA_HOME}/lib/tools.jar"
