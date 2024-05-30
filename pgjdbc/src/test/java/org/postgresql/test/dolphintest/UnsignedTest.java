@@ -115,4 +115,84 @@ public class UnsignedTest extends BaseTest4B {
 
         TestUtil.dropTable(con, "test_unit8");
     }
+
+    @Test
+    public void testCreateArrayOfUint1() throws SQLException {
+        PreparedStatement pstmt = con.prepareStatement("SELECT ?::uint1[]");
+        Short[] in = new Short[3];
+        in[0] = 0;
+        in[1] = 188;
+        in[2] = 234;
+        pstmt.setArray(1, con.createArrayOf("uint1", in));
+
+        ResultSet rs = pstmt.executeQuery();
+        Assert.assertTrue(rs.next());
+        Array arr = rs.getArray(1);
+        Short[] out = (Short[]) arr.getArray();
+
+        Assert.assertEquals(3, out.length);
+        Assert.assertEquals(0, out[0].shortValue());
+        Assert.assertEquals(188, out[1].shortValue());
+        Assert.assertEquals(234, out[2].shortValue());
+    }
+
+    @Test
+    public void testCreateArrayOfUint2() throws SQLException {
+        PreparedStatement pstmt = con.prepareStatement("SELECT ?::uint2[]");
+        Integer[] in = new Integer[3];
+        in[0] = 0;
+        in[1] = 12654;
+        in[2] = 65535;
+        pstmt.setArray(1, con.createArrayOf("uint2", in));
+
+        ResultSet rs = pstmt.executeQuery();
+        Assert.assertTrue(rs.next());
+        Array arr = rs.getArray(1);
+        Integer[] out = (Integer[]) arr.getArray();
+
+        Assert.assertEquals(3, out.length);
+        Assert.assertEquals(0, out[0].intValue());
+        Assert.assertEquals(12654, out[1].intValue());
+        Assert.assertEquals(65535, out[2].intValue());
+    }
+
+    @Test
+    public void testCreateArrayOfUint4() throws SQLException {
+        PreparedStatement pstmt = con.prepareStatement("SELECT ?::uint4[]");
+        Long[] in = new Long[2];
+        in[0] = 0L;
+        in[1] = 4294967295L;
+        pstmt.setArray(1, con.createArrayOf("uint4", in));
+
+        ResultSet rs = pstmt.executeQuery();
+        Assert.assertTrue(rs.next());
+        Array arr = rs.getArray(1);
+        Long[] out = (Long[]) arr.getArray();
+
+        Assert.assertEquals(2, out.length);
+        Assert.assertEquals(0, out[0].longValue());
+        Assert.assertEquals(4294967295L, out[1].longValue());
+    }
+
+    @Test
+    public void testCreateArrayOfSmallInt() throws SQLException {
+        PreparedStatement pstmt = con.prepareStatement("SELECT ?::uint8[]");
+        Long[] in = new Long[2];
+        in[0] = 0L;
+        in[1] = 32458765334567556L;
+        pstmt.setArray(1, con.createArrayOf("uint8", in));
+
+        ResultSet rs = pstmt.executeQuery();
+        Assert.assertTrue(rs.next());
+        Array arr = rs.getArray(1);
+        Object[] out = (Object[]) arr.getArray();
+        Long[] outLong = new Long[out.length];
+        for (int i = 0; i < out.length; i++) {
+            outLong[i] = Long.valueOf(out[i].toString());
+        }
+
+        Assert.assertEquals(2, out.length);
+        Assert.assertEquals(0L, outLong[0].longValue());
+        Assert.assertEquals(32458765334567556L,  outLong[1].longValue());
+    }
 }
