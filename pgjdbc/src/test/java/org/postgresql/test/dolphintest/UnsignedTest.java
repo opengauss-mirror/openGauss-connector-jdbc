@@ -175,7 +175,7 @@ public class UnsignedTest extends BaseTest4B {
     }
 
     @Test
-    public void testCreateArrayOfSmallInt() throws SQLException {
+    public void testCreateArrayOfUint8() throws SQLException {
         PreparedStatement pstmt = con.prepareStatement("SELECT ?::uint8[]");
         Long[] in = new Long[2];
         in[0] = 0L;
