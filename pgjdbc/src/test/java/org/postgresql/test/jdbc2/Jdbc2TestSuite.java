@@ -129,7 +129,8 @@ import org.junit.runners.Suite;
         CopyTest.class,
         CopyLargeFileTest.class,
         UpsertTest.class,
-        OuterJoinSyntaxTest.class
+        OuterJoinSyntaxTest.class,
+        NumericNegScaleTest.class
 })
 public class Jdbc2TestSuite {
 }

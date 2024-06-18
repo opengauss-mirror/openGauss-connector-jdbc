@@ -274,8 +274,13 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
         return getBigInteger(columnIndex);
       case Types.NUMERIC:
       case Types.DECIMAL:
-        return getBigDecimal(columnIndex,
-            (field.getMod() == -1) ? -1 : ((field.getMod() - 4) & 0xffff));
+        int scale;
+        if (field.getMod() == -1) {
+          return getBigDecimal(columnIndex, -1);
+        } else {
+          scale = (short)((field.getMod() - 4) & 0xffff);
+          return getBigDecimal(columnIndex, (Math.max(scale, -1)));
+        }
       case Types.REAL:
         return getFloat(columnIndex);
       case Types.FLOAT:
