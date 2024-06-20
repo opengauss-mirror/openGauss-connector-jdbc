@@ -2192,7 +2192,17 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     if (connection.getBitToString()) {
       return val;
     }
-    return BooleanTypeUtil.castToBoolean(val);
+
+    Field field = this.fields[columnIndex - 1];
+    if (field.getMod() == 1 || !isDolphin()) {
+      return BooleanTypeUtil.castToBoolean(val);
+    }
+
+    return this.getBytes(columnIndex);
+  }
+
+  public static boolean isDolphin() {
+    return "B".equals(TypeInfoCache.getSqlCompatibility()) && "on".equals(TypeInfoCache.getDolphinMode());
   }
 
   private static final BigInteger BYTEMAX = new BigInteger(Byte.toString(Byte.MAX_VALUE));
