@@ -35,9 +35,6 @@ import java.util.UUID;
 
 @RunWith(Parameterized.class)
 public class ArrayTest extends BaseTest4 {
-
-  private Connection _conn;
-
   public ArrayTest(BinaryMode binaryMode) {
     setBinaryMode(binaryMode);
   }
@@ -54,26 +51,24 @@ public class ArrayTest extends BaseTest4 {
   @Override
   public void setUp() throws Exception {
     super.setUp();
-    _conn = con;
-
-    TestUtil.createTable(_conn, "arrtest",
+    TestUtil.createTable(con, "arrtest",
         "intarr int[], decarr decimal(2,1)[], strarr text[]"
-        + (TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_3) ? ", uuidarr uuid[]" : "")
+        + (TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_3) ? ", uuidarr uuid[]" : "")
         + ", floatarr float8[]"
         + ", intarr2 int4[][]");
-    TestUtil.createTable(_conn, "arrcompprnttest", "id serial, name character(10)");
-    TestUtil.createTable(_conn, "arrcompchldttest",
+    TestUtil.createTable(con, "arrcompprnttest", "id serial, name character(10)");
+    TestUtil.createTable(con, "arrcompchldttest",
         "id serial, name character(10), description character varying, parent integer");
-    TestUtil.createTable(_conn, "\"correctcasing\"", "id serial");
-    TestUtil.createTable(_conn, "\"evil.table\"", "id serial");
+    TestUtil.createTable(con, "\"correctcasing\"", "id serial");
+    TestUtil.createTable(con, "\"evil.table\"", "id serial");
   }
 
   @Override
   public void tearDown() throws SQLException {
-    TestUtil.dropTable(_conn, "arrtest");
-    TestUtil.dropTable(_conn, "arrcompprnttest");
-    TestUtil.dropTable(_conn, "arrcompchldttest");
-    TestUtil.dropTable(_conn, "\"CorrectCasing\"");
+    TestUtil.dropTable(con, "arrtest");
+    TestUtil.dropTable(con, "arrcompprnttest");
+    TestUtil.dropTable(con, "arrcompchldttest");
+    TestUtil.dropTable(con, "\"CorrectCasing\"");
     super.tearDown();
   }
 
@@ -81,8 +76,8 @@ public class ArrayTest extends BaseTest4 {
   @Ignore
   // TODO PG修复了这个
   public void testCreateArrayOfBool() throws SQLException {
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::bool[]");
-    Array list= _conn.createArrayOf("boolean", new Object[]{ true, true, false });
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::bool[]");
+    Array list= con.createArrayOf("boolean", new Object[]{ true, true, false });
     pstmt.setArray(1, list);
 
     ResultSet rs = pstmt.executeQuery();
@@ -98,12 +93,12 @@ public class ArrayTest extends BaseTest4 {
 
   @Test
   public void testCreateArrayOfInt() throws SQLException {
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::int[]");
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::int[]");
     Integer[] in = new Integer[3];
     in[0] = 0;
     in[1] = -1;
     in[2] = 2;
-    pstmt.setArray(1, _conn.createArrayOf("int4", in));
+    pstmt.setArray(1, con.createArrayOf("int4", in));
 
     ResultSet rs = pstmt.executeQuery();
     Assert.assertTrue(rs.next());
@@ -118,12 +113,12 @@ public class ArrayTest extends BaseTest4 {
 
   @Test
   public void testCreateArrayOfSmallInt() throws SQLException {
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::smallint[]");
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::smallint[]");
     Short[] in = new Short[3];
     in[0] = 0;
     in[1] = -1;
     in[2] = 2;
-    pstmt.setArray(1, _conn.createArrayOf("int2", in));
+    pstmt.setArray(1, con.createArrayOf("int2", in));
 
     ResultSet rs = pstmt.executeQuery();
     Assert.assertTrue(rs.next());
@@ -138,13 +133,13 @@ public class ArrayTest extends BaseTest4 {
 
   @Test
   public void testCreateArrayOfMultiString() throws SQLException {
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::text[]");
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::text[]");
     String[][] in = new String[2][2];
     in[0][0] = "a";
     in[0][1] = "";
     in[1][0] = "\\";
     in[1][1] = "\"\\'z";
-    pstmt.setArray(1, _conn.createArrayOf("text", in));
+    pstmt.setArray(1, con.createArrayOf("text", in));
 
     ResultSet rs = pstmt.executeQuery();
     Assert.assertTrue(rs.next());
@@ -161,10 +156,10 @@ public class ArrayTest extends BaseTest4 {
 
   @Test
   public void testCreateArrayOfMultiJson() throws SQLException {
-    if (!TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v9_2)) {
+    if (!TestUtil.haveMinimumServerVersion(con, ServerVersion.v9_2)) {
       return;
     }
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::json[]");
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::json[]");
     PGobject p1 = new PGobject();
     p1.setType("json");
     p1.setValue("{\"x\": 10}");
@@ -173,7 +168,7 @@ public class ArrayTest extends BaseTest4 {
     p2.setType("json");
     p2.setValue("{\"x\": 20}");
     PGobject[] in = new PGobject[] { p1, p2 };
-    pstmt.setArray(1, _conn.createArrayOf("json", in));
+    pstmt.setArray(1, con.createArrayOf("json", in));
 
     ResultSet rs = pstmt.executeQuery();
     Assert.assertTrue(rs.next());
@@ -192,8 +187,8 @@ public class ArrayTest extends BaseTest4 {
     in[0] = new PGbox(1, 2, 3, 4);
     in[1] = new PGbox(5, 6, 7, 8);
 
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::box[]");
-    pstmt.setArray(1, _conn.createArrayOf("box", in));
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::box[]");
+    pstmt.setArray(1, con.createArrayOf("box", in));
     ResultSet rs = pstmt.executeQuery();
     Assert.assertTrue(rs.next());
     Array arr = rs.getArray(1);
@@ -213,11 +208,11 @@ public class ArrayTest extends BaseTest4 {
       sql = "SELECT ?::int8[]";
     }
 
-    PreparedStatement pstmt = _conn.prepareStatement(sql);
+    PreparedStatement pstmt = con.prepareStatement(sql);
     String[] in = new String[2];
     in[0] = null;
     in[1] = null;
-    pstmt.setArray(1, _conn.createArrayOf("int8", in));
+    pstmt.setArray(1, con.createArrayOf("int8", in));
 
     ResultSet rs = pstmt.executeQuery();
     Assert.assertTrue(rs.next());
@@ -231,9 +226,9 @@ public class ArrayTest extends BaseTest4 {
 
   @Test
   public void testCreateEmptyArrayOfIntViaAlias() throws SQLException {
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::int[]");
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::int[]");
     Integer[] in = new Integer[0];
-    pstmt.setArray(1, _conn.createArrayOf("integer", in));
+    pstmt.setArray(1, con.createArrayOf("integer", in));
 
     ResultSet rs = pstmt.executeQuery();
     Assert.assertTrue(rs.next());
@@ -254,7 +249,7 @@ public class ArrayTest extends BaseTest4 {
     in[1][0] = "\\";
     in[1][1] = "\"\\'z";
 
-    Array arr = _conn.createArrayOf("varchar", in);
+    Array arr = con.createArrayOf("varchar", in);
     String[][] out = (String[][]) arr.getArray();
 
     Assert.assertEquals(2, out.length);
@@ -273,7 +268,7 @@ public class ArrayTest extends BaseTest4 {
     in[1][0] = 10.0 / 3;
     in[1][1] = 77;
 
-    Array arr = _conn.createArrayOf("float8", in);
+    Array arr = con.createArrayOf("float8", in);
     Double[][] out = (Double[][]) arr.getArray();
 
     Assert.assertEquals(2, out.length);
@@ -289,19 +284,19 @@ public class ArrayTest extends BaseTest4 {
     Assume.assumeTrue("UUID is not supported in PreferQueryMode.SIMPLE",
         preferQueryMode != PreferQueryMode.SIMPLE);
     Assume.assumeTrue("UUID requires PostgreSQL 8.3+",
-        TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_3));
+        TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_3));
     UUID uuid1 = UUID.randomUUID();
     UUID uuid2 = UUID.randomUUID();
     UUID uuid3 = UUID.randomUUID();
 
     // insert a uuid array, and check
-    PreparedStatement pstmt1 = _conn.prepareStatement("INSERT INTO arrtest(uuidarr) VALUES (?)");
-    pstmt1.setArray(1, _conn.createArrayOf("uuid", new UUID[]{uuid1, uuid2, uuid3}));
+    PreparedStatement pstmt1 = con.prepareStatement("INSERT INTO arrtest(uuidarr) VALUES (?)");
+    pstmt1.setArray(1, con.createArrayOf("uuid", new UUID[]{uuid1, uuid2, uuid3}));
     pstmt1.executeUpdate();
 
     PreparedStatement pstmt2 =
-        _conn.prepareStatement("SELECT uuidarr FROM arrtest WHERE uuidarr @> ?");
-    pstmt2.setObject(1, _conn.createArrayOf("uuid", new UUID[]{uuid1}), Types.OTHER);
+            con.prepareStatement("SELECT uuidarr FROM arrtest WHERE uuidarr @> ?");
+    pstmt2.setObject(1, con.createArrayOf("uuid", new UUID[]{uuid1}), Types.OTHER);
     ResultSet rs = pstmt2.executeQuery();
     Assert.assertTrue(rs.next());
     Array arr = rs.getArray(1);
@@ -315,13 +310,13 @@ public class ArrayTest extends BaseTest4 {
     // concatenate a uuid, and check
     UUID uuid4 = UUID.randomUUID();
     PreparedStatement pstmt3 =
-        _conn.prepareStatement("UPDATE arrtest SET uuidarr = uuidarr || ? WHERE uuidarr @> ?");
+            con.prepareStatement("UPDATE arrtest SET uuidarr = uuidarr || ? WHERE uuidarr @> ?");
     pstmt3.setObject(1, uuid4, Types.OTHER);
-    pstmt3.setArray(2, _conn.createArrayOf("uuid", new UUID[]{uuid1}));
+    pstmt3.setArray(2, con.createArrayOf("uuid", new UUID[]{uuid1}));
     pstmt3.executeUpdate();
 
     // --
-    pstmt2.setObject(1, _conn.createArrayOf("uuid", new UUID[]{uuid4}), Types.OTHER);
+    pstmt2.setObject(1, con.createArrayOf("uuid", new UUID[]{uuid4}), Types.OTHER);
     rs = pstmt2.executeQuery();
     Assert.assertTrue(rs.next());
     arr = rs.getArray(1);
@@ -339,7 +334,7 @@ public class ArrayTest extends BaseTest4 {
     String[] strArray = new String[]{"a", "b", "c"};
     Object[] objCopy = Arrays.copyOf(strArray, strArray.length, Object[].class);
 
-    PreparedStatement pstmt = _conn.prepareStatement("INSERT INTO arrtest(strarr) VALUES (?)");
+    PreparedStatement pstmt = con.prepareStatement("INSERT INTO arrtest(strarr) VALUES (?)");
 
     //cannot handle generic Object[]
     try {
@@ -366,7 +361,7 @@ public class ArrayTest extends BaseTest4 {
 
     // Correct way, though the use of "text" as a type is non-portable.
     // Only supported for JDK 1.6 and JDBC4
-    Array sqlArray = _conn.createArrayOf("text", strArray);
+    Array sqlArray = con.createArrayOf("text", strArray);
     pstmt.setArray(1, sqlArray);
     pstmt.executeUpdate();
 
@@ -376,10 +371,10 @@ public class ArrayTest extends BaseTest4 {
   @Test
   public void testGetArrayOfComposites() throws SQLException {
     Assume.assumeTrue("array_agg(expression) requires PostgreSQL 8.4+",
-        TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_4));
+        TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_4));
 
     PreparedStatement insert_parent_pstmt =
-        _conn.prepareStatement("INSERT INTO arrcompprnttest (name) "
+            con.prepareStatement("INSERT INTO arrcompprnttest (name) "
             + "VALUES ('aParent');");
     insert_parent_pstmt.execute();
 
@@ -390,7 +385,7 @@ public class ArrayTest extends BaseTest4 {
         "5\",3\""};
 
     PreparedStatement insert_children_pstmt =
-        _conn.prepareStatement("INSERT INTO arrcompchldttest (name,description,parent) "
+            con.prepareStatement("INSERT INTO arrcompchldttest (name,description,parent) "
             + "VALUES ('child1',?,1),"
             + "('child2',?,1),"
             + "('child3',?,1),"
@@ -403,7 +398,7 @@ public class ArrayTest extends BaseTest4 {
 
     insert_children_pstmt.execute();
 
-    PreparedStatement pstmt = _conn.prepareStatement(
+    PreparedStatement pstmt = con.prepareStatement(
         "SELECT arrcompprnttest.name, "
             + "array_agg("
             + "DISTINCT(arrcompchldttest.id, "
@@ -444,7 +439,7 @@ public class ArrayTest extends BaseTest4 {
   @Test
   public void testCasingComposite() throws SQLException {
     Assume.assumeTrue("Arrays of composite types requires PostgreSQL 8.3+",
-        TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_3));
+        TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_3));
 
     PGobject cc = new PGobject();
     cc.setType("correctcasing");
@@ -452,8 +447,8 @@ public class ArrayTest extends BaseTest4 {
     Object[] in = new Object[1];
     in[0] = cc;
 
-    Array arr = _conn.createArrayOf("correctcasing", in);
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::correctcasing[]");
+    Array arr = con.createArrayOf("correctcasing", in);
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::correctcasing[]");
     pstmt.setArray(1, arr);
     ResultSet rs = pstmt.executeQuery();
 
@@ -467,8 +462,8 @@ public class ArrayTest extends BaseTest4 {
 
   @Test
   public void testCasingBuiltinAlias() throws SQLException {
-    Array arr = _conn.createArrayOf("INT", new Integer[]{1, 2, 3});
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::INT[]");
+    Array arr = con.createArrayOf("INT", new Integer[]{1, 2, 3});
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::INT[]");
     pstmt.setArray(1, arr);
     ResultSet rs = pstmt.executeQuery();
 
@@ -480,8 +475,8 @@ public class ArrayTest extends BaseTest4 {
 
   @Test
   public void testCasingBuiltinNonAlias() throws SQLException {
-    Array arr = _conn.createArrayOf("int4", new Integer[]{1, 2, 3});
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::int4[]");
+    Array arr = con.createArrayOf("int4", new Integer[]{1, 2, 3});
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::int4[]");
     pstmt.setArray(1, arr);
     ResultSet rs = pstmt.executeQuery();
 
@@ -494,7 +489,7 @@ public class ArrayTest extends BaseTest4 {
   @Test
   public void testEvilCasing() throws SQLException {
     Assume.assumeTrue("Arrays of composite types requires PostgreSQL 8.3+",
-        TestUtil.haveMinimumServerVersion(_conn, ServerVersion.v8_3));
+        TestUtil.haveMinimumServerVersion(con, ServerVersion.v8_3));
 
     PGobject cc = new PGobject();
     cc.setType("\"evil.table\"");
@@ -502,8 +497,8 @@ public class ArrayTest extends BaseTest4 {
     Object[] in = new Object[1];
     in[0] = cc;
 
-    Array arr = _conn.createArrayOf("\"evil.table\"", in);
-    PreparedStatement pstmt = _conn.prepareStatement("SELECT ?::\"evil.table\"[]");
+    Array arr = con.createArrayOf("\"evil.table\"", in);
+    PreparedStatement pstmt = con.prepareStatement("SELECT ?::\"evil.table\"[]");
     pstmt.setArray(1, arr);
     ResultSet rs = pstmt.executeQuery();
 
@@ -598,5 +593,42 @@ public class ArrayTest extends BaseTest4 {
     Assert.assertEquals("{{1,2},{3,4}}", stringValue);
     TestUtil.closeQuietly(rs);
     TestUtil.closeQuietly(ps);
+  }
+
+  @Test
+  public void testBooleanArray() throws SQLException {
+    PreparedStatement pstmt = con.prepareStatement("select array_replace(?,'true','f');");
+    Boolean[][] in = new Boolean[][]{{false,false,false}, {true,true,true}};
+    pstmt.setArray(1, con.createArrayOf("boolean", in));
+
+    ResultSet rs = pstmt.executeQuery();
+    Assert.assertTrue(rs.next());
+    Array arr = rs.getArray(1);
+    Boolean[][] out = (Boolean[][]) arr.getArray();
+
+    Assert.assertEquals(2, out.length);
+    Assert.assertEquals(3, out[0].length);
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 2; j++) {
+        Assert.assertFalse(out[i][j]);
+      }
+    }
+  }
+
+  @Test
+  public void testBooleanArray2() throws SQLException {
+    PreparedStatement pstmt = con.prepareStatement("select array_replace(array[[false,FALSE,false],[false,TRUE,false]],'false','t');");
+    ResultSet rs = pstmt.executeQuery();
+    Assert.assertTrue(rs.next());
+    Array arr = rs.getArray(1);
+    Boolean[][] out = (Boolean[][]) arr.getArray();
+
+    Assert.assertEquals(2, out.length);
+    Assert.assertEquals(3, out[0].length);
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 2; j++) {
+        Assert.assertTrue(out[i][j]);
+      }
+    }
   }
 }
