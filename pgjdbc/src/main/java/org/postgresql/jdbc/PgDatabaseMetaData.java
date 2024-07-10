@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 
+import static org.postgresql.jdbc.TypeInfoCache.FLOATSCALE;
+
 public class PgDatabaseMetaData implements DatabaseMetaData {
 
   public PgDatabaseMetaData(PgConnection conn) {
@@ -1601,7 +1603,7 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
 
       int decimalDigits = connection.getTypeInfo().getScale(typeOid, typeMod);
       int columnSize = connection.getTypeInfo().getPrecision(typeOid, typeMod);
-      if (columnSize == 0) {
+      if (columnSize == 0 || decimalDigits == FLOATSCALE) {
         columnSize = connection.getTypeInfo().getDisplaySize(typeOid, typeMod);
       }
 

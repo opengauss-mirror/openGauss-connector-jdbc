@@ -74,6 +74,13 @@ public class TypeInfoCache implements TypeInfo {
 
   public static String dolphinMode = "off";
 
+  // SELECT LENGTH(pow(10::numeric,131071)); 131071 = 2^17-1
+  public static final int NUMERIC_MAX_DISPLAYSIZE = 131089;
+
+  // when behavior_compat_options='float_as_numeric' is on,
+  // openGauss accepts float(p) as numeric Type and the scale is -32768(PG_INT16_MIN)
+  public static final int FLOATSCALE = -32768;
+
   // basic pg types info:
   // 0 - type name
   // 1 - type oid
@@ -821,7 +828,7 @@ public class TypeInfoCache implements TypeInfo {
         if (typmod == -1) {
           return 0;
         }
-        return (typmod - 4) & 0xFFFF;
+        return (short)((typmod - 4) & 0xFFFF);
       case Oid.TIME:
       case Oid.TIMETZ:
       case Oid.TIMESTAMP:
@@ -957,10 +964,15 @@ public class TypeInfoCache implements TypeInfo {
         return typmod - 4;
       case Oid.NUMERIC:
         if (typmod == -1) {
-          return 131089; // SELECT LENGTH(pow(10::numeric,131071)); 131071 = 2^17-1
+          return NUMERIC_MAX_DISPLAYSIZE;
         }
         int precision = (typmod - 4 >> 16) & 0xffff;
-        int scale = (typmod - 4) & 0xffff;
+        int scale = (short)((typmod - 4) & 0xffff);
+        if (scale == FLOATSCALE) {
+          return NUMERIC_MAX_DISPLAYSIZE;
+        } else if (scale < 0) {
+          return 1 + precision - scale;
+        }
         // sign + digits + decimal point (only if we have nonzero scale)
         return 1 + precision + (scale != 0 ? 1 : 0);
       case Oid.BIT:
