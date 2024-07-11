@@ -1843,13 +1843,12 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     long encodedSize = 0;
     for (int j = 0; j < parameterLists.length; j++) {
-      V3ParameterList tmpParameters = (V3ParameterList) parameterLists[j];
-      params = (SimpleParameterList) tmpParameters;
-      for (int i = 1; i <= params.getParameterCount(); ++i) {
-        if (params.isNull(i)) {
+      SimpleParameterList tmpParameters = (SimpleParameterList) parameterLists[j];
+      for (int i = 1; i <= tmpParameters.getParameterCount(); ++i) {
+        if (tmpParameters.isNull(i)) {
           encodedSize += 4;
         } else {
-          encodedSize += (long) 4 + params.getV3Length(i, getClientEncoding());
+          encodedSize += (long) 4 + tmpParameters.getV3Length(i, getClientEncoding());
         }
       }
     }
