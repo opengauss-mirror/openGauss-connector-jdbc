@@ -39,6 +39,7 @@ import org.postgresql.util.PGBinaryObject;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.util.CompatibilityEnum;
 import org.postgresql.xml.DefaultPGXmlFactoryFactory;
 import org.postgresql.xml.LegacyInsecurePGXmlFactoryFactory;
 import org.postgresql.xml.PGXmlFactoryFactory;
@@ -195,6 +196,9 @@ public class PgConnection implements BaseConnection {
   private PGXmlFactoryFactory xmlFactoryFactory;
   private String socketAddress;
   private boolean isDolphinCmpt = false;
+
+  private boolean isBDatabase = false;
+
   final CachedQuery borrowQuery(String sql) throws SQLException {
     return queryExecutor.borrowQuery(sql);
   }
@@ -307,6 +311,15 @@ public class PgConnection implements BaseConnection {
       bindStringAsVarchar = true;
     }
 
+    int unknownLength = PGProperty.UNKNOWN_LENGTH.getInt(info);
+
+    // Initialize object handling
+    _typeCache = createTypeInfo(this, unknownLength);
+    _typeCache.setPGTypes();
+    initObjectTypes(info);
+
+    setDolphin();
+
     // Initialize timestamp stuff
     timestampUtils = new TimestampUtils(!queryExecutor.getIntegerDateTimes(), new Provider<TimeZone>() {
       @Override
@@ -315,19 +328,13 @@ public class PgConnection implements BaseConnection {
       }
     });
     timestampUtils.setTimestampNanoFormat(PGProperty.TIMESTAMP_NANO_FORMAT.getInteger(info));
+    timestampUtils.setDolphin(isBDatabase);
 
     // Initialize common queries.
     // isParameterized==true so full parse is performed and the engine knows the query
     // is not a compound query with ; inside, so it could use parse/bind/exec messages
     commitQuery = createQuery("COMMIT", false, true).query;
     rollbackQuery = createQuery("ROLLBACK", false, true).query;
-
-    int unknownLength = PGProperty.UNKNOWN_LENGTH.getInt(info);
-
-    // Initialize object handling
-    _typeCache = createTypeInfo(this, unknownLength);
-    _typeCache.setPGTypes();
-    initObjectTypes(info);
 
     if (PGProperty.LOG_UNCLOSED_CONNECTIONS.getBoolean(info)) {
       openStackTrace = new Throwable("Connection was created at this point:");
@@ -463,6 +470,29 @@ public class PgConnection implements BaseConnection {
     this.setDolphinCmpt(PGProperty.B_CMPT_MODE.getBoolean(info));
     
     initClientLogic(info);
+  }
+
+  public void setDolphin() throws SQLException {
+    String compatibility = getDBParam("show sql_compatibility;");
+    if (CompatibilityEnum.B.equals(CompatibilityEnum.valueOf(compatibility))) {
+      isBDatabase = true;
+      return;
+    }
+    isBDatabase = false;
+  }
+
+  private String getDBParam(String sql) throws SQLException {
+    try (PreparedStatement dbStatement = prepareStatement(sql)) {
+      if (!((BaseStatement) dbStatement).executeWithFlags(QueryExecutor.QUERY_SUPPRESS_BEGIN)) {
+        throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
+      }
+      try (ResultSet rs = dbStatement.getResultSet()) {
+        if (rs.next()) {
+          return rs.getString(1);
+        }
+        return "A";
+      }
+    }
   }
 
   /**
