@@ -61,6 +61,12 @@ public class TimestampUtils {
   private TimeZone defaultTimeZoneCache;
   private int timestampNanoFormat = 0;
 
+  private boolean isDolphin = false;
+
+  public void setDolphin(boolean isDolphin) {
+    this.isDolphin = isDolphin;
+  }
+
   static {
     // The expected maximum value is 60 (seconds), so 64 is used "just in case"
     NUMBERS = new char[64][];
@@ -640,6 +646,9 @@ public class TimestampUtils {
   }
 
   public synchronized String toString(Calendar cal, Timestamp x) {
+    if (isDolphin) {
+      return toString(cal, x, false);
+    }
     return toString(cal, x, true);
   }
 

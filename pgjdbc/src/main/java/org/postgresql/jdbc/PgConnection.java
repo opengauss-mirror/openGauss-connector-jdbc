@@ -198,7 +198,9 @@ public class PgConnection implements BaseConnection {
   private String socketAddress;
   private String secSocketAddress;
   private boolean adaptiveSetSQLType = false;
-    private boolean isDolphinCmpt = false;
+  private boolean isDolphinCmpt = false;
+  private PgDatabase pgDatabase;
+
   final CachedQuery borrowQuery(String sql) throws SQLException {
     return queryExecutor.borrowQuery(sql);
   }
@@ -226,6 +228,10 @@ public class PgConnection implements BaseConnection {
   public void setFlushCacheOnDeallocate(boolean flushCacheOnDeallocate) {
     queryExecutor.setFlushCacheOnDeallocate(flushCacheOnDeallocate);
     LOGGER.debug("  setFlushCacheOnDeallocate = " + flushCacheOnDeallocate);
+  }
+
+  public PgDatabase getPgDatabase() {
+    return pgDatabase;
   }
 
   //
@@ -312,6 +318,19 @@ public class PgConnection implements BaseConnection {
       bindStringAsVarchar = true;
     }
 
+    /* set dolphin.b_compatibility_mode to the value of PGProperty.B_CMPT_MODE */
+    this.setDolphinCmpt(PGProperty.B_CMPT_MODE.getBoolean(info));
+
+    int unknownLength = PGProperty.UNKNOWN_LENGTH.getInt(info);
+
+    // Initialize object handling
+    _typeCache = createTypeInfo(this, unknownLength);
+    _typeCache.setPGTypes();
+    initObjectTypes(info);
+
+    pgDatabase = new PgDatabase(this);
+    pgDatabase.setDolphin();
+
     // Initialize timestamp stuff
     timestampUtils = new TimestampUtils(!queryExecutor.getIntegerDateTimes(), new Provider<TimeZone>() {
       @Override
@@ -320,20 +339,13 @@ public class PgConnection implements BaseConnection {
       }
     });
     timestampUtils.setTimestampNanoFormat(PGProperty.TIMESTAMP_NANO_FORMAT.getInteger(info));
+    timestampUtils.setDolphin(pgDatabase.isDolphin());
 
     // Initialize common queries.
     // isParameterized==true so full parse is performed and the engine knows the query
     // is not a compound query with ; inside, so it could use parse/bind/exec messages
     commitQuery = createQuery("COMMIT", false, true).query;
     rollbackQuery = createQuery("ROLLBACK", false, true).query;
-
-    int unknownLength = PGProperty.UNKNOWN_LENGTH.getInt(info);
-
-    // Initialize object handling
-    _typeCache = createTypeInfo(this, unknownLength);
-    _typeCache.setPGTypes();
-    _typeCache.setDBType();
-    initObjectTypes(info);
 
     if (PGProperty.LOG_UNCLOSED_CONNECTIONS.getBoolean(info)) {
       openStackTrace = new Throwable("Connection was created at this point:");
@@ -465,11 +477,8 @@ public class PgConnection implements BaseConnection {
         batchInsert = false;
     }
 
-    /* set dolphin.b_compatibility_mode to the value of PGProperty.B_CMPT_MODE */
-    this.setDolphinCmpt(PGProperty.B_CMPT_MODE.getBoolean(info));
-
     adaptiveSetSQLType = PGProperty.ADAPTIVE_SET_SQL_TYPE.getBoolean(info);
-    
+
     initClientLogic(info);
   }
 
