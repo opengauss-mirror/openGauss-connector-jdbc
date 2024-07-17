@@ -18,7 +18,7 @@
 #############################################################################
 set -e
 
-PKG_VERSION=5.0.2
+PKG_VERSION=5.0.3
 BUILD_FAILED=1
 JDBC_DIR=$(dirname $(readlink -f $0))
 LOG_FILE=$JDBC_DIR/logfile
