@@ -2,7 +2,7 @@ package org.postgresql.test.dolphintest;
 
 import org.junit.Test;
 import org.postgresql.test.TestUtil;
-import org.postgresql.test.jdbc2.BaseTest4B;
+import org.postgresql.test.jdbc2.BaseTest4;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -12,7 +12,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
-public class BitTest extends BaseTest4B {
+public class BitTest extends BaseTest4 {
     /*
      * Tests bit type
      */

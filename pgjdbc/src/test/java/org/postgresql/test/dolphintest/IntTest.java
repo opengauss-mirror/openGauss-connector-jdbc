@@ -2,7 +2,7 @@ package org.postgresql.test.dolphintest;
 
 import org.junit.Test;
 import org.postgresql.test.TestUtil;
-import org.postgresql.test.jdbc2.BaseTest4B;
+import org.postgresql.test.jdbc2.BaseTest4;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -12,7 +12,7 @@ import java.sql.Types;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 
-public class IntTest extends BaseTest4B {
+public class IntTest extends BaseTest4 {
     /*
      * Tests tinyint1 to boolean
      */

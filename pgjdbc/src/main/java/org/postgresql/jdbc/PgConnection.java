@@ -472,7 +472,11 @@ public class PgConnection implements BaseConnection {
     initClientLogic(info);
   }
 
-  public void setDolphin() throws SQLException {
+  public boolean isDolphin() {
+    return isBDatabase;
+  }
+
+  private void setDolphin() throws SQLException {
     String compatibility = getDBParam("show sql_compatibility;");
     if (CompatibilityEnum.B.equals(CompatibilityEnum.valueOf(compatibility))) {
       isBDatabase = true;
