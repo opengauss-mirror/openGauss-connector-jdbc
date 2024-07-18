@@ -2064,14 +2064,18 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
     Encoding encoding = connection.getEncoding();
     try {
-            String typeName = getPGType(columnIndex);
-            String result = trimString(columnIndex, encoding.decode(this_row[columnIndex - 1]));
-            if (("blob".equals(typeName))) {
-                if (connection.unwrap(PgConnection.class).isDolphinCmpt()) {
-                    return new String(toBytes(result));
-                }
-            } else if (blobSet.contains(typeName)) {
+      String typeName = getPGType(columnIndex);
+      String result = trimString(columnIndex, encoding.decode(this_row[columnIndex - 1]));
+      if (("blob".equals(typeName))) {
+        if (connection.unwrap(PgConnection.class).isDolphinCmpt()) {
+          return new String(toBytes(result));
+        }
+      } else if (blobSet.contains(typeName)) {
         return new String(toBytes(result));
+      } else if ("time".equals(typeName)) {
+        char[] cs = result.toCharArray();
+        int start = TimestampUtils.firstDigit(cs, 0);
+        result = result.substring(start);
       }
       return result;
     } catch (IOException ioe) {
@@ -2188,7 +2192,13 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     if (connection.getBitToString()) {
       return val;
     }
-    return BooleanTypeUtil.castToBoolean(val);
+
+    Field field = this.fields[columnIndex - 1];
+    if (field.getMod() == 1 || !connection.isDolphin()) {
+      return BooleanTypeUtil.castToBoolean(val);
+    }
+
+    return this.getBytes(columnIndex);
   }
 
   private static final BigInteger BYTEMAX = new BigInteger(Byte.toString(Byte.MAX_VALUE));
