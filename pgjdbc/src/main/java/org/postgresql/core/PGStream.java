@@ -229,6 +229,19 @@ public class PGStream implements Closeable, Flushable {
   }
 
   /**
+   * Sends a Long to the back end.
+   *
+   * @param val the long to be sent
+   * @throws IOException if an I/O error occurs
+   */
+  public void sendLong(long val) throws IOException {
+    int high = (int)(val >> 32);
+    int low = (int)(val & 0xffffffff);
+    sendInteger4(high);
+    sendInteger4(low);
+  }
+
+  /**
    * Sends a 2-byte integer (short) to the back end.
    *
    * @param val the integer to be sent
@@ -325,6 +338,18 @@ public class PGStream implements Closeable, Flushable {
 
     return (_int4buf[0] & 0xFF) << 24 | (_int4buf[1] & 0xFF) << 16 | (_int4buf[2] & 0xFF) << 8
         | _int4buf[3] & 0xFF;
+  }
+
+  /**
+   * Receives a Long from the backend.
+   *
+   * @return the 64bit integer received from the backend
+   * @throws IOException if an I/O error occurs
+   */
+  public long receiveLong() throws IOException {
+    long high = receiveInteger4();
+    long low = receiveInteger4();
+    return (high << 32) | low;
   }
 
   /**
