@@ -7,6 +7,7 @@ package org.postgresql.jdbc;
 
 import org.postgresql.Driver;
 import org.postgresql.core.*;
+import org.postgresql.core.v3.QueryExecutorImpl;
 import org.postgresql.quickautobalance.ConnectionManager;
 import org.postgresql.quickautobalance.LoadBalanceHeartBeating;
 import org.postgresql.util.GT;
@@ -991,6 +992,7 @@ public class PgStatement implements Statement, BaseStatement {
     BatchResultHandler handler;
     handler = createBatchHandler(queries, parameterLists);
 
+    QueryExecutorImpl executer = (QueryExecutorImpl) connection.getQueryExecutor();
     if ((preDescribe || forceBinaryTransfers)
         && (flags & QueryExecutor.QUERY_EXECUTE_AS_SIMPLE) == 0) {
       // Do a client-server round trip, parsing and describing the query so we
@@ -1000,6 +1002,9 @@ public class PgStatement implements Statement, BaseStatement {
       StatementResultHandler handler2 = new StatementResultHandler();
       try {
         connection.getQueryExecutor().execute(queries[0], parameterLists[0], handler2, 0, 0, flags2);
+        if (connection.getQueryExecutor() instanceof QueryExecutorImpl) {
+          executer.setWaitNexttime(true);
+        }
       } catch (SQLException e) {
         // Unable to parse the first statement -> throw BatchUpdateException
         handler.handleError(e);
@@ -1046,6 +1051,7 @@ public class PgStatement implements Statement, BaseStatement {
     	        }
     	    }
     }
+    executer.setWaitNexttime(false);
 
     return handler;
   }

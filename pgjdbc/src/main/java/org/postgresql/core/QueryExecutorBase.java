@@ -90,7 +90,11 @@ public abstract class QueryExecutorBase implements QueryExecutor {
     });
   }
 
+  protected abstract void sendSupportTrace() throws IOException;
+
   protected abstract void sendCloseMessage() throws IOException;
+
+  protected abstract void sendTrace() throws IOException;
 
   @Override
   public void setNetworkTimeout(int milliseconds) throws IOException {
@@ -146,6 +150,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
 
     try {
       LOGGER.trace(" FE=> Terminate");
+      sendTrace();
       sendCloseMessage();
       pgStream.flush();
       pgStream.close();
