@@ -10,6 +10,7 @@ import org.postgresql.jdbc.ClientLogic;
 import org.postgresql.jdbc.FieldMetadata;
 import org.postgresql.jdbc.PgStatement;
 import org.postgresql.jdbc.TimestampUtils;
+import org.postgresql.jdbc.PgDatabase;
 import org.postgresql.log.Log;
 import org.postgresql.util.LruCache;
 import org.postgresql.xml.PGXmlFactoryFactory;
@@ -246,4 +247,6 @@ public interface BaseConnection extends PGConnection, Connection {
   public boolean IsBatchInsert();
 
   public boolean isAdaptiveSetSQLType();
+
+  PgDatabase getPgDatabase();
 }
