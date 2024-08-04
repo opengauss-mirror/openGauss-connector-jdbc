@@ -8,6 +8,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNotNull;
@@ -103,5 +105,51 @@ public class TimestampTest extends BaseTest4B {
         }
 
         TestUtil.dropTable(con, "test_TimeRange");
+    }
+
+    @Test
+    public void testYear2() throws Exception {
+        TestUtil.createTable(con, "test_year2", "id year(2)");
+        try (Statement stat = con.createStatement()) {
+            stat.execute("INSERT INTO test_year2 VALUES (8),(69),(70),(82)");
+        }
+
+        String sql5 = "select id from test_year2";
+        try (PreparedStatement pstmt2 = con.prepareStatement(sql5);
+             ResultSet rs = pstmt2.executeQuery()) {
+            assertTrue(rs.next());
+            Date d1 = rs.getDate(1);
+            assertNotNull(d1);
+            Date date = new SimpleDateFormat("yyyy-MM-dd").parse("2008-01-01");
+            assertEquals(date, d1);
+            String s1 = rs.getString(1);
+            assertEquals("2008-01-01", s1);
+
+            assertTrue(rs.next());
+            Date d2 = rs.getDate(1);
+            assertNotNull(d2);
+            Date date2 = new SimpleDateFormat("yyyy-MM-dd").parse("2069-01-01");
+            assertEquals(date2, d2);
+            String s2 = rs.getString(1);
+            assertEquals("2069-01-01", s2);
+
+            assertTrue(rs.next());
+            Date d3 = rs.getDate(1);
+            assertNotNull(d3);
+            Date date3 = new SimpleDateFormat("yyyy-MM-dd").parse("1970-01-01");
+            assertEquals(date3, d3);
+            String s3 = rs.getString(1);
+            assertEquals("1970-01-01", s3);
+
+            assertTrue(rs.next());
+            Date d4 = rs.getDate(1);
+            assertNotNull(d4);
+            Date date4 = new SimpleDateFormat("yyyy-MM-dd").parse("1982-01-01");
+            assertEquals(date4, d4);
+            String s4 = rs.getString(1);
+            assertEquals("1982-01-01", s4);
+        }
+
+        TestUtil.dropTable(con, "test_year2");
     }
 }

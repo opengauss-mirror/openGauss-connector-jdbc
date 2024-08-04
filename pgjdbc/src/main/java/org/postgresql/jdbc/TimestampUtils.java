@@ -408,7 +408,7 @@ public class TimestampUtils {
     ParsedTimestamp ts = parseBackendTimestamp(s);
     Calendar useCal = ts.tz != null ? ts.tz : setupCalendar(cal);
     useCal.set(Calendar.ERA, ts.era);
-    useCal.set(Calendar.YEAR, ts.year);
+    useCal.set(Calendar.YEAR, getYear(ts.year, slen));
     useCal.set(Calendar.MONTH, ts.month - 1);
     useCal.set(Calendar.DAY_OF_MONTH, ts.day);
     useCal.set(Calendar.HOUR_OF_DAY, ts.hour);
@@ -419,6 +419,17 @@ public class TimestampUtils {
     Timestamp result = new Timestamp(useCal.getTimeInMillis());
     result.setNanos(ts.nanos);
     return result;
+  }
+
+  private int getYear(int tsYear, int slen) {
+    int year = tsYear;
+    if (slen == 2 || slen == 1) {
+      if (year <= 69) {
+        year += 100;
+      }
+      year += 1900;
+    }
+    return year;
   }
 
   /**
