@@ -565,7 +565,9 @@ public enum PGProperty {
           "the cluster is considered to have no active node and no maintenance is performed on the current cluster. This time should include the RTO time of the active node."),
 
     B_CMPT_MODE("BCmptMode", "true", "Specify 'dolphin.b_compatibility_mode'"
-            + " connection initialization parameter.")
+            + " connection initialization parameter."),
+
+  NULL_DEFAULT_TYPE("nullDefaultType", null, "12000 not config, -3 mains A, 12 mains M"),
   ;
 
   private String _name;

@@ -6,6 +6,7 @@
 package org.postgresql.jdbc;
 
 import org.postgresql.Driver;
+import org.postgresql.PGProperty;
 import org.postgresql.core.BaseConnection;
 import org.postgresql.core.CachedQuery;
 import org.postgresql.core.Oid;
@@ -222,7 +223,20 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
       sqlTypeToOid.put(Types.STRUCT, Oid.UNSPECIFIED);
       sqlTypeToOid.put(Types.NULL, Oid.UNSPECIFIED);
       sqlTypeToOid.put(Types.OTHER, Oid.UNSPECIFIED);
+      sqlTypeToOid.put(Types.VARCHAR, Oid.VARCHAR);
   }
+
+  private int convertNullDefaultSqlType(int sqlType) {
+    if (this.connection != null && (this.connection instanceof PgConnection)) {
+      String defaultType = ((PgConnection) this.connection).getNullDefaultType();
+      if (defaultType == null) {
+        return sqlType;
+      }
+      return Integer.parseInt(defaultType);
+    }
+    return sqlType;
+  }
+
   public void setNull(int parameterIndex, int sqlType) throws SQLException {
     checkClosed();
 
@@ -230,7 +244,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
     if (sqlType == Types.VARCHAR || sqlType == Types.LONGVARCHAR) {
         oid = connection.getStringVarcharFlag() ? Oid.VARCHAR : Oid.UNSPECIFIED;
     } else if (sqlTypeToOid.containsKey(sqlType)) {
-        oid = sqlTypeToOid.get(sqlType);
+        oid = sqlTypeToOid.get(convertNullDefaultSqlType(sqlType));
     } else {
         // Bad Types value.
         throw new PSQLException(GT.tr("Unknown Types value."), PSQLState.INVALID_PARAMETER_TYPE);

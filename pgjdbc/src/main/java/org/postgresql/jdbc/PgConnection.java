@@ -198,6 +198,7 @@ public class PgConnection implements BaseConnection {
   private boolean isDolphinCmpt = false;
 
   private boolean isBDatabase = false;
+  private String nullDefaultType = null;
 
   final CachedQuery borrowQuery(String sql) throws SQLException {
     return queryExecutor.borrowQuery(sql);
@@ -468,7 +469,9 @@ public class PgConnection implements BaseConnection {
 
     /* set dolphin.b_compatibility_mode to the value of PGProperty.B_CMPT_MODE */
     this.setDolphinCmpt(PGProperty.B_CMPT_MODE.getBoolean(info));
-    
+
+    this.setNullDefaultType(PGProperty.NULL_DEFAULT_TYPE.get(info));
+
     initClientLogic(info);
   }
 
@@ -2136,4 +2139,12 @@ public class PgConnection implements BaseConnection {
         updateDolphinCmpt(isDolphinCmpt);
         this.isDolphinCmpt = isDolphinCmpt;
     }
+
+  public void setNullDefaultType(String type) {
+    this.nullDefaultType = type;
+  }
+
+  public String getNullDefaultType() {
+    return nullDefaultType;
+  }
 }
