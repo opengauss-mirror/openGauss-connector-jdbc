@@ -2098,7 +2098,11 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       } else if ("time".equals(typeName)) {
         char[] cs = result.toCharArray();
         int start = TimestampUtils.firstDigit(cs, 0);
-        result = result.substring(start);
+        return result.substring(start);
+      } else if ("date".equals(typeName) && connection.getPgDatabase().isDolphin()) {
+        java.util.Calendar cal = getDefaultCalendar();
+        Date dt = connection.getTimestampUtils().toDate(cal, result);
+        return String.valueOf(dt);
       }
       return result;
     } catch (IOException ioe) {
