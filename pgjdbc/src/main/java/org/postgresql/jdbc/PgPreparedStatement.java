@@ -223,7 +223,7 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
     checkClosed();
 
     int oid;
-    if (sqlType == Types.VARCHAR || sqlType == Types.LONGVARCHAR) {
+    if (sqlType == Types.VARCHAR || sqlType == Types.LONGVARCHAR || connection.getPgDatabase().isDolphin()) {
         oid = connection.getStringVarcharFlag() ? Oid.VARCHAR : Oid.UNSPECIFIED;
     } else if (sqlTypeToOid.containsKey(sqlType)) {
         oid = sqlTypeToOid.get(sqlType);
