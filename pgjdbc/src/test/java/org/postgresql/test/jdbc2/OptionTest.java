@@ -75,7 +75,7 @@ public class OptionTest extends BaseTest4 {
         assertEquals(value, s);
         // behavior_compat_options_name duplicate option
         s = setOptionsAndGet(behaviorCompatOptionsName, "hide_tailing_zero,hide_tailing_zero");
-        assertEquals("hide_tailing_zero,hide_tailing_zero", s);
+        assertEquals("hide_tailing_zero", s);
         // options applied failed
         optionsBehaviorCompatOptionsFailed(behaviorCompatOptionsName, "''");
         optionsBehaviorCompatOptionsFailed(behaviorCompatOptionsName, "hide_tailing_zero,,");
