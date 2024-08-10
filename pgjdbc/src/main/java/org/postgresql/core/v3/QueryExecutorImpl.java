@@ -1624,6 +1624,10 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     }
     pgStream.sendChar('K'); // Sync
     pgStream.sendInteger4(8 + PROTOCOL3_MSGLEN_OFFSET); // Length
+    if (getWaitNexttime()) {
+      pgStream.sendLong(0L);
+      return;
+    }
     pgStream.sendLong(netTime);
     }
 
