@@ -167,7 +167,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   private static final String OFF = "off";
 
-  private static final String SERVER_SUPPORT_TRACE = "server_support_trace";
+  private static final String GUC_SERVER_SUPPORT_TRACE = "enable_record_nettime";
 
   private static final int PROTOCOL3_MSGLEN_OFFSET = 4;
 
@@ -3215,11 +3215,9 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     String name = pgStream.receiveString();
     String value = pgStream.receiveString();
 
-    if (name.equals(SERVER_SUPPORT_TRACE)) {
-      // SERVER_SUPPORT_TRACE equals "1" means server support trace
-      if ("1".equals(value)) {
-        sendSupportTrace();
-      }
+    if (name.equals(GUC_SERVER_SUPPORT_TRACE)) {
+      // receive GUC_SERVER_SUPPORT_TRACE from server means server support trace
+      sendSupportTrace();
     }
 
     if (name.equals(CLIENT_ENCODING)) {
