@@ -5,12 +5,14 @@ import org.postgresql.test.TestUtil;
 import org.postgresql.test.jdbc2.BaseTest4B;
 
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.sql.Types;
+import java.sql.Statement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class IntTest extends BaseTest4B {
     /*
@@ -115,5 +117,29 @@ public class IntTest extends BaseTest4B {
         assertEquals(0, r32);
 
         TestUtil.dropTable(con, "test_tinyint2");
+    }
+
+    /*
+     * Tests int type
+     */
+    @Test
+    public void testIntType() throws Exception {
+        TestUtil.createTable(con, "test_int", "c1 int1,c2 int2,c3 int4,"
+                + "c4 int8,uc1 uint1,uc2 uint2,uc3 uint4,uc4 uint8");
+        try (Statement stmt = con.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM test_int")) {
+            ResultSetMetaData rsmd = rs.getMetaData();
+            assertEquals(8, rsmd.getColumnCount());
+            assertEquals(Types.TINYINT, rsmd.getColumnType(1));
+            assertEquals(Types.SMALLINT, rsmd.getColumnType(2));
+            assertEquals(Types.INTEGER, rsmd.getColumnType(3));
+            assertEquals(Types.BIGINT, rsmd.getColumnType(4));
+            assertEquals(Types.TINYINT, rsmd.getColumnType(5));
+            assertEquals(Types.SMALLINT, rsmd.getColumnType(6));
+            assertEquals(Types.INTEGER, rsmd.getColumnType(7));
+            assertEquals(Types.BIGINT, rsmd.getColumnType(8));
+        } finally {
+            TestUtil.dropTable(con, "test_int");
+        }
     }
 }

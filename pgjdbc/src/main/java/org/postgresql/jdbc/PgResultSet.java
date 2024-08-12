@@ -256,118 +256,122 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     return getURL(findColumn(columnName));
   }
 
-  protected Object internalGetObject(int columnIndex, Field field) throws SQLException {
-    switch (getSQLType(columnIndex)) {
-      case Types.BOOLEAN:
-        return getBoolean(columnIndex);
-      case Types.BIT:
-        return getBit(columnIndex);
-      case Types.SQLXML:
-        return getSQLXML(columnIndex);
-      case Types.TINYINT:
-      case Types.SMALLINT:
-      case Types.INTEGER:
-        return getInt(columnIndex);
-      case Types.BIGINT:
-        return getLong(columnIndex);
-      case TypeInfoCache.bIntegerType:
-        return getBigInteger(columnIndex);
-      case Types.NUMERIC:
-      case Types.DECIMAL:
-        int scale;
-        if (field.getMod() == -1) {
-          return getBigDecimal(columnIndex, -1);
-        } else {
-          scale = (short)((field.getMod() - 4) & 0xffff);
-          return getBigDecimal(columnIndex, (Math.max(scale, -1)));
+    protected Object internalGetObject(int columnIndex, Field field) throws SQLException {
+        switch (getSQLType(columnIndex)) {
+            case Types.BOOLEAN:
+                return getBoolean(columnIndex);
+            case Types.BIT:
+                return getBit(columnIndex);
+            case Types.SQLXML:
+                return getSQLXML(columnIndex);
+            case Types.TINYINT:
+            case Types.SMALLINT:
+            case Types.INTEGER:
+                if (field.getPGType().equals("uint4")) {
+                    return getLong(columnIndex);
+                }
+                return getInt(columnIndex);
+            case Types.BIGINT:
+                if (field.getPGType().equals("uint8")) {
+                    return getBigInteger(columnIndex);
+                }
+                return getLong(columnIndex);
+            case Types.NUMERIC:
+            case Types.DECIMAL:
+                int scale;
+                if (field.getMod() == -1) {
+                    return getBigDecimal(columnIndex, -1);
+                } else {
+                    scale = (short) ((field.getMod() - 4) & 0xffff);
+                    return getBigDecimal(columnIndex, (Math.max(scale, -1)));
+                }
+            case Types.REAL:
+                return getFloat(columnIndex);
+            case Types.FLOAT:
+            case Types.DOUBLE:
+                return getDouble(columnIndex);
+            case Types.CHAR:
+            case Types.VARCHAR:
+            case Types.LONGVARCHAR:
+                return getString(columnIndex);
+            case Types.DATE:
+                return getDate(columnIndex);
+            case Types.TIME:
+                return getTime(columnIndex);
+            case Types.TIMESTAMP:
+                return getTimestamp(columnIndex, null);
+            case Types.BINARY:
+            case Types.VARBINARY:
+            case Types.LONGVARBINARY:
+                return getBytes(columnIndex);
+            case Types.ARRAY:
+                return getArray(columnIndex);
+            case Types.CLOB:
+                return getClob(columnIndex);
+            case Types.BLOB:
+                return getBlob(columnIndex);
+            case Types.STRUCT:
+                return getStruct(columnIndex);
+
+            default:
+                String type = getPGType(columnIndex);
+
+                // if the backend doesn't know the type then coerce to String
+                if (type.equals("unknown")) {
+                    return getString(columnIndex);
+                }
+
+                if (type.equals("uuid")) {
+                    if (isBinary(columnIndex)) {
+                        return getUUID(this_row[columnIndex - 1]);
+                    }
+                    return getUUID(getString(columnIndex));
+                }
+
+                // Specialized support for ref cursors is neater.
+                if (type.equals("refcursor")) {
+                    // Fetch all results.
+                    String cursorName = getString(columnIndex);
+
+                    StringBuilder sb = new StringBuilder("FETCH ALL IN ");
+                    Utils.escapeIdentifier(sb, cursorName);
+
+                    // nb: no BEGIN triggered here. This is fine. If someone
+                    // committed, and the cursor was not holdable (closing the
+                    // cursor), we avoid starting a new xact and promptly causing
+                    // it to fail. If the cursor *was* holdable, we don't want a
+                    // new xact anyway since holdable cursor state isn't affected
+                    // by xact boundaries. If our caller didn't commit at all, or
+                    // autocommit was on, then we wouldn't issue a BEGIN anyway.
+                    //
+                    // We take the scrollability from the statement, but until
+                    // we have updatable cursors it must be readonly.
+                    ResultSet rs =
+                            connection.execSQLQuery(sb.toString(), resultsettype, ResultSet.CONCUR_READ_ONLY);
+                    //
+                    // In long running transactions these backend cursors take up memory space
+                    // we could close in rs.close(), but if the transaction is closed before the result set,
+                    // then
+                    // the cursor no longer exists
+
+                    sb.setLength(0);
+                    sb.append("CLOSE ");
+                    Utils.escapeIdentifier(sb, cursorName);
+                    connection.execSQLUpdate(sb.toString());
+                    ((PgResultSet) rs).setRefCursor(cursorName);
+                    return rs;
+                }
+                if ("hstore".equals(type)) {
+                    if (isBinary(columnIndex)) {
+                        return HStoreConverter.fromBytes(this_row[columnIndex - 1], connection.getEncoding());
+                    }
+                    return HStoreConverter.fromString(getString(columnIndex));
+                }
+
+                // Caller determines what to do (JDBC3 overrides in this case)
+                return null;
         }
-      case Types.REAL:
-        return getFloat(columnIndex);
-      case Types.FLOAT:
-      case Types.DOUBLE:
-        return getDouble(columnIndex);
-      case Types.CHAR:
-      case Types.VARCHAR:
-      case Types.LONGVARCHAR:
-        return getString(columnIndex);
-      case Types.DATE:
-        return getDate(columnIndex);
-      case Types.TIME:
-        return getTime(columnIndex);
-      case Types.TIMESTAMP:
-        return getTimestamp(columnIndex, null);
-      case Types.BINARY:
-      case Types.VARBINARY:
-      case Types.LONGVARBINARY:
-        return getBytes(columnIndex);
-      case Types.ARRAY:
-        return getArray(columnIndex);
-      case Types.CLOB:
-        return getClob(columnIndex);
-      case Types.BLOB:
-        return getBlob(columnIndex);
-      case Types.STRUCT:
-        return getStruct(columnIndex);
-
-      default:
-        String type = getPGType(columnIndex);
-
-        // if the backend doesn't know the type then coerce to String
-        if (type.equals("unknown")) {
-          return getString(columnIndex);
-        }
-
-        if (type.equals("uuid")) {
-          if (isBinary(columnIndex)) {
-            return getUUID(this_row[columnIndex - 1]);
-          }
-          return getUUID(getString(columnIndex));
-        }
-
-        // Specialized support for ref cursors is neater.
-        if (type.equals("refcursor")) {
-          // Fetch all results.
-          String cursorName = getString(columnIndex);
-
-          StringBuilder sb = new StringBuilder("FETCH ALL IN ");
-          Utils.escapeIdentifier(sb, cursorName);
-
-          // nb: no BEGIN triggered here. This is fine. If someone
-          // committed, and the cursor was not holdable (closing the
-          // cursor), we avoid starting a new xact and promptly causing
-          // it to fail. If the cursor *was* holdable, we don't want a
-          // new xact anyway since holdable cursor state isn't affected
-          // by xact boundaries. If our caller didn't commit at all, or
-          // autocommit was on, then we wouldn't issue a BEGIN anyway.
-          //
-          // We take the scrollability from the statement, but until
-          // we have updatable cursors it must be readonly.
-          ResultSet rs =
-              connection.execSQLQuery(sb.toString(), resultsettype, ResultSet.CONCUR_READ_ONLY);
-          //
-          // In long running transactions these backend cursors take up memory space
-          // we could close in rs.close(), but if the transaction is closed before the result set,
-          // then
-          // the cursor no longer exists
-
-          sb.setLength(0);
-          sb.append("CLOSE ");
-          Utils.escapeIdentifier(sb, cursorName);
-          connection.execSQLUpdate(sb.toString());
-          ((PgResultSet) rs).setRefCursor(cursorName);
-          return rs;
-        }
-        if ("hstore".equals(type)) {
-          if (isBinary(columnIndex)) {
-            return HStoreConverter.fromBytes(this_row[columnIndex - 1], connection.getEncoding());
-          }
-          return HStoreConverter.fromString(getString(columnIndex));
-        }
-
-        // Caller determines what to do (JDBC3 overrides in this case)
-        return null;
     }
-  }
 
     /**
      * Get the PGStruct object based on parameter index
