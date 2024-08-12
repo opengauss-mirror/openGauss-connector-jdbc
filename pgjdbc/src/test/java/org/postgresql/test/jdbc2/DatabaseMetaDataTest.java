@@ -1332,4 +1332,38 @@ public class DatabaseMetaDataTest {
     }
   }
 
+  @Test
+  public void testPrimaryKey() throws SQLException {
+    try (Statement stmt = con.createStatement()) {
+      stmt.execute("drop table if exists test_metadata");
+      stmt.execute("CREATE TABLE test_metadata (\n"
+          + "    col_pk numeric NOT NULL primary key,\n"
+          + "    partition_col character varying(30) NOT NULL\n"
+          + ")\n"
+          + "WITH (orientation=row, compression=no)\n"
+          + "PARTITION BY LIST (partition_col)\n"
+          + "(\n"
+          + "    PARTITION partition_col_id_0100 VALUES ('0100') ,\n"
+          + "    PARTITION partition_col_id_0110 VALUES ('0110') ,\n"
+          + "    PARTITION partition_col_id_other VALUES (DEFAULT)\n"
+          + ");");
+    }
+    DatabaseMetaData metaData = con.getMetaData();
+    try (ResultSet rs = metaData.getPrimaryKeys("", "public", "test_metadata")) {
+      assertTrue(rs.next());
+      assertEquals("col_pk", rs.getString(4));
+      assertEquals(1, rs.getInt(5));
+      assertFalse(rs.next());
+    }
+
+    try (ResultSet rs1 = metaData.getIndexInfo("", "public",
+            "test_metadata", true, true)) {
+      assertTrue(rs1.next());
+      assertEquals("test_metadata_pkey", rs1.getString(6));
+      assertEquals("col_pk", rs1.getString(9));
+      assertFalse(rs1.next());
+    }
+
+    TestUtil.dropTable(con, "test_metadata");
+  }
 }

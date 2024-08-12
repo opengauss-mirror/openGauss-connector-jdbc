@@ -2421,6 +2421,7 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
       sql += ") i";
     }
 
+    sql += " where (i.keys).x >= 0";
     sql += "  ORDER BY NON_UNIQUE, TYPE, INDEX_NAME, ORDINAL_POSITION ";
     
     return connection.createStatement().executeQuery(sql);
