@@ -107,4 +107,27 @@ public class BlobTest extends BaseTest4B {
             }
         }
     }
+
+    @Test
+    public void testStringToBlob() throws SQLException {
+        String sql = "INSERT INTO test_blob_b VALUES (2,'1234'::tinyblob,"
+                + "'1234'::blob,'1234'::mediumblob,'1234'::longblob)";
+        try (PreparedStatement pstmt = con.prepareStatement(sql)) {
+            pstmt.execute();
+        }
+
+        try (Statement statement = con.createStatement();
+             ResultSet rs = statement.executeQuery("SELECT * FROM test_blob_b")) {
+            while (rs.next()) {
+                assertEquals("1234", new String(rs.getBlob(2).getBytes(1, 4),
+                        StandardCharsets.UTF_8));
+                assertEquals("1234", new String(rs.getBlob(3).getBytes(1, 4),
+                        StandardCharsets.UTF_8));
+                assertEquals("1234", new String(rs.getBlob(4).getBytes(1, 4),
+                        StandardCharsets.UTF_8));
+                assertEquals("1234", new String(rs.getBlob(5).getBytes(1, 4),
+                        StandardCharsets.UTF_8));
+            }
+        }
+    }
 }
