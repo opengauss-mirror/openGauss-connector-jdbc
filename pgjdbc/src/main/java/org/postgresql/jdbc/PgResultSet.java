@@ -2653,9 +2653,41 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       return trimBytes(columnIndex, PGbytea.toBytes(this_row[columnIndex - 1]));
     } else if (oid == Oid.BLOB) {
       return toBytes(getString(columnIndex));
+    } else if (oid == Oid.BIT && connection.getPgDatabase().isDec()) {
+      return toDecBytes(fields[columnIndex - 1].getMod(), getString(columnIndex));
     } else {
       return trimBytes(columnIndex, this_row[columnIndex - 1]);
     }
+  }
+
+  private byte[] toDecBytes(int mod, String str) {
+    if (mod <= 0) {
+      return new byte[0];
+    }
+    int lengthToSplit = 8;
+    long value = Long.parseLong(str);
+    String binary = Long.toBinaryString(value);
+    int formatMod = mod;
+    if (mod % lengthToSplit != 0) {
+      formatMod = (mod / lengthToSplit + 1) * lengthToSplit;
+    }
+
+    if (binary.length() < formatMod) {
+      StringBuilder formatBinary = new StringBuilder();
+      for (int i = 0; i < formatMod - binary.length(); i++) {
+        formatBinary.append("0");
+      }
+      binary = formatBinary.append(binary).toString();
+    }
+
+    int byteLength = formatMod / lengthToSplit;
+    byte[] bytes = new byte[byteLength];
+    for (int i = 0; i < byteLength; i++) {
+      String splitStr = binary.substring(i * lengthToSplit, (i + 1) * lengthToSplit);
+      bytes[i] = (byte) Integer.parseInt(splitStr, 2);
+    }
+
+    return bytes;
   }
 
   public java.sql.Date getDate(int columnIndex) throws SQLException {

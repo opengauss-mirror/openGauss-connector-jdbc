@@ -41,6 +41,7 @@ public class TestUtil {
    */
   public static final String SERVER_HOST_PORT_PROP = "_test_hostport";
   public static final String DATABASE_PROP = "_test_database";
+  private static String applicationName = "Driver Tests";
 
   /*
    * Returns the Test database JDBC URL
@@ -50,10 +51,10 @@ public class TestUtil {
   }
 
   public static String getURL(String server, int port) {
-    return getURL(server + ":" + port, getDatabase());
+    return getURL(server + ":" + port, getDatabase(), applicationName);
   }
 
-  public static String getURL(String hostport, String database) {
+  public static String getURL(String hostport, String database, String applicationName) {
     String logLevel = "";
     if (getLogLevel() != null && !getLogLevel().equals("")) {
       logLevel = "&loggerLevel=" + getLogLevel();
@@ -99,10 +100,11 @@ public class TestUtil {
         allowEncodingChanges = "&allowEncodingChanges=" + getAllowEncodingChanges();
     }
 
+    String application = "?ApplicationName=" + applicationName;
     return "jdbc:postgresql://"
         + hostport + "/"
         + database
-        + "?ApplicationName=Driver Tests"
+        + application
         + logLevel
         + logFile
         + protocolVersion
@@ -412,7 +414,10 @@ public class TestUtil {
     String hostport = props.getProperty(SERVER_HOST_PORT_PROP, getServer() + ":" + getPort());
     String database = props.getProperty(DATABASE_PROP, dbName);
 
-    return DriverManager.getConnection(getURL(hostport, database), props);
+    if (props.containsKey("ApplicationName")) {
+      return DriverManager.getConnection(getURL(hostport, database, props.get("ApplicationName").toString()), props);
+    }
+    return DriverManager.getConnection(getURL(hostport, database, applicationName), props);
   }
 
   /*
