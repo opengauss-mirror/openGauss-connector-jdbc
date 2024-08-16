@@ -329,7 +329,7 @@ public class PgConnection implements BaseConnection {
     initObjectTypes(info);
 
     pgDatabase = new PgDatabase(this);
-    pgDatabase.setDolphin();
+    pgDatabase.setDolphin(info);
 
     // Initialize timestamp stuff
     timestampUtils = new TimestampUtils(!queryExecutor.getIntegerDateTimes(), new Provider<TimeZone>() {
