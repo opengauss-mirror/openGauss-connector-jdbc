@@ -1,6 +1,16 @@
 /*
- * Copyright (c) openGauss 2024. All rights reserved.
- * See the LICENSE file in the project root for more information.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
+ *
+ * openGauss is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *
+ *          http://license.coscl.org.cn/MulanPSL2
+ *
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
  */
 
 package org.postgresql.test.dolphintest;
@@ -23,8 +33,8 @@ import static org.junit.Assert.assertEquals;
 /**
  * test binary
  *
- * 2024/8/10
- * @version 6.0.0
+ * @author zhangting
+ * @since  2024-08-20
  */
 public class BinaryTest extends BaseTest4B {
     @Test
