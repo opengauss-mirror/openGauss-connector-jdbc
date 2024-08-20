@@ -153,6 +153,7 @@ public class PGPropertyTest {
     excluded.add("enableStatementLoadBalance");
     excluded.add("writeDataSourceAddress");
     excluded.add("BCmptMode");
+    excluded.add("bitOutput");
 
     // index PropertyDescriptors by name
     Map<String, PropertyDescriptor> propertyDescriptors =
