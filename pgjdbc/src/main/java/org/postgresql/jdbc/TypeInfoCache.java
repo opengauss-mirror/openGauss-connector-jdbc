@@ -68,8 +68,6 @@ public class TypeInfoCache implements TypeInfo {
 
   private static ConcurrentHashMap<Integer, String> pgTypes = new ConcurrentHashMap<>();
 
-  public static final int bIntegerType = 1324;
-
   // SELECT LENGTH(pow(10::numeric,131071)); 131071 = 2^17-1
   public static final int NUMERIC_MAX_DISPLAYSIZE = 131089;
 
@@ -77,48 +75,48 @@ public class TypeInfoCache implements TypeInfo {
   // openGauss accepts float(p) as numeric Type and the scale is -32768(PG_INT16_MIN)
   public static final int FLOATSCALE = -32768;
 
-  // basic pg types info:
-  // 0 - type name
-  // 1 - type oid
-  // 2 - sql type
-  // 3 - java class
-  // 4 - array type oid
-  private static final Object[][] types = {
-	  {"int1", Oid.INT1, Types.TINYINT, "java.lang.Integer", Oid.INT1_ARRAY},	
-      {"int2", Oid.INT2, Types.SMALLINT, "java.lang.Integer", Oid.INT2_ARRAY},
-      {"int4", Oid.INT4, Types.INTEGER, "java.lang.Integer", Oid.INT4_ARRAY},
-      {"oid", Oid.OID, Types.BIGINT, "java.lang.Long", Oid.OID_ARRAY},
-      {"int8", Oid.INT8, Types.BIGINT, "java.lang.Long", Oid.INT8_ARRAY},
-      {"uint1", Oid.UINT1, Types.SMALLINT, "java.lang.Integer", Oid.UINT1_ARRAY},
-      {"uint2", Oid.UINT2, Types.INTEGER, "java.lang.Integer", Oid.UINT2_ARRAY},
-      {"uint4", Oid.UINT4, Types.BIGINT, "java.lang.Long", Oid.UINT4_ARRAY},
-      {"uint8", Oid.UINT8, bIntegerType, "java.math.BigInteger", Oid.UINT8_ARRAY},
-      {"money", Oid.MONEY, Types.DOUBLE, "java.lang.Double", Oid.MONEY_ARRAY},
-      {"numeric", Oid.NUMERIC, Types.NUMERIC, "java.math.BigDecimal", Oid.NUMERIC_ARRAY},
-      {"float4", Oid.FLOAT4, Types.REAL, "java.lang.Float", Oid.FLOAT4_ARRAY},
-      {"float8", Oid.FLOAT8, Types.DOUBLE, "java.lang.Double", Oid.FLOAT8_ARRAY},
-      {"char", Oid.CHAR, Types.CHAR, "java.lang.String", Oid.CHAR_ARRAY},
-      {"bpchar", Oid.BPCHAR, Types.CHAR, "java.lang.String", Oid.BPCHAR_ARRAY},
-      {"varchar", Oid.VARCHAR, Types.VARCHAR, "java.lang.String", Oid.VARCHAR_ARRAY},
-      {"text", Oid.TEXT, Types.VARCHAR, "java.lang.String", Oid.TEXT_ARRAY},
-      {"name", Oid.NAME, Types.VARCHAR, "java.lang.String", Oid.NAME_ARRAY},
-      {"bytea", Oid.BYTEA, Types.BINARY, "[B", Oid.BYTEA_ARRAY},
-      {"bool", Oid.BOOL, Types.BOOLEAN, "java.lang.Boolean", Oid.BOOL_ARRAY},
-      {"bit", Oid.BIT, Types.BIT, "java.lang.Boolean", Oid.BIT_ARRAY},
-      {"date", Oid.DATE, Types.DATE, "java.sql.Date", Oid.DATE_ARRAY},
-      {"time", Oid.TIME, Types.TIME, "java.sql.Time", Oid.TIME_ARRAY},
-      {"timetz", Oid.TIMETZ, Types.TIME, "java.sql.Time", Oid.TIMETZ_ARRAY},
-      {"timestamp", Oid.TIMESTAMP, Types.TIMESTAMP, "java.sql.Timestamp", Oid.TIMESTAMP_ARRAY},
-      {"smalldatetime", Oid.SMALLDATETIME, Types.TIMESTAMP, "java.lang.Timestamp", Oid.SMALLDATETIME_ARRAY},
-      {"timestamptz", Oid.TIMESTAMPTZ, Types.TIMESTAMP, "java.sql.Timestamp",
-          Oid.TIMESTAMPTZ_ARRAY},
-      {"json", Oid.JSON, Types.OTHER, "org.postgresql.util.PGobject", Oid.JSON_ARRAY},
-      {"point", Oid.POINT, Types.OTHER, "org.postgresql.geometric.PGpoint", Oid.POINT_ARRAY},
-      {"blob", Oid.BLOB, Types.BLOB, "org.postgresql.util.PGobject", -1},
-      {"clob", Oid.CLOB, Types.CLOB, "org.postgresql.util.PGobject", -1},
-      {"nvarchar2", Oid.NVARCHAR2, Types.VARCHAR, "java.lang.String", Oid.NVARCHAR2_ARRAY},
-      {"refcursor", Oid.REF_CURSOR, Types.REF_CURSOR, "java.sql.ResultSet", Oid.REF_CURSOR_ARRAY}
-  };
+    // basic pg types info:
+    // 0 - type name
+    // 1 - type oid
+    // 2 - sql type
+    // 3 - java class
+    // 4 - array type oid
+    private static final Object[][] types = {
+        {"int1", Oid.INT1, Types.TINYINT, "java.lang.Integer", Oid.INT1_ARRAY},
+        {"int2", Oid.INT2, Types.SMALLINT, "java.lang.Integer", Oid.INT2_ARRAY},
+        {"int4", Oid.INT4, Types.INTEGER, "java.lang.Integer", Oid.INT4_ARRAY},
+        {"oid", Oid.OID, Types.BIGINT, "java.lang.Long", Oid.OID_ARRAY},
+        {"int8", Oid.INT8, Types.BIGINT, "java.lang.Long", Oid.INT8_ARRAY},
+        {"uint1", Oid.UINT1, Types.TINYINT, "java.lang.Integer", Oid.UINT1_ARRAY},
+        {"uint2", Oid.UINT2, Types.SMALLINT, "java.lang.Integer", Oid.UINT2_ARRAY},
+        {"uint4", Oid.UINT4, Types.INTEGER, "java.lang.Integer", Oid.UINT4_ARRAY},
+        {"uint8", Oid.UINT8, Types.BIGINT, "java.lang.Long", Oid.UINT8_ARRAY},
+        {"money", Oid.MONEY, Types.DOUBLE, "java.lang.Double", Oid.MONEY_ARRAY},
+        {"numeric", Oid.NUMERIC, Types.NUMERIC, "java.math.BigDecimal", Oid.NUMERIC_ARRAY},
+        {"float4", Oid.FLOAT4, Types.REAL, "java.lang.Float", Oid.FLOAT4_ARRAY},
+        {"float8", Oid.FLOAT8, Types.DOUBLE, "java.lang.Double", Oid.FLOAT8_ARRAY},
+        {"char", Oid.CHAR, Types.CHAR, "java.lang.String", Oid.CHAR_ARRAY},
+        {"bpchar", Oid.BPCHAR, Types.CHAR, "java.lang.String", Oid.BPCHAR_ARRAY},
+        {"varchar", Oid.VARCHAR, Types.VARCHAR, "java.lang.String", Oid.VARCHAR_ARRAY},
+        {"text", Oid.TEXT, Types.VARCHAR, "java.lang.String", Oid.TEXT_ARRAY},
+        {"name", Oid.NAME, Types.VARCHAR, "java.lang.String", Oid.NAME_ARRAY},
+        {"bytea", Oid.BYTEA, Types.BINARY, "[B", Oid.BYTEA_ARRAY},
+        {"bool", Oid.BOOL, Types.BOOLEAN, "java.lang.Boolean", Oid.BOOL_ARRAY},
+        {"bit", Oid.BIT, Types.BIT, "java.lang.Boolean", Oid.BIT_ARRAY},
+        {"date", Oid.DATE, Types.DATE, "java.sql.Date", Oid.DATE_ARRAY},
+        {"time", Oid.TIME, Types.TIME, "java.sql.Time", Oid.TIME_ARRAY},
+        {"timetz", Oid.TIMETZ, Types.TIME, "java.sql.Time", Oid.TIMETZ_ARRAY},
+        {"timestamp", Oid.TIMESTAMP, Types.TIMESTAMP, "java.sql.Timestamp", Oid.TIMESTAMP_ARRAY},
+        {"smalldatetime", Oid.SMALLDATETIME, Types.TIMESTAMP, "java.lang.Timestamp", Oid.SMALLDATETIME_ARRAY},
+        {"timestamptz", Oid.TIMESTAMPTZ, Types.TIMESTAMP, "java.sql.Timestamp",
+            Oid.TIMESTAMPTZ_ARRAY},
+        {"json", Oid.JSON, Types.OTHER, "org.postgresql.util.PGobject", Oid.JSON_ARRAY},
+        {"point", Oid.POINT, Types.OTHER, "org.postgresql.geometric.PGpoint", Oid.POINT_ARRAY},
+        {"blob", Oid.BLOB, Types.BLOB, "org.postgresql.util.PGobject", -1},
+        {"clob", Oid.CLOB, Types.CLOB, "org.postgresql.util.PGobject", -1},
+        {"nvarchar2", Oid.NVARCHAR2, Types.VARCHAR, "java.lang.String", Oid.NVARCHAR2_ARRAY},
+        {"refcursor", Oid.REF_CURSOR, Types.REF_CURSOR, "java.sql.ResultSet", Oid.REF_CURSOR_ARRAY}
+    };
 
   /**
    * PG maps several alias to real type names. When we do queries against pg_catalog, we must use
