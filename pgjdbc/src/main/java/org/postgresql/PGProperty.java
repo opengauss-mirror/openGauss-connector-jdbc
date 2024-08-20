@@ -612,6 +612,11 @@ public enum PGProperty {
 
     B_CMPT_MODE("BCmptMode", "true", "Specify 'dolphin.b_compatibility_mode'"
             + " connection initialization parameter."),
+
+    /**
+     * Configure bit type format of b database, value include dec,bin,hex.
+     */
+    BIT_OUTPUT("bitOutput", null, "Specify 'dolphin.bit_output' connection initialization parameter."),
   ;
 
   private String _name;
