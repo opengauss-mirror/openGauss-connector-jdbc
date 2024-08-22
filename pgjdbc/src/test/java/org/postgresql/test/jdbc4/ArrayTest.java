@@ -160,14 +160,7 @@ public class ArrayTest extends BaseTest4 {
       return;
     }
     PreparedStatement pstmt = con.prepareStatement("SELECT ?::json[]");
-    PGobject p1 = new PGobject();
-    p1.setType("json");
-    p1.setValue("{\"x\": 10}");
-
-    PGobject p2 = new PGobject();
-    p2.setType("json");
-    p2.setValue("{\"x\": 20}");
-    PGobject[] in = new PGobject[] { p1, p2 };
+    String[] in = new String[]{"{\"x\": 10}", "{\"x\": 20}"};
     pstmt.setArray(1, con.createArrayOf("json", in));
 
     ResultSet rs = pstmt.executeQuery();
@@ -175,10 +168,10 @@ public class ArrayTest extends BaseTest4 {
     Array arr = rs.getArray(1);
     ResultSet arrRs = arr.getResultSet();
     Assert.assertTrue(arrRs.next());
-    Assert.assertEquals(in[0], arrRs.getObject(2));
+    Assert.assertEquals(in[0], arrRs.getString(2));
 
     Assert.assertTrue(arrRs.next());
-    Assert.assertEquals(in[1], arrRs.getObject(2));
+    Assert.assertEquals(in[1], arrRs.getString(2));
   }
 
   @Test
