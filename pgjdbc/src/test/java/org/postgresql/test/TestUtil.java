@@ -365,6 +365,10 @@ public class TestUtil {
    return openDB(props,getDatabase());
   }
 
+  public static Connection openDB(String dbName) throws Exception {
+    return openDB(new Properties(), dbName);
+  }
+
   public static Connection openDBPG(Properties props) throws Exception {
     return openDB(props,getDatabasePG());
   }
