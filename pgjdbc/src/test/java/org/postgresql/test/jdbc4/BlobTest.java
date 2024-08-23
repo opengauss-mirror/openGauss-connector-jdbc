@@ -1,9 +1,19 @@
 /*
- * Copyright (c) openGauss 2024. All rights reserved.
- * See the LICENSE file in the project root for more information.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
+ *
+ * openGauss is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *
+ *          http://license.coscl.org.cn/MulanPSL2
+ *
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
  */
 
-package org.postgresql.test.test5;
+package org.postgresql.test.jdbc4;
 
 import org.junit.Test;
 import org.postgresql.core.types.PGBlob;
@@ -21,8 +31,8 @@ import static org.junit.Assert.assertEquals;
 /**
  * test blob
  *
- * 2024/8/10
- * @version 6.0.0
+ * @author zhangting
+ * @since  2024-08-23
  */
 public class BlobTest extends BaseTest4 {
     @Test
@@ -45,6 +55,7 @@ public class BlobTest extends BaseTest4 {
             while (rs.next()) {
                 assertEquals("1234", new String(rs.getBlob(2).getBytes(1, 4),
                         StandardCharsets.UTF_8));
+                assertEquals("1234", new String(rs.getBytes(2), StandardCharsets.UTF_8));
             }
         }
         TestUtil.dropTable(con, "test_blob_a");
