@@ -171,7 +171,7 @@ public class CallableStmtTest extends BaseTest4 {
     assumeCallableStatementsSupported();
     CallableStatement call = con.prepareCall(func + pkgName + "getNumeric (?) }");
     call.setBigDecimal(2, new java.math.BigDecimal(4));
-    call.registerOutParameter(1, Types.NUMERIC);
+    call.registerOutParameter(1, Types.DECIMAL);
     call.execute();
     assertEquals(new java.math.BigDecimal(42), call.getBigDecimal(1));
   }
@@ -180,7 +180,7 @@ public class CallableStmtTest extends BaseTest4 {
   public void testGetNumericWithoutArg() throws Throwable {
     assumeCallableStatementsSupported();
     CallableStatement call = con.prepareCall(func + pkgName + "getNumericWithoutArg () }");
-    call.registerOutParameter(1, Types.NUMERIC);
+    call.registerOutParameter(1, Types.DECIMAL);
     call.execute();
     assertEquals(new java.math.BigDecimal(42), call.getBigDecimal(1));
   }
