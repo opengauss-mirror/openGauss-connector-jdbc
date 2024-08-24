@@ -109,7 +109,7 @@ public class ArrayTest extends BaseTest4 {
     assertEquals(3, intarr[2].intValue());
 
     arr = rs.getArray(2);
-    assertEquals(Types.NUMERIC, arr.getBaseType());
+    assertEquals(Types.DECIMAL, arr.getBaseType());
     BigDecimal[] decarr = (BigDecimal[]) arr.getArray();
     assertEquals(2, decarr.length);
     assertEquals(new BigDecimal("3.1"), decarr[0]);
@@ -151,7 +151,7 @@ public class ArrayTest extends BaseTest4 {
     Assert.assertEquals(3, intarr[2].intValue());
 
     arr = rs.getArray(2);
-    Assert.assertEquals(Types.NUMERIC, arr.getBaseType());
+    Assert.assertEquals(Types.DECIMAL, arr.getBaseType());
     BigDecimal[] decarr = (BigDecimal[]) arr.getArray();
     Assert.assertEquals(2, decarr.length);
     Assert.assertEquals(new BigDecimal("3.1"), decarr[0]);
@@ -223,7 +223,7 @@ public class ArrayTest extends BaseTest4 {
     Assert.assertEquals(3, intarr[2].intValue());
 
     arr = rs.getArray(2);
-    Assert.assertEquals(Types.NUMERIC, arr.getBaseType());
+    Assert.assertEquals(Types.DECIMAL, arr.getBaseType());
     BigDecimal[] decarr = (BigDecimal[]) arr.getArray();
     Assert.assertEquals(2, decarr.length);
     Assert.assertEquals(new BigDecimal("3.1"), decarr[0]);
@@ -271,7 +271,7 @@ public class ArrayTest extends BaseTest4 {
     arrrs.close();
 
     arr = rs.getArray(2);
-    Assert.assertEquals(Types.NUMERIC, arr.getBaseType());
+    Assert.assertEquals(Types.DECIMAL, arr.getBaseType());
     arrrs = arr.getResultSet();
     Assert.assertTrue(arrrs.next());
     Assert.assertEquals(new BigDecimal("3.1"), arrrs.getBigDecimal(2));

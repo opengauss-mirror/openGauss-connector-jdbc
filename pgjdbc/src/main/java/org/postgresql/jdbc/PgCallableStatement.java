@@ -181,7 +181,7 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
         }
         int columnType = rs.getMetaData().getColumnType(i + 1);
 
-        if (columnType == Types.NUMERIC) {
+        if (columnType == Types.NUMERIC || columnType == Types.DECIMAL) {
             callResult[j] = rs.getBigDecimal(i + 1);
         } else {
             callResult[j] = rs.getObject(i + 1);
@@ -251,8 +251,8 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
       case Types.LONGVARCHAR:
         sqlType = Types.VARCHAR;
         break;
-      case Types.DECIMAL:
-        sqlType = Types.NUMERIC;
+      case Types.NUMERIC:
+        sqlType = Types.DECIMAL;
         break;
       case Types.FLOAT:
         // float is the same as double
@@ -598,7 +598,7 @@ class PgCallableStatement extends PgPreparedStatement implements CallableStateme
 
   public java.math.BigDecimal getBigDecimal(int parameterIndex) throws SQLException {
     checkClosed();
-    checkIndex(parameterIndex, Types.NUMERIC, "BigDecimal");
+    checkIndex(parameterIndex, Types.DECIMAL, "BigDecimal");
     try {
     	 return ((BigDecimal) callResult[parameterIndex - 1]);
     }catch(Exception e) {
