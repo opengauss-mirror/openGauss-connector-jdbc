@@ -20,6 +20,7 @@ import java.sql.Statement;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class BlobTest extends BaseTest4B {
 
@@ -128,6 +129,33 @@ public class BlobTest extends BaseTest4B {
                 assertEquals("1234", new String(rs.getBlob(5).getBytes(1, 4),
                         StandardCharsets.UTF_8));
             }
+        }
+    }
+
+    /**
+     * test blob by getBytes
+     *
+     * @throws SQLException  sql exception
+     */
+    @Test
+    public void testBlobToBytes() throws SQLException {
+        String sql = "INSERT INTO test_blob_b VALUES (1,'abcd'::tinyblob,"
+                + "'abcd'::blob,'abcd'::mediumblob,'abcd'::longblob)";
+        try (PreparedStatement pstmt = con.prepareStatement(sql)) {
+            pstmt.execute();
+        }
+
+        try (Statement statement = con.createStatement();
+             ResultSet rs = statement.executeQuery("SELECT * FROM test_blob_b")) {
+            assertTrue(rs.next());
+            assertEquals("abcd", new String(rs.getBytes(2),
+                    StandardCharsets.UTF_8));
+            assertEquals("abcd", new String(rs.getBytes(3),
+                    StandardCharsets.UTF_8));
+            assertEquals("abcd", new String(rs.getBytes(4),
+                    StandardCharsets.UTF_8));
+            assertEquals("abcd", new String(rs.getBytes(5),
+                    StandardCharsets.UTF_8));
         }
     }
 }
