@@ -328,8 +328,8 @@ public class PgCallableStatementTest extends BaseTest4 {
             String queryStr = "{? = call fn_ty_in_ty_out3(?)}";
             cmt = con.prepareCall(queryStr);
             {
-                cmt.registerOutParameter(1, Types.NUMERIC);
-                cmt.registerOutParameter(2, Types.NUMERIC);
+                cmt.registerOutParameter(1, Types.DECIMAL);
+                cmt.registerOutParameter(2, Types.DECIMAL);
             }
             cmt.execute();
             assertEquals(new BigDecimal(0), cmt.getObject(1));

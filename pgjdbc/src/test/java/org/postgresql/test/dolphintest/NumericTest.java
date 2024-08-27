@@ -56,15 +56,15 @@ public class NumericTest extends BaseTest4B {
             assertTrue(rs.next());
             ResultSetMetaData rsmd = rs.getMetaData();
             assertEquals(9, rsmd.getColumnCount());
-            assertEquals(Types.NUMERIC, rsmd.getColumnType(1));
-            assertEquals(Types.NUMERIC, rsmd.getColumnType(2));
+            assertEquals(Types.DECIMAL, rsmd.getColumnType(1));
+            assertEquals(Types.DECIMAL, rsmd.getColumnType(2));
             assertEquals(Types.REAL, rsmd.getColumnType(3));
-            assertEquals(Types.NUMERIC, rsmd.getColumnType(4));
+            assertEquals(Types.DECIMAL, rsmd.getColumnType(4));
             assertEquals(Types.DOUBLE, rsmd.getColumnType(5));
-            assertEquals(Types.NUMERIC, rsmd.getColumnType(6));
+            assertEquals(Types.DECIMAL, rsmd.getColumnType(6));
             assertEquals(Types.REAL, rsmd.getColumnType(7));
-            assertEquals(Types.NUMERIC, rsmd.getColumnType(8));
-            assertEquals(Types.NUMERIC, rsmd.getColumnType(9));
+            assertEquals(Types.DECIMAL, rsmd.getColumnType(8));
+            assertEquals(Types.DECIMAL, rsmd.getColumnType(9));
 
             assertEquals(new BigDecimal(92), rs.getObject(1));
             assertEquals(new String("92.4567"), rs.getString(2));

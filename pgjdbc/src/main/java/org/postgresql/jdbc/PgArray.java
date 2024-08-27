@@ -656,7 +656,7 @@ public class PgArray implements java.sql.Array {
           pa[length++] = o == null ? 0L : PgResultSet.toLong((String) o);
         }
       }
-    } else if (type == Types.NUMERIC) {
+    } else if (type == Types.NUMERIC || type == Types.DECIMAL) {
       Object[] oa = null;
       ret = oa =
           (dims > 1 ? (Object[]) java.lang.reflect.Array.newInstance(BigDecimal.class, dimsLength)
