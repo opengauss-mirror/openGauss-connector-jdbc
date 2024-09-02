@@ -658,7 +658,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       }
     }
 
-    return connection.getTimestampUtils().toDate(cal, getString(i));
+    return connection.getTimestampUtils().toDate(cal, new String(this_row[i - 1]));
   }
 
 
