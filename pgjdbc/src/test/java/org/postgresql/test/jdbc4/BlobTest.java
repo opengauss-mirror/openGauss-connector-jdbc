@@ -25,6 +25,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.ResultSetMetaData;
+import java.sql.Types;
 
 import static org.junit.Assert.assertEquals;
 
@@ -53,6 +55,8 @@ public class BlobTest extends BaseTest4 {
         try (Statement statement = con.createStatement();
              ResultSet rs = statement.executeQuery("SELECT * FROM test_blob_a")) {
             while (rs.next()) {
+                ResultSetMetaData rsmd = rs.getMetaData();
+                assertEquals(Types.BLOB, rsmd.getColumnType(2));
                 assertEquals("1234", new String(rs.getBlob(2).getBytes(1, 4),
                         StandardCharsets.UTF_8));
                 assertEquals("1234", new String(rs.getBytes(2), StandardCharsets.UTF_8));
