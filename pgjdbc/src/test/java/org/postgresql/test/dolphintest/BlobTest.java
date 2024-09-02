@@ -5,7 +5,6 @@
 package org.postgresql.test.dolphintest;
 
 import org.junit.Test;
-import org.postgresql.core.ServerVersion;
 import org.postgresql.core.types.PGBlob;
 import org.postgresql.jdbc.PgConnection;
 import org.postgresql.test.TestUtil;
@@ -18,6 +17,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
+import java.sql.ResultSetMetaData;
+import java.sql.Types;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -148,6 +149,8 @@ public class BlobTest extends BaseTest4B {
         try (Statement statement = con.createStatement();
              ResultSet rs = statement.executeQuery("SELECT * FROM test_blob_b")) {
             assertTrue(rs.next());
+            ResultSetMetaData rsmd = rs.getMetaData();
+            assertEquals(Types.LONGVARBINARY, rsmd.getColumnType(3));
             assertEquals("abcd", new String(rs.getBytes(2),
                     StandardCharsets.UTF_8));
             assertEquals("abcd", new String(rs.getBytes(3),

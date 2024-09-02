@@ -357,7 +357,11 @@ public class PgConnection implements BaseConnection {
       _typeCache.addCoreType("xml", Oid.XML, Types.SQLXML, "java.sql.SQLXML", Oid.XML_ARRAY);
     }
     _typeCache.addCoreType("clob", Oid.CLOB, Types.CLOB, "java.sql.CLOB", Oid.UNSPECIFIED);
-    _typeCache.addCoreType("blob", Oid.BLOB, Types.BLOB, "java.sql.BLOB", Oid.UNSPECIFIED);
+    int blobType = Types.BLOB;
+    if (pgDatabase.isDolphin()) {
+        blobType = Types.LONGVARBINARY;
+    }
+    _typeCache.addCoreType("blob", Oid.BLOB, blobType, "java.sql.BLOB", Oid.UNSPECIFIED);
 
     this._clientInfo = new Properties();
     if (haveMinimumServerVersion(ServerVersion.v9_0)) {
