@@ -216,6 +216,18 @@ public class TypeInfoCache implements TypeInfo {
       return i;
     }
 
+    Integer type = null;
+    if ("binary".equals(pgTypeName)) {
+      type = Types.BINARY;
+    } else if ("varbinary".equals(pgTypeName)) {
+      type = Types.VARBINARY;
+    }
+
+    if (type != null) {
+      _pgNameToSQLType.put(pgTypeName, type);
+      return type;
+    }
+
     if (_getTypeInfoStatement == null) {
       // There's no great way of telling what's an array type.
       // People can name their own types starting with _.
@@ -241,7 +253,6 @@ public class TypeInfoCache implements TypeInfo {
 
     ResultSet rs = _getTypeInfoStatement.getResultSet();
 
-    Integer type = null;
     if (rs.next()) {
       boolean isArray = rs.getBoolean(1);
       String typtype = rs.getString(2);

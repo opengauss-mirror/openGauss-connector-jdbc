@@ -2878,7 +2878,8 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       return null;
     }
 
-    if(blobSet.contains(getPGType(columnIndex))){
+    String pgType = getPGType(columnIndex);
+    if (blobSet.contains(pgType)) {
     	return toBytes(getBlobSetString(columnIndex));
     }
 
@@ -2887,13 +2888,13 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       return result;
     }
 
-    if (binarySet.contains(getPGType(columnIndex))) {
+    if (binarySet.contains(pgType)) {
       return this_row[columnIndex - 1];
     }
     if (isBinary(columnIndex)) {
-      return connection.getObject(getPGType(columnIndex), null, this_row[columnIndex - 1]);
+      return connection.getObject(pgType, null, this_row[columnIndex - 1]);
     }
-    return connection.getObject(getPGType(columnIndex), getString(columnIndex), null);
+    return connection.getObject(pgType, getString(columnIndex), null);
   }
 
   public Object getObject(String columnName) throws SQLException {
