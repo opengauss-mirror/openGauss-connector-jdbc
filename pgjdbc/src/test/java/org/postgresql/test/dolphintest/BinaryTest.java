@@ -27,8 +27,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.ResultSetMetaData;
+import java.sql.Types;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * test binary
@@ -92,5 +95,35 @@ public class BinaryTest extends BaseTest4B {
                 }
             }
         }
+    }
+
+    /*
+     * test binary type
+     */
+    @Test
+    public void testBinaryType() throws Exception {
+        TestUtil.createTable(con, "test_binary", "c1 binary,c2 binary(5),"
+                + "c3 varbinary,c4 varbinary(5)");
+
+        try (Statement stat = con.createStatement()) {
+            stat.execute("set bytea_output=escape;");
+            stat.executeUpdate("INSERT INTO test_binary VALUES ('a','abcde','a','abcde')");
+        }
+        try (Statement stmt = con.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM test_binary")) {
+            assertTrue(rs.next());
+            ResultSetMetaData rsmd = rs.getMetaData();
+            assertEquals(4, rsmd.getColumnCount());
+            assertEquals(Types.BINARY, rsmd.getColumnType(1));
+            assertEquals(Types.BINARY, rsmd.getColumnType(2));
+            assertEquals(Types.VARBINARY, rsmd.getColumnType(3));
+            assertEquals(Types.VARBINARY, rsmd.getColumnType(4));
+
+            assertEquals("a", rs.getString(1));
+            assertEquals("abcde", rs.getString(2));
+            assertEquals("a", rs.getString(3));
+            assertEquals("abcde", rs.getString(4));
+        }
+        TestUtil.dropTable(con, "test_binary");
     }
 }
