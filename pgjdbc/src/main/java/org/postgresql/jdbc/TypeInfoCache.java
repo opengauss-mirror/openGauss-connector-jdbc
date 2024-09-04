@@ -266,7 +266,11 @@ public class TypeInfoCache implements TypeInfo {
     }
 
     if (type == null) {
-      type = Types.OTHER;
+      if (_conn.getPgDatabase().isDolphin()) {
+        type = Types.CHAR;
+      } else {
+        type = Types.OTHER;
+      }
     }
     rs.close();
 
