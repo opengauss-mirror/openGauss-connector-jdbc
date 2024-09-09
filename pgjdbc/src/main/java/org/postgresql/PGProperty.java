@@ -617,6 +617,12 @@ public enum PGProperty {
      * Configure bit type format of b database, value include dec,bin,hex.
      */
     BIT_OUTPUT("bitOutput", null, "Specify 'dolphin.bit_output' connection initialization parameter."),
+
+    /**
+     * Determine whether SAVEPOINTS used in AUTOSAVE will be released per query or not
+     */
+    CLEANUP_SAVEPOINTS("cleanupSavepoints", "false", "Determine whether SAVEPOINTS "
+            + "used in AUTOSAVE will be released per query or not", false, new String[]{"true", "false"})
   ;
 
   private String _name;
