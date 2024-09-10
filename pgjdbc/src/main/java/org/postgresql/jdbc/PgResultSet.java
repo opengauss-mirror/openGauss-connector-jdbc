@@ -2097,7 +2097,8 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
         if (connection.unwrap(PgConnection.class).isDolphinCmpt()) {
           return new String(toBytes(result));
         }
-      } else if (blobSet.contains(typeName)) {
+      } else if (blobSet.contains(typeName) || ("raw".equals(typeName)
+              && connection.getPgDatabase().isDolphin())) {
         return new String(toBytes(result));
       } else if ("time".equals(typeName)) {
         char[] cs = result.toCharArray();
