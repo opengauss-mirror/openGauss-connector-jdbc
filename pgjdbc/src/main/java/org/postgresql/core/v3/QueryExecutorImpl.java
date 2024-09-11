@@ -178,6 +178,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     super(pgStream, user, database, cancelSignalTimeout, info);
 
     this.allowEncodingChanges = PGProperty.ALLOW_ENCODING_CHANGES.getBoolean(info);
+    this.cleanupSavePoints = PGProperty.CLEANUP_SAVEPOINTS.getBoolean(info);
     this.replicationProtocol = new V3ReplicationProtocol(this, pgStream);
     this.socketAddress = pgStream.getConnectInfo();
     this.secSocketAddress = pgStream.getSecConnectInfo();
@@ -469,8 +470,23 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     try {
       handler.handleCompletion();
+      if (cleanupSavePoints) {
+        releaseSavePoint(autosave, flags);
+      }
     } catch (SQLException e) {
       rollbackIfRequired(autosave, e);
+    }
+  }
+
+  private void releaseSavePoint(boolean autosave, int flags) throws SQLException {
+    if (autosave && getAutoSave() == AutoSave.ALWAYS
+            && getTransactionState() == TransactionState.OPEN) {
+      try {
+        sendOneQuery(releaseAutoSave, SimpleQuery.NO_PARAMETERS, 1, 0,
+                QUERY_NO_RESULTS | QUERY_NO_METADATA | QUERY_EXECUTE_AS_SIMPLE);
+      } catch (IOException ex) {
+        throw new PSQLException(GT.tr("Error releasing savepoint"), PSQLState.IO_ERROR);
+      }
     }
   }
 
@@ -622,6 +638,9 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     try {
       handler.handleCompletion();
+      if (cleanupSavePoints) {
+        releaseSavePoint(autosave, flags);
+      }
     } catch (SQLException e) {
       rollbackIfRequired(autosave, e);
     }
@@ -688,6 +707,9 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     try {
       handler.handleCompletion();
+      if (cleanupSavePoints) {
+        releaseSavePoint(autosave, flags);
+      }
     } catch (SQLException e) {
       rollbackIfRequired(autosave, e);
     }
@@ -2676,8 +2698,8 @@ public class QueryExecutorImpl extends QueryExecutorBase {
               // For simple 'Q' queries, executeQueue is cleared via ReadyForQuery message
             }
 
-            if (currentQuery == autoSaveQuery) {
-              // ignore "SAVEPOINT" status from autosave query
+            if (currentQuery == autoSaveQuery || currentQuery == releaseAutoSave) {
+              // ignore "SAVEPOINT" or RELEASE SAVEPOINT status from autosave query
               break;
             }
 
@@ -3389,6 +3411,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   private long nextUniqueID = 1;
   private final boolean allowEncodingChanges;
+  private final boolean cleanupSavePoints;
   private String output = "";
 
 
@@ -3416,6 +3439,11 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   private final SimpleQuery autoSaveQuery =
           new SimpleQuery(
                   new NativeQuery("SAVEPOINT PGJDBC_AUTOSAVE", new int[0], false, SqlCommand.BLANK),
+                  null, false);
+
+  private final SimpleQuery releaseAutoSave =
+          new SimpleQuery(
+                  new NativeQuery("RELEASE SAVEPOINT PGJDBC_AUTOSAVE", new int[0], false, SqlCommand.BLANK),
                   null, false);
 
   private final SimpleQuery restoreToAutoSave =
