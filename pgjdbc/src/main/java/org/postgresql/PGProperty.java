@@ -622,7 +622,12 @@ public enum PGProperty {
      * Determine whether SAVEPOINTS used in AUTOSAVE will be released per query or not
      */
     CLEANUP_SAVEPOINTS("cleanupSavepoints", "false", "Determine whether SAVEPOINTS "
-            + "used in AUTOSAVE will be released per query or not", false, new String[]{"true", "false"})
+            + "used in AUTOSAVE will be released per query or not", false, new String[]{"true", "false"}),
+
+    /**
+     * Determine whether use utf8 encoding
+     */
+    UTF8_DECODE("UTF8Decode", "false", "Use utf8 encoding.")
   ;
 
   private String _name;

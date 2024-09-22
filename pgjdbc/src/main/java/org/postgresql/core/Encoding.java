@@ -128,6 +128,16 @@ public class Encoding {
   }
 
   /**
+   * Construct utf8 Encoding for a given JVM encoding.
+   *
+   * @param jvmEncoding the name of the JVM encoding
+   * @return an Encoding instance for the specified encoding.
+   */
+  public static Encoding getUtf8Encoding(String jvmEncoding) {
+    return new UTF8Encoding(jvmEncoding);
+  }
+
+  /**
    * Construct an Encoding for a given database encoding.
    *
    * @param databaseEncoding the name of the database encoding
