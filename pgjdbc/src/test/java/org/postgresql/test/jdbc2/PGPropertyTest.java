@@ -154,6 +154,7 @@ public class PGPropertyTest {
     excluded.add("writeDataSourceAddress");
     excluded.add("BCmptMode");
     excluded.add("bitOutput");
+    excluded.add("UTF8Decode");
 
     // index PropertyDescriptors by name
     Map<String, PropertyDescriptor> propertyDescriptors =
