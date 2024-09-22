@@ -49,6 +49,9 @@ public class PGStream implements Closeable, Flushable {
   private Writer encodingWriter;
 
   private final int MAX_PARAMS_NUM = 65535;
+
+  private boolean isUtf8Encode = false;
+
   /**
    * Constructor: Connect to the PostgreSQL back end and return a stream connection.
    *
@@ -101,6 +104,10 @@ public class PGStream implements Closeable, Flushable {
 
   public SocketFactory getSocketFactory() {
     return socketFactory;
+  }
+
+  public void setUtf8Encode(boolean isUtf8Encode) {
+    this.isUtf8Encode = isUtf8Encode;
   }
 
   /**
@@ -162,7 +169,7 @@ public class PGStream implements Closeable, Flushable {
    * @throws IOException if something goes wrong
    */
   public void setEncoding(Encoding encoding) throws IOException {
-    if (this.encoding != null && this.encoding.name().equals(encoding.name())) {
+    if (!isUtf8Encode && this.encoding != null && this.encoding.name().equals(encoding.name())) {
       return;
     }
     // Close down any old writer.
