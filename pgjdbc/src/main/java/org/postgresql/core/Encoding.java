@@ -13,6 +13,7 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
@@ -27,7 +28,7 @@ public class Encoding {
   private static Log LOGGER = Logger.getLogger(Encoding.class.getName());
 
   private static final Encoding DEFAULT_ENCODING = new Encoding();
-  private static final Encoding UTF8_ENCODING = new Encoding("UTF-8");
+  private static final Encoding UTF8_ENCODING = new Encoding(StandardCharsets.UTF_8, true);
 
   /*
    * Preferred JVM encodings for backend encodings.
@@ -79,27 +80,42 @@ public class Encoding {
     encodings.put("LATIN10", new String[0]);
   }
 
-  private final String encoding;
+  private final Charset encoding;
   private final boolean fastASCIINumbers;
 
   /**
    * Uses the default charset of the JVM.
    */
   private Encoding() {
-    this(Charset.defaultCharset().name());
+    this(Charset.defaultCharset());
   }
 
   /**
-   * Use the charset passed as parameter.
+   * Use the charset passed as parameter and tests at creation time whether
+   * the specified encoding is compatible with ASCII numbers.
    *
    * @param encoding charset name to use
    */
-  protected Encoding(String encoding) {
+  private Encoding(Charset encoding) {
+    this(encoding, testAsciiNumbers(encoding));
+  }
+
+  /**
+   * Subclasses may use this constructor if they know in advance of their
+   * ASCII number compatibility.
+   *
+   * @param encoding charset name to use
+   * @param isFastASCIINumbers whether this encoding is compatible with ASCII numbers.
+   */
+  private Encoding(Charset encoding, boolean isFastASCIINumbers) {
     if (encoding == null) {
       throw new NullPointerException("Null encoding charset not supported");
     }
     this.encoding = encoding;
-    fastASCIINumbers = testAsciiNumbers();
+    this.fastASCIINumbers = isFastASCIINumbers;
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("Creating new Encoding " + encoding + " with fastASCIINumbers " + isFastASCIINumbers);
+    }
   }
 
   /**
@@ -120,21 +136,13 @@ public class Encoding {
    *     default JVM encoding if the specified encoding is unavailable.
    */
   public static Encoding getJVMEncoding(String jvmEncoding) {
-    if (Charset.isSupported(jvmEncoding)) {
-      return new Encoding(jvmEncoding);
-    } else {
-      return DEFAULT_ENCODING;
+    if ("UTF-8".equals(jvmEncoding)) {
+      return UTF8_ENCODING;
     }
-  }
-
-  /**
-   * Construct utf8 Encoding for a given JVM encoding.
-   *
-   * @param jvmEncoding the name of the JVM encoding
-   * @return an Encoding instance for the specified encoding.
-   */
-  public static Encoding getUtf8Encoding(String jvmEncoding) {
-    return new UTF8Encoding(jvmEncoding);
+    if (Charset.isSupported(jvmEncoding)) {
+      return new Encoding(Charset.forName(jvmEncoding));
+    }
+    return DEFAULT_ENCODING;
   }
 
   /**
@@ -145,7 +153,7 @@ public class Encoding {
    *     default JVM encoding if the specified encoding is unavailable.
    */
   public static Encoding getDatabaseEncoding(String databaseEncoding) {
-    if ("UTF8".equals(databaseEncoding)) {
+    if ("UTF8".equals(databaseEncoding) || "UNICODE".equals(databaseEncoding)) {
       return UTF8_ENCODING;
     }
     // If the backend encoding is known and there is a suitable
@@ -154,9 +162,11 @@ public class Encoding {
     String[] candidates = encodings.get(databaseEncoding);
     if (candidates != null) {
       for (String candidate : candidates) {
-        LOGGER.trace("Search encoding candidate " + candidate);
+        if (LOGGER.isTraceEnabled()) {
+          LOGGER.trace("Search encoding candidate " + candidate);
+        }
         if (Charset.isSupported(candidate)) {
-          return new Encoding(candidate);
+          return new Encoding(Charset.forName(candidate));
         }
       }
     }
@@ -164,11 +174,13 @@ public class Encoding {
     // Try the encoding name directly -- maybe the charset has been
     // provided by the user.
     if (Charset.isSupported(databaseEncoding)) {
-      return new Encoding(databaseEncoding);
+      return new Encoding(Charset.forName(databaseEncoding));
     }
 
     // Fall back to default JVM encoding.
-    LOGGER.trace(databaseEncoding + " encoding not found, returning default encoding");
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace(databaseEncoding + " encoding not found, returning default encoding");
+    }
     return DEFAULT_ENCODING;
   }
 
@@ -178,7 +190,7 @@ public class Encoding {
    * @return the JVM encoding name used by this instance.
    */
   public String name() {
-    return Charset.isSupported(encoding) ? Charset.forName(encoding).name() : encoding;
+    return encoding.name();
   }
 
   /**
@@ -252,30 +264,25 @@ public class Encoding {
     return DEFAULT_ENCODING;
   }
 
+  @Override
   public String toString() {
-    return encoding;
+    return encoding.name();
   }
 
   /**
    * Checks weather this encoding is compatible with ASCII for the number characters '-' and
    * '0'..'9'. Where compatible means that they are encoded with exactly same values.
    *
+   * @param encoding current encoding
    * @return If faster ASCII number parsing can be used with this encoding.
    */
-  private boolean testAsciiNumbers() {
-    // TODO: test all postgres supported encoding to see if there are
+  private static boolean testAsciiNumbers(Charset encoding) {
     // any which do _not_ have ascii numbers in same location
     // at least all the encoding listed in the encodings hashmap have
     // working ascii numbers
-    try {
-      String test = "-0123456789";
-      byte[] bytes = encode(test);
-      String res = new String(bytes, "US-ASCII");
-      return test.equals(res);
-    } catch (java.io.UnsupportedEncodingException e) {
-      return false;
-    } catch (IOException e) {
-      return false;
-    }
+    String test = "-0123456789";
+    byte[] bytes = test.getBytes(encoding);
+    String res = new String(bytes, StandardCharsets.US_ASCII);
+    return test.equals(res);
   }
 }
