@@ -15,6 +15,7 @@ import org.junit.Test;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.Reader;
+import java.nio.charset.Charset;
 import java.util.Locale;
 
 /**
@@ -35,6 +36,7 @@ public class EncodingTest {
   @Test
   public void testTransformations() throws Exception {
     Encoding encoding = Encoding.getDatabaseEncoding("UTF8");
+    assertTrue(encoding.hasAsciiNumbers());
     assertEquals("ab", encoding.decode(new byte[]{97, 98}));
 
     assertEquals(2, encoding.encode("ab").length);
@@ -54,5 +56,32 @@ public class EncodingTest {
     assertEquals(97, reader.read());
     assertEquals(98, reader.read());
     assertEquals(-1, reader.read());
+  }
+
+  @Test
+  public void testEncodingWithNull() {
+    try {
+      Encoding encoding = Encoding.getDatabaseEncoding(null);
+    } catch (IllegalArgumentException e) {
+      assertEquals(e.getMessage(), "Null charset name");
+    }
+  }
+
+  @Test
+  public void testGetJVMEncoding() {
+    Encoding encoding = Encoding.getJVMEncoding("UTF8");
+    assertEquals(encoding.name(), "UTF-8");
+
+    Encoding encodingGBK = Encoding.getJVMEncoding("GBK");
+    assertEquals(encodingGBK.name(), "GBK");
+
+    Encoding encodingWrong = Encoding.getJVMEncoding("encodingWrong");
+    assertEquals(encodingWrong.name(), Charset.defaultCharset().name());
+  }
+
+  @Test
+  public void testDefaultEncoding() {
+    Charset.defaultCharset();
+    assertEquals(Encoding.defaultEncoding().name(), Charset.defaultCharset().name());
   }
 }
