@@ -18,7 +18,6 @@ import org.postgresql.core.SetupQueryRunner;
 import org.postgresql.core.SocketFactoryFactory;
 import org.postgresql.core.Utils;
 import org.postgresql.core.Version;
-import org.postgresql.core.Encoding;
 import org.postgresql.hostchooser.*;
 import org.postgresql.jdbc.SslMode;
 import org.postgresql.QueryCNListUtils;
@@ -112,10 +111,6 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     }
 
     PGStream newStream = new PGStream(socketFactory, hostSpec, connectTimeout);
-    if (Boolean.valueOf(PGProperty.UTF8_DECODE.get(info))) {
-      newStream.setUtf8Encode(true);
-      newStream.setEncoding(Encoding.getUtf8Encoding("UTF-8"));
-    }
 
     // Construct and send an ssl startup packet if requested.
     newStream = enableSSL(newStream, sslMode, info, connectTimeout);
