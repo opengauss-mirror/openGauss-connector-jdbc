@@ -50,13 +50,17 @@ public class PgDatabase {
         if (dolphinNum > 0 && CompatibilityEnum.ON.equals(compatibilityEnum)) {
             isDolphin = true;
             String bitOutput = PGProperty.BIT_OUTPUT.get(info);
-            if (bitOutput == null) {
-                bitOutput = getDolphin("show dolphin.bit_output;");
-            } else {
-                updateBitOutput(bitOutput);
-            }
-            if (BitOutputEnum.DEC.equals(BitOutputEnum.valueOf(bitOutput.toUpperCase(Locale.ROOT)))) {
-                isDec = true;
+            try {
+                if (bitOutput == null) {
+                    bitOutput = getDolphin("show dolphin.bit_output;");
+                } else {
+                    updateBitOutput(bitOutput);
+                }
+                if (BitOutputEnum.DEC.equals(BitOutputEnum.valueOf(bitOutput.toUpperCase(Locale.ROOT)))) {
+                    isDec = true;
+                }
+            } catch (SQLException e) {
+                isDec = false;
             }
         } else {
             isDolphin = false;
