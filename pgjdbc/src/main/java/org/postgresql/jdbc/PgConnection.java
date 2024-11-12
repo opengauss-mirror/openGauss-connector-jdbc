@@ -125,13 +125,16 @@ public class PgConnection implements BaseConnection {
   /* URL we were created via */
   private final String creatingURL;
 
-  private Throwable openStackTrace;
-
-  /* Actual network handler */
-  private final QueryExecutor queryExecutor;
+  /**
+   * Actual network handler
+   */
+  private QueryExecutor queryExecutor;
 
   /* Query that runs COMMIT */
   private final Query commitQuery;
+
+  private Throwable openStackTrace;
+
   /* Query that runs ROLLBACK */
   private final Query rollbackQuery;
 
@@ -200,6 +203,15 @@ public class PgConnection implements BaseConnection {
   private boolean adaptiveSetSQLType = false;
   private boolean isDolphinCmpt = false;
   private PgDatabase pgDatabase;
+  private Properties props;
+
+  public Properties getProps() {
+    return props;
+  }
+
+  public void setProps(Properties props) {
+    this.props = props;
+  }
 
   final CachedQuery borrowQuery(String sql) throws SQLException {
     return queryExecutor.borrowQuery(sql);
@@ -673,6 +685,10 @@ public class PgConnection implements BaseConnection {
 
   public QueryExecutor getQueryExecutor() {
     return queryExecutor;
+  }
+
+  public void setQueryExecutor(QueryExecutor queryExecutor) {
+    this.queryExecutor = queryExecutor;
   }
 
   public ReplicationProtocol getReplicationProtocol() {

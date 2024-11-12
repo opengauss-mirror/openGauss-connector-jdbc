@@ -75,6 +75,11 @@ public interface BaseConnection extends PGConnection, Connection {
   QueryExecutor getQueryExecutor();
 
   /**
+   * Set the QueryExecutor implementation for this connection.
+   */
+  void setQueryExecutor(QueryExecutor queryExecutor);
+
+  /**
    * Internal protocol for work with physical and logical replication. Physical replication available
    * only since PostgreSQL version 9.1. Logical replication available only since PostgreSQL version 9.4.
    *
