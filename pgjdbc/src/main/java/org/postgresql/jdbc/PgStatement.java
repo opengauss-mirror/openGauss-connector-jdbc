@@ -6,6 +6,7 @@
 package org.postgresql.jdbc;
 
 import org.postgresql.Driver;
+import org.postgresql.PGProperty;
 import org.postgresql.core.*;
 import org.postgresql.core.v3.QueryExecutorImpl;
 import org.postgresql.quickautobalance.ConnectionManager;
@@ -24,6 +25,7 @@ import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
@@ -472,73 +474,103 @@ public class PgStatement implements Statement, BaseStatement {
 
   private void executeInternal(CachedQuery cachedQuery, ParameterList queryParameters, int flags)
       throws SQLException {
-    closeForNextExecution();
-    // Replace the query for client logic case
-    ClientLogic clientLogic = replaceQueryForClientLogic(cachedQuery, queryParameters, flags);
-    // Enable cursor-based resultset if possible.
-    if (fetchSize > 0 && !wantsScrollableResultSet() && !connection.getAutoCommit()
-        && !wantsHoldableResultSet()) {
-      flags |= QueryExecutor.QUERY_FORWARD_CURSOR;
-    }
-
-    if (wantsGeneratedKeysOnce || wantsGeneratedKeysAlways) {
-      flags |= QueryExecutor.QUERY_BOTH_ROWS_AND_STATUS;
-
-      // If the no results flag is set (from executeUpdate)
-      // clear it so we get the generated keys results.
-      if ((flags & QueryExecutor.QUERY_NO_RESULTS) != 0) {
-        flags &= ~(QueryExecutor.QUERY_NO_RESULTS);
+    try {
+      closeForNextExecution();
+      // Replace the query for client logic case
+      ClientLogic clientLogic = replaceQueryForClientLogic(cachedQuery, queryParameters, flags);
+      // Enable cursor-based resultset if possible.
+      if (fetchSize > 0 && !wantsScrollableResultSet() && !connection.getAutoCommit()
+              && !wantsHoldableResultSet()) {
+        flags |= QueryExecutor.QUERY_FORWARD_CURSOR;
       }
-    }
 
-    if (isOneShotQuery(cachedQuery)) {
-      flags |= QueryExecutor.QUERY_ONESHOT;
-    }
-    // Only use named statements after we hit the threshold. Note that only
-    // named statements can be transferred in binary format.
+      if (wantsGeneratedKeysOnce || wantsGeneratedKeysAlways) {
+        flags |= QueryExecutor.QUERY_BOTH_ROWS_AND_STATUS;
 
-    if (connection.getAutoCommit()) {
-      flags |= QueryExecutor.QUERY_SUPPRESS_BEGIN;
-    }
-
-    // updateable result sets do not yet support binary updates
-    if (concurrency != ResultSet.CONCUR_READ_ONLY) {
-      flags |= QueryExecutor.QUERY_NO_BINARY_TRANSFER;
-    }
-
-    Query queryToExecute = cachedQuery.query;
-
-    if (queryToExecute.isEmpty()) {
-      flags |= QueryExecutor.QUERY_SUPPRESS_BEGIN;
-    }
-
-    if (!queryToExecute.isStatementDescribed() && forceBinaryTransfers
-        && (flags & QueryExecutor.QUERY_EXECUTE_AS_SIMPLE) == 0) {
-      // Simple 'Q' execution does not need to know parameter types
-      // When binaryTransfer is forced, then we need to know resulting parameter and column types,
-      // thus sending a describe request.
-      int flags2 = flags | QueryExecutor.QUERY_DESCRIBE_ONLY;
-      StatementResultHandler handler2 = new StatementResultHandler();
-      if (clientLogic != null) {
-        runQueryExecutorForClientLogic(queryParameters, clientLogic, queryToExecute, flags2, handler2, 0, 0);
+        // If the no results flag is set (from executeUpdate)
+        // clear it so we get the generated keys results.
+        if ((flags & QueryExecutor.QUERY_NO_RESULTS) != 0) {
+          flags &= ~(QueryExecutor.QUERY_NO_RESULTS);
+        }
       }
-      else {
-        connection.getQueryExecutor().execute(queryToExecute, queryParameters, handler2, 0, 0,
-                flags2);
-      }
-      ResultWrapper result2 = handler2.getResults();
-      if (result2 != null) {
-        result2.getResultSet().close();
-      }
-    }
 
-    StatementResultHandler handler = new StatementResultHandler();
-    synchronized (this) {
-      result = null;
+      if (isOneShotQuery(cachedQuery)) {
+        flags |= QueryExecutor.QUERY_ONESHOT;
+      }
+      // Only use named statements after we hit the threshold. Note that only
+      // named statements can be transferred in binary format.
+
+      if (connection.getAutoCommit()) {
+        flags |= QueryExecutor.QUERY_SUPPRESS_BEGIN;
+      }
+
+      // updateable result sets do not yet support binary updates
+      if (concurrency != ResultSet.CONCUR_READ_ONLY) {
+        flags |= QueryExecutor.QUERY_NO_BINARY_TRANSFER;
+      }
+
+      Query queryToExecute = cachedQuery.query;
+
+      if (queryToExecute.isEmpty()) {
+        flags |= QueryExecutor.QUERY_SUPPRESS_BEGIN;
+      }
+
+      if (!queryToExecute.isStatementDescribed() && forceBinaryTransfers
+              && (flags & QueryExecutor.QUERY_EXECUTE_AS_SIMPLE) == 0) {
+        // Simple 'Q' execution does not need to know parameter types
+        // When binaryTransfer is forced, then we need to know resulting parameter and column types,
+        // thus sending a describe request.
+        int flags2 = flags | QueryExecutor.QUERY_DESCRIBE_ONLY;
+        StatementResultHandler handler2 = new StatementResultHandler();
+        if (clientLogic != null) {
+          runQueryExecutorForClientLogic(queryParameters, clientLogic, queryToExecute, flags2, handler2, 0, 0);
+        } else {
+          connection.getQueryExecutor().execute(queryToExecute, queryParameters, handler2, 0, 0,
+                  flags2);
+        }
+        ResultWrapper result2 = handler2.getResults();
+        if (result2 != null) {
+          result2.getResultSet().close();
+        }
+      }
+
+      StatementResultHandler handler = new StatementResultHandler();
+      synchronized (this) {
+        result = null;
+      }
+      runQueryExecutor(queryParameters, flags, clientLogic, queryToExecute, handler);
+      updateGeneratedKeyStatus(clientLogic, handler);
+      runQueryPostProcess(clientLogic);
+    } catch (SQLException e) {
+      handleTerminateConn(e, cachedQuery, queryParameters, flags);
     }
-    runQueryExecutor(queryParameters, flags, clientLogic, queryToExecute, handler);
-    updateGeneratedKeyStatus(clientLogic, handler);
-    runQueryPostProcess(clientLogic);
+  }
+
+  private void handleTerminateConn(SQLException e, CachedQuery cachedQuery,
+                                   ParameterList queryParameters, int flags) throws SQLException {
+    Properties info;
+    if (connection instanceof PgConnection) {
+      info = ((PgConnection) connection).getProps();
+    } else {
+      throw new IllegalArgumentException("Connection is not an instance of PgConnection");
+    }
+    String terminateConn = "terminating connection due to administrator command";
+    int maxReconnects = PGProperty.MAX_RECONNECTS.getInt(info);
+    if (PGProperty.AUTO_RECONNECT.getBoolean(info) && e.getMessage().contains(terminateConn)) {
+      for (int i = 0; i < maxReconnects; i++) {
+        try {
+          QueryExecutor queryExecutor = ConnectionFactory.openConnection(Driver.GetHostSpecs(info),
+                  Driver.GetUser(info), Driver.GetDatabase(info), info);
+          connection.setQueryExecutor(queryExecutor);
+          executeInternal(cachedQuery, queryParameters, flags);
+          return;
+        } catch (SQLException e2) {
+          continue;
+        }
+      }
+    } else {
+      throw e;
+    }
   }
 
   private void runQueryPostProcess(ClientLogic clientLogic) {

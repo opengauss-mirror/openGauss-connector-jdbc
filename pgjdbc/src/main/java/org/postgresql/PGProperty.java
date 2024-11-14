@@ -622,7 +622,19 @@ public enum PGProperty {
      * Determine whether SAVEPOINTS used in AUTOSAVE will be released per query or not
      */
     CLEANUP_SAVEPOINTS("cleanupSavepoints", "false", "Determine whether SAVEPOINTS "
-            + "used in AUTOSAVE will be released per query or not", false, new String[]{"true", "false"})
+            + "used in AUTOSAVE will be released per query or not", false, new String[]{"true", "false"}),
+
+    /**
+     * whether re-establish the connection when the created connection is disconnected
+     */
+    AUTO_RECONNECT("autoReconnect", "false", "whether re-establish the connection when "
+            + "the created connection is disconnected", false, new String[]{"true", "false"}),
+
+    /**
+     * Maximum number of reconnections when the created connection is disconnected
+     */
+    MAX_RECONNECTS("maxReconnects", "3", "Maximum number of reconnections when the "
+            + "created connection is disconnected", false)
   ;
 
   private String _name;

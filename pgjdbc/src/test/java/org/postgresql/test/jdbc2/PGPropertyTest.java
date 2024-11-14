@@ -154,6 +154,8 @@ public class PGPropertyTest {
     excluded.add("writeDataSourceAddress");
     excluded.add("BCmptMode");
     excluded.add("bitOutput");
+    excluded.add("autoReconnect");
+    excluded.add("maxReconnects");
 
     // index PropertyDescriptors by name
     Map<String, PropertyDescriptor> propertyDescriptors =
