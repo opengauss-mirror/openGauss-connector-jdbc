@@ -2624,8 +2624,9 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     int oid = fields[columnIndex - 1].getOID();
     if (oid == Oid.BYTEA) {
       return trimBytes(columnIndex, PGbytea.toBytes(this_row[columnIndex - 1]));
-    } else if (oid == Oid.BLOB) {
-      return toBytes(getString(columnIndex));
+    } else if (oid == Oid.BLOB || blobSet.contains(getPGType(columnIndex))) {
+      String result = new String(this_row[columnIndex - 1]);
+      return toBytes(result);
     } else {
       return trimBytes(columnIndex, this_row[columnIndex - 1]);
     }
