@@ -72,6 +72,11 @@ Remember: Once you have compiled the driver, it will work on ALL platforms that 
 
 - CentOS 7.6（x86 architecture）
 - openEuler-20.03-LTS（aarch64 architecture）
+- openEuler-20.03-LTS (x86_64 architecture)
+- openEuler-22.03-LTS（aarch64 architecture）
+- openEuler-22.03-LTS (x86_64 architecture)
+- openEuler-24.03-LTS (aarch64 architecture)
+- openEuler-24.03-LTS (x86_64 architecture)
 - Windows
 
 The following table lists the software requirements for compiling the openGauss-connector-jdbc.
