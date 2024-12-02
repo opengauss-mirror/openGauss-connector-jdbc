@@ -52,6 +52,11 @@ openGauss JDBC 驱动的生成支持以下操作系统：
 
 - CentOS 7.6（x86架构）
 - openEuler-20.03-LTS（aarch64架构）
+- openEuler-20.03-LTS（x86_64架构）
+- openEuler-22.03-LTS（aarch64架构）
+- openEuler-22.03-LTS（x86_64架构）
+- openEuler-24.03-LTS（aarch64架构）
+- openEuler-24.03-LTS（x86_64架构）
 - Windows
 
 适配其他系统，参照博客[openGauss数据库编译指导](https://opengauss.org/zh/blogs/xingchen/opengauss_compile.html)
