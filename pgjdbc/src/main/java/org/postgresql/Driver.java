@@ -566,7 +566,6 @@ public class Driver implements java.sql.Driver {
             return new ReadWriteSplittingPgConnection(hostSpecs(props), props, user(props), database(props), url);
         }
         PgConnection pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props, url);
-        pgConnection.setProps(props);
         GlobalConnectionTracker.possessConnectionReference(pgConnection.getQueryExecutor(), props);
         LoadBalanceHeartBeating.setConnection(pgConnection, props);
         return pgConnection;

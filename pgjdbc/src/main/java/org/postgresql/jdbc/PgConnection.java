@@ -278,6 +278,7 @@ public class PgConnection implements BaseConnection {
     }
 
     this.creatingURL = url;
+    setProps(info);
 
     bitToString = PGProperty.BIT_TO_STRING.getBoolean(info);
     setDefaultFetchSize(PGProperty.DEFAULT_ROW_FETCH_SIZE.getInt(info));
