@@ -278,13 +278,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
                 return getLong(columnIndex);
             case Types.NUMERIC:
             case Types.DECIMAL:
-                int scale;
-                if (field.getMod() == -1) {
-                    return getBigDecimal(columnIndex, -1);
-                } else {
-                    scale = (short) ((field.getMod() - 4) & 0xffff);
-                    return getBigDecimal(columnIndex, (Math.max(scale, -1)));
-                }
+                return getBigDecimal(columnIndex, field);
             case Types.REAL:
                 return getFloat(columnIndex);
             case Types.FLOAT:
@@ -2595,6 +2589,18 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
     return toDouble(getFixedString(columnIndex));
   }
+
+    private Object getBigDecimal(int columnIndex, Field field) throws SQLException {
+        String stringValue = this.getFixedString(columnIndex);
+        if ("NaN".equalsIgnoreCase(stringValue)) {
+            return Double.NaN;
+        }
+        if (field.getMod() == -1) {
+            return getBigDecimal(columnIndex, -1);
+        }
+        int scale = (short) ((field.getMod() - 4) & 0xffff);
+        return getBigDecimal(columnIndex, (Math.max(scale, -1)));
+    }
 
   public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
     connection.getLogger().trace("[" + connection.getSecSocketAddress() + "]" + " getBigDecimal columnIndex: " + columnIndex);
