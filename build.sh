@@ -28,7 +28,7 @@ bit=$(getconf LONG_BIT)
 if [ "$bit" -eq 64 ]; then
    PLATFORM=64
 fi
-PKG_VERSION=6.0.0
+PKG_VERSION=6.0.1
 #get OS distributed version.
 kernel=""
 version=""
