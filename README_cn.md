@@ -31,13 +31,21 @@ Java开发者可从maven中央仓库中直接获取jar包，坐标如下：
 
    点击[链接](https://opengauss.org/zh/download/)，在openGauss Connectors部分下，根据您部署数据库的服务器的对应系统选择JDBC_\\${version}的下载按钮。\\${version}即您需要的版本号。
 
-2. 解压压缩包。
+2. 校验安装包的完整性。
+（1）计算下载包的sha256值（以6.0.1版本发布包为例，其他版本操作相同）
+~~~
+sha256sum openGauss-JDBC-6.0.1.tar.gz
+~~~
+
+（2）在[官网下载页面](https://opengauss.org/zh/download/)的openGauss Connectors部分中复制对应发布包的sha256值，与步骤（1）计算出的sha256值做对比，如果一致则可以确认下载下来的包是完整的，否则需要重新下载。
+
+3. 解压压缩包。
 
    ```
    tar -zxvf openGauss-${version}-JDBC.tar.gz
    ```
 
-3. 解压后可以看到同级目录下出现了两个jar包，分别是opengauss-jdbc-\\${version}.jar和postgresql.jar。opengauss-jdbc-\\${version}.jar是可以与PG-JDBC共存的包, 包名自2.0.1之后的版本全部从org.postgresql变更为org.opengauss,并且驱动名称从jdbc:postgresql://替换为jdbc:opengauss://。目前从maven中央仓库中获取的也是这个包。
+4. 解压后可以看到同级目录下出现了两个jar包，分别是opengauss-jdbc-\\${version}.jar和postgresql.jar。opengauss-jdbc-\\${version}.jar是可以与PG-JDBC共存的包, 包名自2.0.1之后的版本全部从org.postgresql变更为org.opengauss,并且驱动名称从jdbc:postgresql://替换为jdbc:opengauss://。目前从maven中央仓库中获取的也是这个包。
 
 
 ## 从源码构建
