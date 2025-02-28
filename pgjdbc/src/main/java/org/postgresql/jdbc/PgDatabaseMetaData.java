@@ -131,14 +131,14 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
   }
 
   /**
-   * Retrieves the name of this database product. We hope that it is PostgreSQL, so we return that
+   * Retrieves the name of this database product. We hope that it is openGauss, so we return that
    * explicitly.
    *
-   * @return "PostgreSQL"
+   * @return "openGauss"
    */
   @Override
   public String getDatabaseProductName() throws SQLException {
-    return "PostgreSQL";
+    return "openGauss";
   }
 
   @Override
