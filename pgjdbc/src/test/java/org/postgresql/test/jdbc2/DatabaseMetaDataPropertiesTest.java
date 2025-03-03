@@ -195,7 +195,7 @@ public class DatabaseMetaDataPropertiesTest {
     DatabaseMetaData dbmd = con.getMetaData();
     assertNotNull(dbmd);
 
-    assertEquals("PostgreSQL", dbmd.getDatabaseProductName());
+    assertEquals("openGauss", dbmd.getDatabaseProductName());
     assertTrue(dbmd.getDatabaseMajorVersion() >= 8);
     assertTrue(dbmd.getDatabaseMinorVersion() >= 0);
     assertTrue(dbmd.getDatabaseProductVersion().startsWith(String.valueOf(dbmd.getDatabaseMajorVersion())));
