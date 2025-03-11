@@ -45,6 +45,9 @@ public class PgDatabase {
         String extensionDolphin = getDolphin("select count(1) from pg_extension where extname = 'dolphin';");
         int dolphinNum = Integer.parseInt(extensionDolphin);
         String compatibility = getDolphin("show dolphin.b_compatibility_mode;");
+        if (compatibility == null || compatibility.isEmpty()) {
+            compatibility = "OFF";
+        }
         CompatibilityEnum compatibilityEnum = CompatibilityEnum.valueOf(compatibility.toUpperCase(Locale.ROOT));
 
         if (dolphinNum > 0 && CompatibilityEnum.ON.equals(compatibilityEnum)) {
