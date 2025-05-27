@@ -281,6 +281,28 @@ class SimpleParameterList implements V3ParameterList {
     return sb.toString();
   }
 
+  private static String nullCast(String text, String type, boolean standardConformingStrings) {
+    StringBuilder sb = new StringBuilder((text.length() + 10) / 10 * 11); // Add 10% for escaping.
+    sb.append("(");
+    try {
+      Utils.escapeLiteral(sb, text, standardConformingStrings);
+    } catch (SQLException e) {
+      // This should only happen if we have an embedded null
+      // and there's not much we can do if we do hit one.
+      //
+      // To force a server side failure, we deliberately include
+      // a zero byte character in the literal to force the server
+      // to reject the command.
+      sb.append('\u0000');
+    }
+    if (type != null) {
+      sb.append("::");
+      sb.append(type);
+    }
+    sb.append(")");
+    return sb.toString();
+  }
+
   @Override
   public String toString(int index, boolean standardConformingStrings) {
     --index;
@@ -349,22 +371,41 @@ class SimpleParameterList implements V3ParameterList {
     } else {
       String param = paramValue.toString();
       int paramType = paramTypes[index];
-      if (paramType == Oid.TIMESTAMP) {
-        return quoteAndCast(param, "timestamp", standardConformingStrings);
-      } else if (paramType == Oid.TIMESTAMPTZ) {
-        return quoteAndCast(param, "timestamp with time zone", standardConformingStrings);
-      } else if (paramType == Oid.TIME) {
-        return quoteAndCast(param, "time", standardConformingStrings);
-      } else if (paramType == Oid.TIMETZ) {
-        return quoteAndCast(param, "time with time zone", standardConformingStrings);
-      } else if (paramType == Oid.DATE) {
-        return quoteAndCast(param, "date", standardConformingStrings);
-      } else if (paramType == Oid.INTERVAL) {
-        return quoteAndCast(param, "interval", standardConformingStrings);
-      } else if (paramType == Oid.NUMERIC) {
-        return quoteAndCast(param, "numeric", standardConformingStrings);
+      if (direction(index) == 1 | direction(index) == 3) {
+        if (paramType == Oid.TIMESTAMP) {
+          return quoteAndCast(param, "timestamp", standardConformingStrings);
+        } else if (paramType == Oid.TIMESTAMPTZ) {
+          return quoteAndCast(param, "timestamp with time zone", standardConformingStrings);
+        } else if (paramType == Oid.TIME) {
+          return quoteAndCast(param, "time", standardConformingStrings);
+        } else if (paramType == Oid.TIMETZ) {
+          return quoteAndCast(param, "time with time zone", standardConformingStrings);
+        } else if (paramType == Oid.DATE) {
+          return quoteAndCast(param, "date", standardConformingStrings);
+        } else if (paramType == Oid.INTERVAL) {
+          return quoteAndCast(param, "interval", standardConformingStrings);
+        } else if (paramType == Oid.NUMERIC) {
+          return quoteAndCast(param, "numeric", standardConformingStrings);
+        }
+        return quoteAndCast(param, null, standardConformingStrings);
+      } else {
+        if (paramType == Oid.TIMESTAMP) {
+          return nullCast(param, "timestamp", standardConformingStrings);
+        } else if (paramType == Oid.TIMESTAMPTZ) {
+          return nullCast(param, "timestamp with time zone", standardConformingStrings);
+        } else if (paramType == Oid.TIME) {
+          return nullCast(param, "time", standardConformingStrings);
+        } else if (paramType == Oid.TIMETZ) {
+          return nullCast(param, "time with time zone", standardConformingStrings);
+        } else if (paramType == Oid.DATE) {
+          return nullCast(param, "date", standardConformingStrings);
+        } else if (paramType == Oid.INTERVAL) {
+          return nullCast(param, "interval", standardConformingStrings);
+        } else if (paramType == Oid.NUMERIC) {
+          return nullCast(param, "numeric", standardConformingStrings);
+        }
+        return nullCast(param, null, standardConformingStrings);
       }
-      return quoteAndCast(param, null, standardConformingStrings);
     }
   }
 
