@@ -28,8 +28,8 @@ bit=$(getconf LONG_BIT)
 if [ "$bit" -eq 64 ]; then
    PLATFORM=64
 fi
-PKG_VERSION=6.0.1
-#get OS distributed version.
+PKG_VERSION=6.0.2
+#get OS distributed version
 kernel=""
 version=""
 if [ -f "/etc/euleros-release" ]; then
