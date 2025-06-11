@@ -139,6 +139,17 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
 
   private static final Set<String> binarySet = new HashSet<>(Arrays.asList(BINARY, VARBINARY));
 
+    public PgResultSet() {
+        this.resultsettype = 0;
+        this.resultsetconcurrency = 0;
+        this.connection = null;
+        this.statement = null;
+        this.fields = null;
+        this.originalQuery = null;
+        this.maxRows = 0;
+        this.maxFieldSize = 0;
+    }
+
   protected ResultSetMetaData createMetaData() throws SQLException {
     return new PgResultSetMetaData(connection, fields);
   }

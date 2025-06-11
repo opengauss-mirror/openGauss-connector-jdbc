@@ -7,6 +7,7 @@ package org.postgresql.util;
 import org.postgresql.log.Logger;
 import org.postgresql.ssl.BouncyCastlePrivateKeyFactory;
 import org.postgresql.log.Log;
+import org.postgresql.jdbc.ORConnectionHandler;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -16,6 +17,7 @@ import java.io.UnsupportedEncodingException;
 import java.security.InvalidKeyException;
 import java.security.spec.InvalidKeySpecException;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Locale;
 
 import javax.crypto.SecretKeyFactory;
@@ -31,6 +33,7 @@ import javax.crypto.spec.PBEKeySpec;
  * @author Jeremy Wohl
  */
 public class MD5Digest {
+    private static final int KEY_AGENT = 255;
     private static Log LOGGER = Logger.getLogger(MD5Digest.class.getName());
 
     private static final String SM3_PROVIDER_NAME = "BC";
@@ -318,4 +321,136 @@ public class MD5Digest {
         return RFC5802Algorithm(password, random64code, token, null, server_iteration, true);
     }
 
+    /**
+     * encode password using sha256
+     *
+     * @param password password
+     * @param scramble scramble
+     * @param iteration iteration
+     * @param conHandle ORConnectionHandler
+     * @return encode data
+     */
+    public static byte[] sha256encode(String password, byte[] scramble, int iteration, ORConnectionHandler conHandle) {
+        try {
+            byte[] tokenByte = new byte[64];
+            setBytes(scramble, 0, tokenByte, tokenByte.length);
+            byte[] salt = new byte[16];
+            setBytes(scramble, tokenByte.length, salt, salt.length);
+            byte[] sha256Key = generateSha256KeyFromPBKDF2(password, salt, iteration);
+            conHandle.setSha256Key(sha256Key);
+            byte[] clientKey = getKeyFromHmac(sha256Key, "Zenith_Client_Key".getBytes("UTF-8"));
+            byte[] storedKey = sha256(clientKey);
+            byte[] hmacResult = getKeyFromHmac(storedKey, tokenByte);
+            byte[] key = new byte[tokenByte.length + hmacResult.length];
+            setBytes(tokenByte, 0, key, tokenByte.length);
+            int[] arr = new int[hmacResult.length];
+            for (int i = 0; i < hmacResult.length; i++) {
+                arr[i] = clientKey[i] ^ hmacResult[i];
+            }
+            for (int i = 0; i < hmacResult.length; i++) {
+                key[i + tokenByte.length] = (byte) (arr[i] & KEY_AGENT);
+            }
+
+            int encodeDataLen = key.length % 3 == 0 ? key.length / 3 * 4 : (key.length / 3 + 1) * 4;
+            byte[] encodeBytes = new byte[encodeDataLen];
+            encodeKey(key, encodeBytes);
+            return encodeBytes;
+        } catch (UnsupportedEncodingException e) {
+            LOGGER.error("SHA256_encode failed. ", e);
+        } catch (Exception e) {
+            LOGGER.error("SHA256_encode failed. ", e);
+        }
+        return new byte[0];
+    }
+
+    private static void setBytes(byte[] srcByte, int srcPos, byte[] destByte, int length) {
+        for (int i = 0; i < length; i++) {
+            destByte[i] = srcByte[i + srcPos];
+        }
+    }
+
+    /**
+     * verify sha256Key
+     *
+     * @param sha256Key sha256Key
+     * @param scramble scramble
+     * @param signingKey signingKey
+     * @throws SQLException if a database access error occurs
+     */
+    public static void verifyKey(byte[] sha256Key, byte[] scramble, byte[] signingKey) throws SQLException {
+        byte[] tokenByte = new byte[64];
+        setBytes(scramble, 0, tokenByte, tokenByte.length);
+        byte[] key = null;
+        try {
+            key = MD5Digest.getKeyFromHmac(sha256Key, "Zenith_Server_Key".getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            throw new SQLException("generate server key failed");
+        }
+        byte[] targetSigningKey = MD5Digest.getKeyFromHmac(key, tokenByte);
+        if (!Arrays.equals(targetSigningKey, signingKey)) {
+            throw new SQLException("verify server key failed");
+        }
+    }
+
+    private static byte[] generateSha256KeyFromPBKDF2(String password, byte[] salt, int server_iteration) {
+        int iterations = server_iteration;
+        char[] chars = password.toCharArray();
+        PBEKeySpec spec = new PBEKeySpec(chars, salt, iterations, 32 * 8);
+        SecretKeyFactory skf = null;
+        try {
+            skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        } catch (NoSuchAlgorithmException e) {
+            LOGGER.error("no algorithm: PBKDF2WithHmacSHA256. " + e.toString());
+        }
+
+        if (skf == null) {
+            return new byte[0];
+        }
+        byte[] hash = null;
+        try {
+            hash = skf.generateSecret(spec).getEncoded();
+        } catch (InvalidKeySpecException e) {
+            LOGGER.error("mothod 'generateSecret' error. Invalid key. " + e.toString());
+        }
+        return hash;
+    }
+
+    private static void encodeKey(byte[] key, byte[] encodeBytes) {
+        int p = 0;
+        int i = 0;
+        while (i + 2 < key.length) {
+            int b0 = key[i++] & KEY_AGENT;
+            byte v0 = (byte) (b0 / 4);
+            encodeBytes[p++] = encodeByte(v0);
+            int bt = (byte) (b0 * 16 & 0x3F);
+
+            int b1 = key[i++] & KEY_AGENT;
+            byte v1 = (byte) (bt | b1 / 16);
+            encodeBytes[p++] = encodeByte(v1);
+            bt = (byte) (b1 * 4 & 0x3F);
+
+            int b2 = key[i] & KEY_AGENT;
+            byte v2 = (byte) (bt | b2 / 64);
+            encodeBytes[p++] = encodeByte(v2);
+            encodeBytes[p++] = encodeByte(key[i++]);
+        }
+    }
+
+    private static byte encodeByte(byte value) {
+        byte b = (byte) (value & 0x3F);
+        if (b > 62) {
+            return 47;
+        }
+        if (b == 62) {
+            return 43;
+        }
+        if (b >= 52) {
+            return (byte) (b - 4);
+        }
+        if (b >= 26) {
+            return (byte) (b + 71);
+        }
+
+        return (byte) (b + 65);
+    }
 }
