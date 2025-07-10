@@ -18,7 +18,11 @@ import org.postgresql.core.SetupQueryRunner;
 import org.postgresql.core.SocketFactoryFactory;
 import org.postgresql.core.Utils;
 import org.postgresql.core.Version;
+import org.postgresql.core.ORBaseConnection;
+import org.postgresql.core.ORStream;
+import org.postgresql.core.ORQueryExecutor;
 import org.postgresql.hostchooser.*;
+import org.postgresql.jdbc.ORConnectionHandler;
 import org.postgresql.jdbc.SslMode;
 import org.postgresql.QueryCNListUtils;
 import org.postgresql.quickautobalance.ConnectionManager;
@@ -158,6 +162,19 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     setSocketTimeout(newStream, info, PGProperty.SOCKET_TIMEOUT);
 
     return newStream;
+  }
+
+  @Override
+  public void openORConnectionImpl(ORBaseConnection connection, Properties info, ORStream orStream)
+          throws SQLException, IOException {
+    setOrStream(orStream);
+    ORQueryExecutor queryExecutor = new ORQueryExecutorImpl(orStream, connection);
+    connection.setQueryExecutor(queryExecutor);
+    this.connection = connection;
+    SocketFactory socketFactory = SocketFactoryFactory.getSocketFactory(info);
+    this.orStream.connect(info, socketFactory);
+    ORConnectionHandler handler = new ORConnectionHandler(connection, orStream);
+    handler.tryORConnect();
   }
 
   @Override

@@ -7,6 +7,7 @@ package org.postgresql;
 
 import org.postgresql.clusterchooser.GlobalClusterStatusTracker;
 import org.postgresql.hostchooser.MultiHostChooser;
+import org.postgresql.jdbc.ORConnection;
 import org.postgresql.jdbc.PgConnection;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
@@ -272,11 +273,15 @@ public class Driver implements java.sql.Driver {
         // get defaults
         Properties defaults, props;
 
-        String[] legalUrlTags = {"jdbc:postgresql:", "jdbc:dws:iam:"};
+        String[] legalUrlTags = {"jdbc:postgresql:", "jdbc:dws:iam:", "jdbc:oGRAC:"};
         boolean isUrlLegal = false;
+        boolean isOGRAC = false;
         for (String urlTag : legalUrlTags) {
             if (url.startsWith(urlTag)) {
                 isUrlLegal = true;
+                if (urlTag.equals("jdbc:oGRAC:")) {
+                    isOGRAC = true;
+                }
             }
         }
         if (!isUrlLegal) {
@@ -314,6 +319,9 @@ public class Driver implements java.sql.Driver {
             // more details.
             long timeout = timeout(props);
             if (timeout <= 0) {
+                if (isOGRAC) {
+                    return makeCTConnection(url, props);
+                }
                 Connection con = makeConnection(url, props);
                 return con;
             }
@@ -572,6 +580,24 @@ public class Driver implements java.sql.Driver {
     }
 
     /**
+     * Create a connection from URL and properties with oGRAC. Always does the connection work in the current
+     * thread without enforcing a timeout, regardless of any timeout specified in the properties.
+     *
+     * @param url   the original URL
+     * @param props the parsed/defaulted connection properties
+     * @return a new connection
+     * @throws SQLException if the connection could not be made
+     */
+    private static Connection makeCTConnection(String url, Properties props) throws SQLException, IOException {
+        String simpleUrl = url;
+        int addressEnd = url.lastIndexOf("?");
+        if (addressEnd > 0) {
+            simpleUrl = url.substring(0, addressEnd);
+        }
+        return new ORConnection(hostSpecs(props), user(props), props, simpleUrl);
+    }
+
+    /**
      * Returns true if the driver thinks it can open a connection to the given URL. Typically, drivers
      * will return true if they understand the subprotocol specified in the URL and false if they
      * don't. Our protocols start with jdbc:postgresql:
@@ -678,7 +704,7 @@ public class Driver implements java.sql.Driver {
         String l_urlServer = url;
         String l_urlArgs = "";
         boolean isUrlLegal = false;
-        String[] legalUrlTags = {"jdbc:postgresql:", "jdbc:dws:iam:"};
+        String[] legalUrlTags = {"jdbc:postgresql:", "jdbc:dws:iam:", "jdbc:oGRAC:"};
 
         int l_qPos = url.indexOf('?');
         if (l_qPos != -1) {
@@ -686,9 +712,13 @@ public class Driver implements java.sql.Driver {
             l_urlArgs = url.substring(l_qPos + 1);
         }
 
+        boolean isOGRAC = false;
         for (String urlTag : legalUrlTags) {
             if (l_urlServer.startsWith(urlTag)) {
                 isUrlLegal = true;
+                if (urlTag.equals("jdbc:oGRAC:")) {
+                    isOGRAC = true;
+                }
             }
         }
 
@@ -698,77 +728,83 @@ public class Driver implements java.sql.Driver {
             return null;
         }
 
-        //if (l_urlServer.startsWith("jdbc:postgresql:")) {
+        if (isOGRAC) {
+            l_urlServer = l_urlServer.substring("jdbc:oGRAC:".length());
+        } else {
             l_urlServer = l_urlServer.substring("jdbc:postgresql:".length());
+        }
 
-            if (l_urlServer.startsWith("//")) {
-                l_urlServer = l_urlServer.substring(2);
-                int slash = l_urlServer.indexOf('/');
+        if (l_urlServer.startsWith("//")) {
+            l_urlServer = l_urlServer.substring(2);
+            int slash;
+            if (isOGRAC) {
+                slash = l_urlServer.length();
+            } else {
+                slash = l_urlServer.indexOf('/');
                 if (slash == -1) {
                     LOGGER.warn("JDBC URL must contain a / at the end of the host or port: "
                             + filterAuthenticationCredentials(url));
                     return null;
                 }
                 urlProps.setProperty("PGDBNAME", URLCoder.decode(l_urlServer.substring(slash + 1)));
+            }
 
-                // Save the ip and port configured in the url
-                String[] addresses = l_urlServer.substring(0, slash).split(",");
-                StringBuilder hosts = new StringBuilder();
-                StringBuilder ports = new StringBuilder();
-                for (String address : addresses) {
-                    int portIdx = address.lastIndexOf(':');
-                    if (portIdx != -1 && address.lastIndexOf(']') < portIdx) {
-                        String portStr = address.substring(portIdx + 1);
-                        try {
-                            int port = Integer.parseInt(portStr);
-                            if (port < 1 || port > 65535) {
-                                LOGGER.warn("JDBC URL port: " + portStr + " not valid (1:65535) ");
-                                return null;
-                            }
-                        } catch (NumberFormatException ignore) {
-                            LOGGER.warn("JDBC URL invalid port number: " + portStr);
+            // Save the ip and port configured in the url
+            String[] addresses = l_urlServer.substring(0, slash).split(",");
+            StringBuilder hosts = new StringBuilder();
+            StringBuilder ports = new StringBuilder();
+            for (String address : addresses) {
+                int portIdx = address.lastIndexOf(':');
+                if (portIdx != -1 && address.lastIndexOf(']') < portIdx) {
+                    String portStr = address.substring(portIdx + 1);
+                    try {
+                        int port = Integer.parseInt(portStr);
+                        if (port < 1 || port > 65535) {
+                            LOGGER.warn("JDBC URL port: " + portStr + " not valid (1:65535) ");
                             return null;
                         }
-                        ports.append(portStr);
-                        hosts.append(parseIPValid((String) address.subSequence(0, portIdx)));
-                    } else {
-                        ports.append(DEFAULT_PORT);
-                        hosts.append(parseIPValid(address));
+                    } catch (NumberFormatException ignore) {
+                        LOGGER.warn("JDBC URL invalid port number: " + portStr);
+                        return null;
                     }
-                    ports.append(',');
-                    hosts.append(',');
+                    ports.append(portStr);
+                    hosts.append(parseIPValid((String) address.subSequence(0, portIdx)));
+                } else {
+                    ports.append(DEFAULT_PORT);
+                    hosts.append(parseIPValid(address));
                 }
-                ports.setLength(ports.length() - 1);
-                hosts.setLength(hosts.length() - 1);
-
-                urlProps.setProperty("PGHOST", hosts.toString());
-                urlProps.setProperty("PGPORT", ports.toString());
-
-                //The first connection, put the host and port in the url into the props
-                urlProps.setProperty("PGHOSTURL", hosts.toString());
-                urlProps.setProperty("PGPORTURL", ports.toString());
-            } else {
-      /*
-       if there are no defaults set or any one of PORT, HOST, DBNAME not set
-       then set it to default
-      */
-                if (defaults == null || !defaults.containsKey("PGPORT")) {
-                    urlProps.setProperty("PGPORT", DEFAULT_PORT);
-                }
-                if (defaults == null || !defaults.containsKey("PGHOST")) {
-                    urlProps.setProperty("PGHOST", "localhost");
-                }
-                if (defaults == null || !defaults.containsKey("PGDBNAME")) {
-                    urlProps.setProperty("PGDBNAME", URLCoder.decode(l_urlServer));
-                }
+                ports.append(',');
+                hosts.append(',');
             }
+            ports.setLength(ports.length() - 1);
+            hosts.setLength(hosts.length() - 1);
 
-            // parse the args part of the url
-            urlProps.putAll(praseParam(l_urlArgs));
-            if (urlProps.getProperty("enable_ce") != null && urlProps.getProperty("enable_ce").equals("1")) {
-                urlProps.setProperty("CLIENTLOGIC", "1");
+            urlProps.setProperty("PGHOST", hosts.toString());
+            urlProps.setProperty("PGPORT", ports.toString());
+
+            // The first connection, put the host and port in the url into the props
+            urlProps.setProperty("PGHOSTURL", hosts.toString());
+            urlProps.setProperty("PGPORTURL", ports.toString());
+        } else {
+            // if there are no defaults set or any one of PORT, HOST, DBNAME not set
+            // then set it to default
+            if (defaults == null || !defaults.containsKey("PGPORT")) {
+                urlProps.setProperty("PGPORT", DEFAULT_PORT);
             }
-            return urlProps;
+            if (defaults == null || !defaults.containsKey("PGHOST")) {
+                urlProps.setProperty("PGHOST", "localhost");
+            }
+            if (defaults == null || !defaults.containsKey("PGDBNAME")) {
+                urlProps.setProperty("PGDBNAME", URLCoder.decode(l_urlServer));
+            }
+        }
+
+        // parse the args part of the url
+        urlProps.putAll(praseParam(l_urlArgs));
+        if (urlProps.getProperty("enable_ce") != null && urlProps.getProperty("enable_ce").equals("1")) {
+            urlProps.setProperty("CLIENTLOGIC", "1");
+        }
+        return urlProps;
     }
 
     /**

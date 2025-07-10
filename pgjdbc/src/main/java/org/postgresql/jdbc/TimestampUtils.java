@@ -31,7 +31,6 @@ import java.util.HashMap;
 import java.util.SimpleTimeZone;
 import java.util.TimeZone;
 
-
 /**
  * Misc utils for handling time and date values.
  */
@@ -40,6 +39,11 @@ public class TimestampUtils {
    * Number of milliseconds in one day.
    */
   private static final int ONEDAY = 24 * 3600 * 1000;
+  private static final int DAYS = 730120;
+  private static final int NON_LEAP_DAYS = 365;
+  private static final int LEAP_DAYS = 366;
+  private static final int MONTH = 12;
+  private static final int DAYS_PER_MONTH = 31;
   private static final char[] ZEROS = {'0', '0', '0', '0', '0', '0', '0', '0', '0'};
   private static final char[][] NUMBERS;
   private static final HashMap<String, TimeZone> GMT_ZONES = new HashMap<String, TimeZone>();
@@ -1602,5 +1606,150 @@ public class TimestampUtils {
     // hardcode utc because the backend does not provide us the timezone
     // Postgres is always UTC
     return LocalDateTime.ofEpochSecond(parsedTimestamp.millis / 1000L, parsedTimestamp.nanos, java.time.ZoneOffset.UTC);
+  }
+
+  private static int[] getDaysInMonth(int year) {
+    int[] daysInMonth = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    if (isLeapYear(year)) {
+      daysInMonth[1] = 29;
+    }
+    return daysInMonth;
+  }
+
+  private static boolean isLeapYear(int year) {
+    if (year % 4 != 0) {
+      return false;
+    } else if (year % 100 != 0) {
+      return true;
+    } else {
+      return year % 400 == 0;
+    }
+  }
+
+  private static long geTimeSec(int year, int month, int day) {
+    int days = (year - 1) * NON_LEAP_DAYS;
+    days += (year - 1) / 400;
+    days += (year - 1) / 4;
+    days -= (year - 1) / 100;
+    days -= DAYS;
+    int[] daysInMonth = getDaysInMonth(year);
+    for (int m = 0; m < month; m++) {
+      days += daysInMonth[m];
+    }
+    days += day;
+    return (long) days * 24 * 60 * 60;
+  }
+
+  /**
+   * set date type param
+   *
+   * @param millis time
+   * @param cal calendar
+   * @return date millis
+   */
+  public static long setDateToLong(long millis, Calendar cal) {
+    cal.setTimeInMillis(millis);
+    int year = cal.get(Calendar.YEAR);
+    int month = cal.get(Calendar.MONTH);
+    int day = cal.get(Calendar.DAY_OF_MONTH);
+    long dateMS = geTimeSec(year, month, day);
+    return dateMS * 1000 * 1000;
+  }
+
+  /**
+   * set time type param
+   *
+   * @param millis time
+   * @param cal calendar
+   * @return date millis
+   */
+  public static long setTimeToLong(long millis, Calendar cal) {
+    cal.setTimeInMillis(millis);
+    int year = 1900;
+    int month = 0;
+    int day = 1;
+    int hour = cal.get(Calendar.HOUR_OF_DAY);
+    int min = cal.get(Calendar.MINUTE);
+    int sec = cal.get(Calendar.SECOND);
+    int ms = cal.get(Calendar.MILLISECOND);
+
+    long dateMS = geTimeSec(year, month, day);
+    dateMS += (long) hour * 60 * 60 + (long) min * 60 + (long) sec;
+    dateMS = dateMS * 1000 + ms;
+    return dateMS * 1000;
+  }
+
+  /**
+   * set timestamp type param
+   *
+   * @param millis time
+   * @param cal calendar
+   * @return date millis
+   */
+  public static long setTimestampToLong(long millis, Calendar cal) {
+    cal.setTimeInMillis(millis);
+    int year = cal.get(Calendar.YEAR);
+    int month = cal.get(Calendar.MONTH);
+    int day = cal.get(Calendar.DAY_OF_MONTH);
+    int hour = cal.get(Calendar.HOUR_OF_DAY);
+    int min = cal.get(Calendar.MINUTE);
+    int sec = cal.get(Calendar.SECOND);
+    int ms = cal.get(Calendar.MILLISECOND);
+
+    long dateMS = geTimeSec(year, month, day);
+    dateMS += (long) hour * 60 * 60 + (long) min * 60 + (long) sec;
+    dateMS = dateMS * 1000 + ms;
+    return dateMS * 1000;
+  }
+
+  /**
+   * convert date millis to timestamp type value
+   *
+   * @param ms date millis
+   * @param cal calendar
+   * @return timestamp value
+   */
+  public static Timestamp getTimestamp(long ms, Calendar cal) {
+    long totalSeconds = ms / (1000 * 1000);
+    long day = totalSeconds / (24 * 60 * 60);
+
+    day += DAYS;
+    int[] ds;
+    int year = 1;
+    while (day > NON_LEAP_DAYS) {
+      if (isLeapYear(year)) {
+        day -= LEAP_DAYS ;
+      } else {
+        day -= NON_LEAP_DAYS;
+      }
+      year++;
+    }
+    if (day == 0) {
+      ds = new int[]{year - 1, MONTH, DAYS_PER_MONTH};
+    } else {
+      int index = 0;
+      int[] daysInMonth = getDaysInMonth(year);
+      while (daysInMonth[index] < day) {
+        day -= daysInMonth[index];
+        index++;
+        if (index >= 12) {
+          break;
+        }
+      }
+      ds = new int[]{year, index + 1, (int) day};
+    }
+
+    long remainingSec = totalSeconds % (24 * 60 * 60);
+    Calendar calendar = cal == null ? Calendar.getInstance() : cal;
+    int hours = (int) (remainingSec / (60 * 60));
+    remainingSec %= (60 * 60);
+    int minutes = (int) (remainingSec / 60);
+    int seconds = (int) (remainingSec % 60);
+    calendar.set(ds[0], ds[1] - 1, ds[2], hours, minutes, seconds);
+    long mills = calendar.getTimeInMillis();
+    Timestamp result = new Timestamp(mills);
+    int remainingMicrosec = (int) (ms % 1000000L);
+    result.setNanos(remainingMicrosec * 1000);
+    return result;
   }
 }

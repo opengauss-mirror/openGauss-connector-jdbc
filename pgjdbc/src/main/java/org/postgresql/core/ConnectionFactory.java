@@ -27,6 +27,25 @@ import org.postgresql.log.Log;
  */
 public abstract class ConnectionFactory {
   private static Log LOGGER = Logger.getLogger(ConnectionFactory.class.getName());
+
+  /**
+   * connection info
+   */
+  protected ORBaseConnection connection;
+
+  /**
+   * connection outputStream/inputStream
+   */
+  protected ORStream orStream;
+
+  public ORBaseConnection getConnection() {
+    return connection;
+  }
+
+  public void setOrStream(ORStream orStream) {
+    this.orStream = orStream;
+  }
+
   /**
    * <p>Establishes and initializes a new connection.</p>
    *
@@ -63,6 +82,21 @@ public abstract class ConnectionFactory {
   }
 
   /**
+   * establishes and initializes a new connection with oGRAC
+   *
+   * @param connection connection
+   * @param info connection info
+   * @param orStream receive and send stream
+   * @throws SQLException if a database access error occurs
+   * @throws IOException if an I/O error occurs
+   */
+  public static void openORConnection(ORBaseConnection connection, Properties info,
+                                      ORStream orStream) throws SQLException, IOException {
+    ConnectionFactory connectionFactory = new ConnectionFactoryImpl();
+    connectionFactory.openORConnectionImpl(connection, info, orStream);
+  }
+
+  /**
    * Implementation of {@link #openConnection} for a particular protocol version. Implemented by
    * subclasses of {@link ConnectionFactory}.
    *
@@ -79,6 +113,18 @@ public abstract class ConnectionFactory {
    */
   public abstract QueryExecutor openConnectionImpl(HostSpec[] hostSpecs, String user,
       String database, Properties info) throws SQLException;
+
+  /**
+   * Implementation of connection for oGRAC protocol
+   *
+   * @param connection connection
+   * @param info connection info
+   * @param orStream receive and send stream
+   * @throws SQLException if a database access error occurs
+   * @throws IOException if an I/O error occurs
+   */
+  public abstract void openORConnectionImpl(ORBaseConnection connection, Properties info,
+                                            ORStream orStream) throws SQLException, IOException;
 
   /**
    * Safely close the given stream.
