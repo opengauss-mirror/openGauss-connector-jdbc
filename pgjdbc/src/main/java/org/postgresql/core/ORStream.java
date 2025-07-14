@@ -18,11 +18,11 @@ package org.postgresql.core;
 import org.postgresql.PGProperty;
 import org.postgresql.log.Log;
 import org.postgresql.log.Logger;
-import org.postgresql.util.GT;
+import org.postgresql.util.HostSpec;
 import org.postgresql.util.PSQLException;
-import org.postgresql.util.PSQLState;
 
 import javax.net.SocketFactory;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
@@ -68,13 +68,13 @@ public class ORStream implements Closeable, Flushable {
     /**
      * input/output stream constructor
      *
-     * @param address host address
+     * @param hostSpec host address
      * @param bufferSize bufferSize
      */
-    public ORStream(SocketAddress address, int bufferSize) {
+    public ORStream(HostSpec hostSpec, int bufferSize) {
         this.charset = Charset.forName("UTF-8");
         this.bufferSize = bufferSize;
-        this.socketAddress = address;
+        this.socketAddress = new InetSocketAddress(hostSpec.getHost(), hostSpec.getPort());
         int2buf = new byte[2];
         int4buf = new byte[4];
     }
@@ -180,22 +180,17 @@ public class ORStream implements Closeable, Flushable {
     public void connect(Properties properties, SocketFactory socketFactory) throws IOException, PSQLException {
         Socket socketConn = socketFactory.createSocket();
         if (!socketConn.isConnected()) {
-            try {
-                socketConn.connect(this.socketAddress, getTimeout(properties));
-                this.localAddress = socketConn.getLocalAddress().toString();
-                socketConn.setKeepAlive(true);
-                this.socket = socketConn;
-                setSocketTimeout(properties);
-                setReceiveBufferSize(properties);
-                setSendBufferSize(properties);
-                socketConn.setTcpNoDelay(true);
-                visibleStream = new VisibleBufferedInputStream(socketConn.getInputStream(), BUFFER_SIZE);
-                outputStream = new BufferedOutputStream(socketConn.getOutputStream(), BUFFER_SIZE);
-                setEncoding(Encoding.getJVMEncoding("UTF-8"));
-            } catch (IOException | PSQLException e) {
-                throw new PSQLException(GT.tr("The socket connect failed."),
-                        PSQLState.CONNECTION_UNABLE_TO_CONNECT, e);
-            }
+            socketConn.connect(this.socketAddress, getTimeout(properties));
+            this.localAddress = socketConn.getLocalAddress().toString();
+            socketConn.setKeepAlive(true);
+            this.socket = socketConn;
+            setSocketTimeout(properties);
+            setReceiveBufferSize(properties);
+            setSendBufferSize(properties);
+            socketConn.setTcpNoDelay(true);
+            visibleStream = new VisibleBufferedInputStream(socketConn.getInputStream(), BUFFER_SIZE);
+            outputStream = new BufferedOutputStream(socketConn.getOutputStream(), BUFFER_SIZE);
+            setEncoding(Encoding.getJVMEncoding("UTF-8"));
         }
     }
 

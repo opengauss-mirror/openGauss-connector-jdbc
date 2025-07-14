@@ -33,17 +33,8 @@ public abstract class ConnectionFactory {
    */
   protected ORBaseConnection connection;
 
-  /**
-   * connection outputStream/inputStream
-   */
-  protected ORStream orStream;
-
   public ORBaseConnection getConnection() {
     return connection;
-  }
-
-  public void setOrStream(ORStream orStream) {
-    this.orStream = orStream;
   }
 
   /**
@@ -84,16 +75,16 @@ public abstract class ConnectionFactory {
   /**
    * establishes and initializes a new connection with oGRAC
    *
+   * @param hostSpecs host info
    * @param connection connection
    * @param info connection info
-   * @param orStream receive and send stream
    * @throws SQLException if a database access error occurs
    * @throws IOException if an I/O error occurs
    */
-  public static void openORConnection(ORBaseConnection connection, Properties info,
-                                      ORStream orStream) throws SQLException, IOException {
+  public static void openORConnection(HostSpec[] hostSpecs, ORBaseConnection connection,
+                                      Properties info) throws SQLException, IOException {
     ConnectionFactory connectionFactory = new ConnectionFactoryImpl();
-    connectionFactory.openORConnectionImpl(connection, info, orStream);
+    connectionFactory.openORConnectionImpl(hostSpecs, connection, info);
   }
 
   /**
@@ -117,14 +108,14 @@ public abstract class ConnectionFactory {
   /**
    * Implementation of connection for oGRAC protocol
    *
+   * @param hostSpecs host info
    * @param connection connection
    * @param info connection info
-   * @param orStream receive and send stream
    * @throws SQLException if a database access error occurs
    * @throws IOException if an I/O error occurs
    */
-  public abstract void openORConnectionImpl(ORBaseConnection connection, Properties info,
-                                            ORStream orStream) throws SQLException, IOException;
+  public abstract void openORConnectionImpl(HostSpec[] hostSpecs, ORBaseConnection connection,
+                                            Properties info) throws SQLException, IOException;
 
   /**
    * Safely close the given stream.

@@ -23,8 +23,6 @@ import org.postgresql.core.ConnectionFactory;
 import org.postgresql.core.ORStream;
 import org.postgresql.fastpath.Fastpath;
 import org.postgresql.largeobject.LargeObjectManager;
-import org.postgresql.log.Log;
-import org.postgresql.log.Logger;
 import org.postgresql.replication.PGReplicationConnection;
 import org.postgresql.util.HostSpec;
 import org.postgresql.util.PSQLException;
@@ -32,8 +30,6 @@ import org.postgresql.util.PSQLState;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.GT;
 
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.ResultSet;
@@ -61,9 +57,6 @@ import java.util.concurrent.Executor;
  * @since  2025-06-29
  */
 public class ORConnection implements ORBaseConnection {
-    private static Log LOGGER = Logger.getLogger(PgConnection.class.getName());
-    private static final int BUFFER_SIZE = 8192;
-
     private final TimestampUtils timestampUtils;
     private ORQueryExecutor queryExecutor;
     private ORStream orStream;
@@ -77,17 +70,13 @@ public class ORConnection implements ORBaseConnection {
     /**
      * connection constructor
      *
-     * @param hostSpecs host info
-     * @param user user
+     * @param hostsInfo hosts info
      * @param info properties
      * @param url url
      * @throws SQLException if a database access error occurs
      * @throws IOException if an I/O error occurs
      */
-    public ORConnection(HostSpec[] hostSpecs,
-                        String user,
-                        Properties info,
-                        String url) throws SQLException, IOException {
+    public ORConnection(HostSpec[] hostsInfo, Properties info, String url) throws SQLException, IOException {
         try {
             if (info.getProperty("fetchsize") != null) {
                 fetchSize = Integer.parseInt(info.getProperty("fetchsize"));
@@ -102,22 +91,13 @@ public class ORConnection implements ORBaseConnection {
         this.isSsl = Boolean.valueOf(info.getProperty("ssl", "true"));
         this.enabledCipherSuites = info.getProperty("enabledCipherSuites", "");
         this.isOnlySSL = Boolean.valueOf(info.getProperty("onlySSL", "false"));
-
-        SocketAddress socketAddress = new InetSocketAddress(info.getProperty("PGHOST").toString(),
-                Integer.valueOf(info.getProperty("PGPORT")));
-        this.orStream = new ORStream(socketAddress, getBufferSize());
-        ConnectionFactory.openORConnection(this, info, orStream);
+        ConnectionFactory.openORConnection(hostsInfo, this, info);
         timestampUtils = new TimestampUtils(true, null);
     }
 
     @Override
     public TimestampUtils getTimestampUtils() {
         return timestampUtils;
-    }
-
-    @Override
-    public int getBufferSize() {
-        return BUFFER_SIZE;
     }
 
     /**
@@ -270,6 +250,10 @@ public class ORConnection implements ORBaseConnection {
     @Override
     public ORStream getORStream() {
         return orStream;
+    }
+
+    public void setOrStream(ORStream orStream) {
+        this.orStream = orStream;
     }
 
     @Override
