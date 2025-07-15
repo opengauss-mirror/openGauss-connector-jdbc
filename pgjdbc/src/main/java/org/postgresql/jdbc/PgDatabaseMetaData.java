@@ -1462,7 +1462,7 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
       clientLogicSelectClause = ",data_type_original_oid, data_type_original_mod ";
       clientLogicFromClause = " LEFT JOIN pg_catalog.gs_encrypted_columns ce ON (a.attrelid=ce.rel_id AND a.attname = ce.column_name) ";
     }
-    int numberOfFields = 23; // JDBC4
+    int numberOfFields = 24; // JDBC4
     List<byte[][]> v = new ArrayList<byte[][]>(); // The new ResultSet tuple stuff
     Field[] f = new Field[numberOfFields]; // The field descriptors for the new ResultSet
 
@@ -1489,6 +1489,7 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
     f[20] = new Field("SCOPE_TABLE", Oid.VARCHAR);
     f[21] = new Field("SOURCE_DATA_TYPE", Oid.INT2);
     f[22] = new Field("IS_AUTOINCREMENT", Oid.VARCHAR);
+    f[23] = new Field("IS_GENERATEDCOLUMN", Oid.VARCHAR);
 
     String sql;
     // a.attnum isn't decremented when preceding columns are dropped,
@@ -1518,6 +1519,12 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
       sql += "nullif(a.attidentity, '') as attidentity,";
     } else {
       sql += "null as attidentity,";
+    }
+
+    if (connection.haveMinimumServerVersion(ServerVersion.v12)) {
+      sql += "nullif(a.attgenerated, '') as attgenerated,";
+    } else {
+      sql += "null as attgenerated,";
     }
     sql += "pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype "
            + clientLogicSelectClause
@@ -1646,6 +1653,13 @@ public class PgDatabaseMetaData implements DatabaseMetaData {
         autoinc = "YES";
       }
       tuple[22] = connection.encodeString(autoinc);
+
+      String generated = rs.getString("attgenerated");
+      if (generated != null) {
+        tuple[23] = connection.encodeString("YES");
+      } else {
+        tuple[23] = connection.encodeString("NO");
+      }
 
       v.add(tuple);
     }
