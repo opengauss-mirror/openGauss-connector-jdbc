@@ -44,7 +44,7 @@ public class MultiHostChooser implements HostChooser {
   private static final int MAX_CONNECT_NUM = 1 << 30;
 
   private enum LoadBalanceType {
-    Shuffle, RoundRobin, PriorityRoundRobin, LeastConn, NONE
+    Shuffle, RoundRobin, PriorityRoundRobin, LeastConn, ShufflePriority, NONE
   }
 
   private static Map<String, Integer> roundRobinCounter = new HashMap<>();
@@ -76,6 +76,9 @@ public class MultiHostChooser implements HostChooser {
       return LoadBalanceType.LeastConn;
     if (PGProperty.LOAD_BALANCE_HOSTS.getBoolean(info) || autoBalance.equals("shuffle"))
       return LoadBalanceType.Shuffle;
+    if (autoBalance.contains("shufflePriority")) {
+      return LoadBalanceType.ShufflePriority;
+    }
     return LoadBalanceType.NONE;
   }
 
@@ -101,6 +104,9 @@ public class MultiHostChooser implements HostChooser {
         break;
       case LeastConn:
         allHosts = leastConn(allHosts);
+        break;
+      case ShufflePriority:
+        allHosts = shufflePriority(allHosts);
         break;
       default:
         isOutPutLog = false;
@@ -179,6 +185,24 @@ public class MultiHostChooser implements HostChooser {
     List<HostSpec> nonPriorityHostSpecs = getNonPriorityHostSpecs(hostSpecs, priorityURLHostSpecs);
     if (priorityURLHostSpecs.size() > 0) {
       List<HostSpec> resultHostSpecs = roundRobin(priorityURLHostSpecs);
+      shuffle(nonPriorityHostSpecs);
+      resultHostSpecs.addAll(nonPriorityHostSpecs);
+      return resultHostSpecs;
+    } else {
+      return roundRobin(hostSpecs);
+    }
+  }
+
+  private List<HostSpec> shufflePriority(List<HostSpec> hostSpecs) {
+    // Obtains the URL CN Host List.
+    List<HostSpec> urlHostSpecs = Arrays.asList(Driver.getURLHostSpecs(info));
+    int priorityCNNumber = Integer.parseInt(info.getProperty("autoBalance").substring("shufflePriority".length()));
+    // Obtain the currently active CN node that is in the priority state.
+    List<HostSpec> priorityURLHostSpecs = getSurvivalPriorityURLHostSpecs(hostSpecs, urlHostSpecs, priorityCNNumber);
+    List<HostSpec> nonPriorityHostSpecs = getNonPriorityHostSpecs(hostSpecs, priorityURLHostSpecs);
+    if (!priorityURLHostSpecs.isEmpty()) {
+      shuffle(priorityURLHostSpecs);
+      List<HostSpec> resultHostSpecs = new ArrayList<>(priorityURLHostSpecs);
       shuffle(nonPriorityHostSpecs);
       resultHostSpecs.addAll(nonPriorityHostSpecs);
       return resultHostSpecs;
