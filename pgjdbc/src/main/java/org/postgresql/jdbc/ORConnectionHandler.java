@@ -59,7 +59,7 @@ public class ORConnectionHandler {
      */
     public ORConnectionHandler(ORBaseConnection connection, ORStream orStream) {
         this.connection = connection;
-        charset = connection.getORStream().getCharset();
+        charset = orStream.getCharset();
         this.orStream = orStream;
     }
 
@@ -79,14 +79,8 @@ public class ORConnectionHandler {
      * @throws SQLException if a database access error occurs
      */
     public synchronized void tryORConnect() throws IOException, SQLException {
-        try {
-            handleshake();
-            doLogin();
-        } catch (SQLException | IOException e) {
-            orStream.close();
-            throw new PSQLException(GT.tr("The database connection attempt failed."),
-                    PSQLState.CONNECTION_UNABLE_TO_CONNECT, e);
-        }
+        handleshake();
+        doLogin();
     }
 
     /**
@@ -115,9 +109,9 @@ public class ORConnectionHandler {
         this.clientKey = new byte[32];
         new SecureRandom().nextBytes(this.clientKey);
         int capacity = 0;
-        connection.getORStream().setCapacity(capacity);
-        int requestFlag = this.connection.getORStream().getRequestFlag();
-        this.connection.getORStream().setRequestFlag(requestFlag);
+        orStream.setCapacity(capacity);
+        int requestFlag = orStream.getRequestFlag();
+        orStream.setRequestFlag(requestFlag);
         ORPackageHead handshakePackageHead = new ORPackageHead();
         ORPackageHead authPackageHead = new ORPackageHead();
         try {
@@ -205,7 +199,7 @@ public class ORConnectionHandler {
         sendData.add(passWordByte);
         sendData.add(passWordLeftBytes);
 
-        String address = this.connection.getORStream().getLocalAddress().toString();
+        String address = orStream.getLocalAddress().toString();
         byte[] addressByte = address.getBytes(charset);
         len += addressByte.length;
         byte[] addressByteLenByte = orStream.getInteger4Bytes(addressByte.length);
@@ -346,7 +340,7 @@ public class ORConnectionHandler {
         orStream.sendChar(handshakePackageHead.getVersion2());
         orStream.sendChar(0);
         orStream.sendInteger4(handshakePackageHead.getRequestCount());
-        orStream.sendInteger4(this.connection.getORStream().getRequestFlag());
+        orStream.sendInteger4(orStream.getRequestFlag());
         orStream.flush();
     }
 

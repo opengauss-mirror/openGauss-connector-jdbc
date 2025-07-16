@@ -49,11 +49,11 @@ public interface ORBaseConnection extends PGConnection, Connection {
     ORStream getORStream();
 
     /**
-     * get buffer size
+     * set connection stream info
      *
-     * @return buffer size
+     * @param orStream data stream processor
      */
-    int getBufferSize();
+    void setOrStream(ORStream orStream);
 
     /**
      * get timestamp utils

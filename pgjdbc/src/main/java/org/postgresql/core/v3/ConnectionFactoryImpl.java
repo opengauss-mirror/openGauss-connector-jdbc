@@ -63,6 +63,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   private static final int AUTH_REQ_GSS = 7;
   private static final int AUTH_REQ_GSS_CONTINUE = 8;
   private static final int AUTH_REQ_SSPI = 9;
+  private static final int BUFFER_SIZE = 8192;
 
   public String CLIENT_ENCODING = "UTF8";
   public static String USE_BOOLEAN = "false";
@@ -165,16 +166,73 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   }
 
   @Override
-  public void openORConnectionImpl(ORBaseConnection connection, Properties info, ORStream orStream)
-          throws SQLException, IOException {
-    setOrStream(orStream);
-    ORQueryExecutor queryExecutor = new ORQueryExecutorImpl(orStream, connection);
-    connection.setQueryExecutor(queryExecutor);
+  public void openORConnectionImpl(HostSpec[] hostSpecs, ORBaseConnection connection,
+                                   Properties info) throws SQLException {
     this.connection = connection;
     SocketFactory socketFactory = SocketFactoryFactory.getSocketFactory(info);
-    this.orStream.connect(info, socketFactory);
-    ORConnectionHandler handler = new ORConnectionHandler(connection, orStream);
-    handler.tryORConnect();
+    Iterator<ClusterSpec> cluster = GlobalClusterStatusTracker.getClusterFromHostSpecs(hostSpecs, info);
+    while (cluster.hasNext()) {
+      HostSpec[] currentSpecs = cluster.next().getHostSpecs();
+      HostChooser hostChooser =
+              HostChooserFactory.createHostChooser(currentSpecs, HostRequirement.any, info);
+      Iterator<CandidateHost> hostIter = hostChooser.iterator();
+      while (hostIter.hasNext()) {
+        CandidateHost candidateHost = hostIter.next();
+        boolean isSuccessed = createConnection(candidateHost, info, socketFactory);
+        if (isSuccessed) {
+          return;
+        }
+        if (!hostIter.hasNext()) {
+          throw new SQLException("Connection refused, all hosts failed to connect.");
+        }
+      }
+    }
+  }
+
+  private boolean createConnection(CandidateHost candidateHost, Properties info,
+                                   SocketFactory socketFactory) {
+    HostSpec hostSpec = candidateHost.hostSpec;
+    ORStream orStream = new ORStream(hostSpec, BUFFER_SIZE);
+    try {
+      try {
+        orStream.connect(info, socketFactory);
+      } catch (SQLException | ConnectException e) {
+        LOGGER.warn("connect to host " + hostSpec + " failed.");
+        try {
+          orStream.connect(info, socketFactory);
+        } catch (ConnectException e2) {
+          LOGGER.error("ConnectException occur, the socket connect failed, target host: " + hostSpec, e2);
+          return false;
+        } catch (SQLException e3) {
+          LOGGER.error("SQLException occur, the socket connect failed, target host: " + hostSpec, e3);
+          return false;
+        }
+      }
+      LOGGER.info("connect to host " + hostSpec + " success.");
+      connection.setOrStream(orStream);
+      ORQueryExecutor queryExecutor = new ORQueryExecutorImpl(orStream, connection);
+      connection.setQueryExecutor(queryExecutor);
+      ORConnectionHandler handler = new ORConnectionHandler(connection, orStream);
+      try {
+        handler.tryORConnect();
+        return true;
+      } catch (SQLException e4) {
+        LOGGER.warn("the database connection attempt failed, target host: " + hostSpec);
+        try {
+          handler.tryORConnect();
+          return true;
+        } catch (SQLException e5) {
+          orStream.close();
+          LOGGER.error("SQLException occur, the database connection attempt failed, target host: " + hostSpec, e5);
+          return false;
+        }
+      }
+    } catch (ConnectException e6) {
+      LOGGER.error("ConnectException occur, connect to host " + hostSpec + " failed.", e6);
+    } catch (IOException e7) {
+      LOGGER.error("IOException occur, connect to host " + hostSpec + " failed.", e7);
+    }
+    return false;
   }
 
   @Override
