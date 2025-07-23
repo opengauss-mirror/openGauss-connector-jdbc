@@ -35,7 +35,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.nio.channels.SocketChannel;
 import java.io.IOException;
 
 /**
@@ -58,7 +57,6 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
     private static final int PACKAGE_HEAD_SIZE = 16;
     private static final int COLUMNS_THRESHOLD = 13;
 
-    private SocketChannel socketChannel;
     private ORStream orStream;
     private ORBaseConnection connection;
     private boolean isClosed = false;
@@ -72,14 +70,13 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
      */
     public ORQueryExecutorImpl(ORStream orStream, ORBaseConnection connection) throws IOException {
         this.orStream = orStream;
-        this.socketChannel = SocketChannel.open();
-        this.socketChannel.configureBlocking(true);
         this.connection = connection;
     }
 
     @Override
-    public synchronized void execute(ORCachedQuery cachedQuery, List<ORParameterList> batchParameters)
+    public void execute(ORCachedQuery cachedQuery, List<ORParameterList> batchParameters)
             throws SQLException {
+        orStream.getLock().lock();
         try {
             ORPackageHead packageHead = new ORPackageHead();
             short statId = (short) cachedQuery.getCtStatement().getMark();
@@ -109,10 +106,14 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
             isClosed = true;
             String socketStatus = getSocketStatus();
             throw new PSQLException(GT.tr(socketStatus + "An I/O error occured while "
-                    + "sending to the backend." + "detail:" + e.getMessage() + "; "),
-                    PSQLState.CONNECTION_FAILURE, e);
+                    + "sending to the backend." + " detail: " + e.getMessage() + "; target host: "
+                    + connection.getHostSpec()), PSQLState.CONNECTION_FAILURE, e);
         } catch (SQLException e2) {
             throw e2;
+        } finally {
+            if (orStream.getLock().isHeldByCurrentThread()) {
+                orStream.getLock().unlock();
+            }
         }
     }
 

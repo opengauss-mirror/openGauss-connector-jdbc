@@ -185,6 +185,16 @@ public class ORPreparedStatement extends ORStatement implements PreparedStatemen
         preparedParameters.bindParam(connection.getORStream(), index, ORDataType.INT, value);
     }
 
+    private void setBinary(int index, Object x) throws SQLException {
+        byte[] value;
+        if (x instanceof byte[]) {
+            value = (byte[]) x;
+        } else {
+            value = String.valueOf(x).getBytes(connection.getORStream().getCharset());
+        }
+        preparedParameters.bindParam(connection.getORStream(), index, ORDataType.BINARY, value);
+    }
+
     @Override
     public void setByte(int index, byte x) throws SQLException {
         verifyClosed();
@@ -644,7 +654,7 @@ public class ORPreparedStatement extends ORStatement implements PreparedStatemen
             case Types.BINARY:
             case Types.VARBINARY:
             case Types.LONGVARBINARY:
-                setObject(index, x);
+                setBinary(index, x);
                 break;
             case Types.DECIMAL:
             case Types.NUMERIC:

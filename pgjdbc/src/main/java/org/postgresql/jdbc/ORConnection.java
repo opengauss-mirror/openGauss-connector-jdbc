@@ -66,6 +66,7 @@ public class ORConnection implements ORBaseConnection {
     private boolean isSsl;
     private String enabledCipherSuites;
     private boolean isOnlySSL;
+    private HostSpec hostSpec;
 
     /**
      * connection constructor
@@ -109,11 +110,17 @@ public class ORConnection implements ORBaseConnection {
         return fetchSize;
     }
 
-    /**
-     * is it ssl
-     *
-     * @return is ssl
-     */
+    @Override
+    public HostSpec getHostSpec() {
+        return hostSpec;
+    }
+
+    @Override
+    public void setHostSpec(HostSpec hostSpec) {
+        this.hostSpec = hostSpec;
+    }
+
+    @Override
     public boolean isSsl() {
         return isSsl;
     }

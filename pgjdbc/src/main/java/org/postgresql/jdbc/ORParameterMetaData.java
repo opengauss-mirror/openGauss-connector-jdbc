@@ -56,7 +56,7 @@ public class ORParameterMetaData extends PgParameterMetaData {
     public String getParameterTypeName(int param) throws SQLException {
         paramVerify(param);
         int[] types = getTypes();
-        return ORDataType.getDataType(types[param])[0].toString();
+        return ORDataType.getDataType(types[param - 1])[0].toString();
     }
 
     @Override
@@ -69,7 +69,7 @@ public class ORParameterMetaData extends PgParameterMetaData {
     public String getParameterClassName(int param) throws SQLException {
         paramVerify(param);
         int[] types = getTypes();
-        return ORDataType.getDataType(types[param])[3].toString();
+        return ORDataType.getDataType(types[param - 1])[3].toString();
     }
 
     private int[] getTypes() throws SQLException {
@@ -84,7 +84,7 @@ public class ORParameterMetaData extends PgParameterMetaData {
     public int getParameterType(int param) throws SQLException {
         paramVerify(param);
         int[] types = getTypes();
-        Object paramType = ORDataType.getDataType(types[param])[2];
+        Object paramType = ORDataType.getDataType(types[param - 1])[2];
         return Integer.parseInt(paramType.toString());
     }
 }
