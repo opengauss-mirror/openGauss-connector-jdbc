@@ -546,13 +546,9 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public void close() throws SQLException {
-        try {
-            if (!isClosed) {
-                connection.getQueryExecutor().closeResultSet(this.statement);
-            }
-        } finally {
-            isClosed = true;
-        }
+        dataRows = null;
+        valueLens = null;
+        isClosed = true;
     }
 
     @Override
@@ -746,8 +742,10 @@ public class ORResultSet extends PgResultSet {
         Object[] type = this.orFields[columnIndex - 1].getTypeInfo();
         int sqlType = Integer.parseInt(type[1].toString());
         switch (sqlType) {
-            case ORDataType.CLOB:
             case ORDataType.BLOB:
+                Blob blob = getBlob(columnIndex);
+                return blob.getBytes(1, (int) blob.length());
+            case ORDataType.CLOB:
             case ORDataType.IMAGE:
             case ORDataType.BINARY:
             case ORDataType.VARBINARY:

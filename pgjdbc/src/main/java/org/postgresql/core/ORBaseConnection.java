@@ -17,6 +17,7 @@ package org.postgresql.core;
 
 import org.postgresql.PGConnection;
 import org.postgresql.jdbc.TimestampUtils;
+import org.postgresql.util.HostSpec;
 
 import java.sql.Connection;
 
@@ -61,4 +62,25 @@ public interface ORBaseConnection extends PGConnection, Connection {
      * @return TimestampUtils
      */
     TimestampUtils getTimestampUtils();
+
+    /**
+     * use ssl
+     *
+     * @return isSsl
+     */
+    boolean isSsl();
+
+    /**
+     * get host info
+     *
+     * @return host info
+     */
+    HostSpec getHostSpec();
+
+    /**
+     * set host info
+     *
+     * @param hostSpec host info
+     */
+    void setHostSpec(HostSpec hostSpec);
 }

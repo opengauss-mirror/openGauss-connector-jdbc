@@ -180,6 +180,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         CandidateHost candidateHost = hostIter.next();
         boolean isSuccessed = createConnection(candidateHost, info, socketFactory);
         if (isSuccessed) {
+          this.connection.setHostSpec(candidateHost.hostSpec);
           return;
         }
         if (!hostIter.hasNext()) {
@@ -192,47 +193,47 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   private boolean createConnection(CandidateHost candidateHost, Properties info,
                                    SocketFactory socketFactory) {
     HostSpec hostSpec = candidateHost.hostSpec;
-    ORStream orStream = new ORStream(hostSpec, BUFFER_SIZE);
+    ORStream orStream = null;
     try {
       try {
-        orStream.connect(info, socketFactory);
-      } catch (SQLException | ConnectException e) {
-        LOGGER.warn("connect to host " + hostSpec + " failed.");
+        orStream = tryORConnect(hostSpec, info, socketFactory);
+      } catch (SQLException | ConnectException e4) {
+        LOGGER.warn("the connection attempt failed, target host: " + hostSpec);
         try {
-          orStream.connect(info, socketFactory);
-        } catch (ConnectException e2) {
-          LOGGER.error("ConnectException occur, the socket connect failed, target host: " + hostSpec, e2);
-          return false;
-        } catch (SQLException e3) {
-          LOGGER.error("SQLException occur, the socket connect failed, target host: " + hostSpec, e3);
+          orStream = tryORConnect(hostSpec, info, socketFactory);
+        } catch (SQLException e5) {
+          LOGGER.error("SQLException occur, the connection attempt failed, target host: " + hostSpec, e5);
           return false;
         }
       }
-      LOGGER.info("connect to host " + hostSpec + " success.");
-      connection.setOrStream(orStream);
       ORQueryExecutor queryExecutor = new ORQueryExecutorImpl(orStream, connection);
       connection.setQueryExecutor(queryExecutor);
-      ORConnectionHandler handler = new ORConnectionHandler(connection, orStream);
-      try {
-        handler.tryORConnect();
-        return true;
-      } catch (SQLException e4) {
-        LOGGER.warn("the database connection attempt failed, target host: " + hostSpec);
-        try {
-          handler.tryORConnect();
-          return true;
-        } catch (SQLException e5) {
-          orStream.close();
-          LOGGER.error("SQLException occur, the database connection attempt failed, target host: " + hostSpec, e5);
-          return false;
-        }
-      }
+      LOGGER.info("connect to host " + hostSpec + " success.");
+      return true;
     } catch (ConnectException e6) {
       LOGGER.error("ConnectException occur, connect to host " + hostSpec + " failed.", e6);
     } catch (IOException e7) {
       LOGGER.error("IOException occur, connect to host " + hostSpec + " failed.", e7);
     }
+    if (orStream != null) {
+      try {
+        orStream.close();
+      } catch (IOException e) {
+        LOGGER.warn("IOException occur on close: ", e);
+      }
+    }
+
     return false;
+  }
+
+  private ORStream tryORConnect(HostSpec hostSpec, Properties info, SocketFactory socketFactory)
+          throws SQLException, IOException {
+    ORStream orStream = new ORStream(hostSpec, BUFFER_SIZE);
+    orStream.connect(info, socketFactory);
+    connection.setOrStream(orStream);
+    ORConnectionHandler handler = new ORConnectionHandler(connection, orStream);
+    handler.loginDB();
+    return orStream;
   }
 
   @Override

@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.BufferedOutputStream;
 import java.io.FilterOutputStream;
 import java.io.EOFException;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * connection stream info
@@ -47,6 +48,7 @@ public class ORStream implements Closeable, Flushable {
     private static final int BUFFER_SIZE = 8192;
     private static final int MAX_PARAMS_NUM = 65535;
 
+    private ReentrantLock lock = new ReentrantLock();
     private SocketAddress socketAddress;
     private String localAddress;
     private Charset charset;
@@ -57,8 +59,6 @@ public class ORStream implements Closeable, Flushable {
     private int capacity;
 
     private int bufferSize;
-    private byte[] int4buf;
-    private byte[] int2buf;
     private boolean isBigEndian;
     private VisibleBufferedInputStream visibleStream;
     private OutputStream outputStream;
@@ -75,8 +75,6 @@ public class ORStream implements Closeable, Flushable {
         this.charset = Charset.forName("UTF-8");
         this.bufferSize = bufferSize;
         this.socketAddress = new InetSocketAddress(hostSpec.getHost(), hostSpec.getPort());
-        int2buf = new byte[2];
-        int4buf = new byte[4];
     }
 
     /**
@@ -122,6 +120,15 @@ public class ORStream implements Closeable, Flushable {
      */
     public void setCapacity(int capacity) {
         this.capacity = capacity;
+    }
+
+    /**
+     * getLock
+     *
+     * @return lock
+     */
+    public ReentrantLock getLock() {
+        return lock;
     }
 
     /**
@@ -402,6 +409,7 @@ public class ORStream implements Closeable, Flushable {
         if (!visibleStream.ensureBytes(2)) {
             throw new EOFException("EOF Exception");
         }
+        byte[] int2buf = new byte[2];
         if (visibleStream.read(int2buf) != 2) {
             throw new EOFException("EOF Exception");
         }
@@ -421,6 +429,7 @@ public class ORStream implements Closeable, Flushable {
         if (!visibleStream.ensureBytes(4)) {
             throw new EOFException("EOF Exception");
         }
+        byte[] int4buf = new byte[4];
         if (visibleStream.read(int4buf) != 4) {
             throw new EOFException("EOF Exception");
         }
@@ -440,6 +449,7 @@ public class ORStream implements Closeable, Flushable {
      * @throws IOException if an I/O error occurs
      */
     public void sendInteger4(int val) throws IOException {
+        byte[] int4buf = new byte[4];
         if (isBigEndian) {
             int4buf[0] = (byte) (val >>> 24);
             int4buf[1] = (byte) (val >>> 16);
@@ -581,6 +591,7 @@ public class ORStream implements Closeable, Flushable {
      * @throws IOException if an I/O error occurs or {@code val} cannot be encoded in 2 bytes
      */
     public void sendInteger2(int val) throws IOException {
+        byte[] int2buf = new byte[2];
         if (isBigEndian) {
             int2buf[0] = (byte) (val >>> 8);
             int2buf[1] = (byte) val;

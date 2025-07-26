@@ -41,10 +41,9 @@ import java.util.List;
 public class ORConnectionHandler {
     private static final int AGENT = 256;
     private static final int PACKAGE_HEAD_SIZE = 16;
-    private static ORStream orStream;
 
+    private ORStream orStream;
     private ORBaseConnection connection;
-    private int sendMsgLen;
     private byte[] clientKey;
     private byte[] scramble;
     private int iteration;
@@ -73,14 +72,21 @@ public class ORConnectionHandler {
     }
 
     /**
-     * try to connect with CT. handleshake, auth and login
+     * try to connect with db. handleshake, auth and login
      *
      * @throws IOException if an I/O error occurs
      * @throws SQLException if a database access error occurs
      */
-    public synchronized void tryORConnect() throws IOException, SQLException {
-        handleshake();
-        doLogin();
+    public void loginDB() throws IOException, SQLException {
+        orStream.getLock().lock();
+        try {
+            handleshake();
+            doLogin();
+        } finally {
+            if (orStream.getLock().isHeldByCurrentThread()) {
+                orStream.getLock().unlock();
+            }
+        }
     }
 
     /**
@@ -330,7 +336,7 @@ public class ORConnectionHandler {
     private void sendHandshakeQuery(ORPackageHead handshakePackageHead) throws IOException {
         handshakePackageHead.setExecCmd((byte) ORRequestCommand.HANDLE_SHAKE);
         handshakePackageHead.setRequestCount(this.orStream.addRequestCount());
-        sendMsgLen = PACKAGE_HEAD_SIZE + 4;
+        int sendMsgLen = PACKAGE_HEAD_SIZE + 4;
         orStream.sendInteger4(sendMsgLen);
         orStream.sendChar(handshakePackageHead.getExecCmd());
         orStream.sendChar(handshakePackageHead.getExecResult());
