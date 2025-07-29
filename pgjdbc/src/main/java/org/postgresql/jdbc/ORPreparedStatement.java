@@ -21,6 +21,7 @@ import org.postgresql.util.PSQLState;
 import java.io.Reader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -870,7 +871,23 @@ public class ORPreparedStatement extends ORStatement implements PreparedStatemen
 
     @Override
     public void setBinaryStream(int index, InputStream x) throws SQLException {
-        setBinaryStream(index, x, Integer.MAX_VALUE);
+        verifyClosed();
+        if (x == null) {
+            setNull(index, Types.VARBINARY);
+            return;
+        }
+        try {
+            ByteArrayOutputStream os = new ByteArrayOutputStream();
+            byte[] bs = new byte[4096];
+            int readLen = x.read(bs);
+            while (readLen > 0) {
+                os.write(bs, 0, readLen);
+                readLen = x.read(bs);
+            }
+            setBytes(index, os.toByteArray());
+        } catch (IOException e) {
+            throw new SQLException("set binaryStream failed.");
+        }
     }
 
     @Override
@@ -886,7 +903,7 @@ public class ORPreparedStatement extends ORStatement implements PreparedStatemen
 
     @Override
     public void setBlob(int index, InputStream inputStream) throws SQLException {
-        setBinaryStream(index, inputStream, Integer.MAX_VALUE);
+        setBinaryStream(index, inputStream);
     }
 
     @Override

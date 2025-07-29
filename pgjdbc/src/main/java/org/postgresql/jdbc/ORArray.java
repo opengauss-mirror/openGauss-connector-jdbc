@@ -71,11 +71,6 @@ public class ORArray implements java.sql.Array {
     }
 
     @Override
-    public Object getArray(long index, int count, Map<String, Class<?>> map) throws SQLException {
-        return getArray(map);
-    }
-
-    @Override
     public ResultSet getResultSet(Map<String, Class<?>> map) throws SQLException {
         throw new SQLException("getResultSet(Map) not implemented");
     }
@@ -93,6 +88,11 @@ public class ORArray implements java.sql.Array {
     @Override
     public Object getArray(Map<String, Class<?>> map) throws SQLException {
         throw new SQLException("getArray(Map) not implemented");
+    }
+
+    @Override
+    public Object getArray(long index, int count, Map<String, Class<?>> map) throws SQLException {
+        return getArray(map);
     }
 
     @Override
