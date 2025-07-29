@@ -538,9 +538,6 @@ public class ORResultSet extends PgResultSet {
             currentRow++;
         }
 
-        if (currentRow > 0) {
-            dataRows.set(currentRow - 1, null);
-        }
         return hasNext;
     }
 
@@ -600,10 +597,7 @@ public class ORResultSet extends PgResultSet {
                 return new String(blob.getBytes(1L, (int) blob.length()), connection.getORStream().getCharset());
             case Types.BOOLEAN:
                 Object obj = this.getBoolean(columnIndex);
-                if (obj != null) {
-                    return obj.toString();
-                }
-                return null;
+                return obj.toString();
             default:
                 int valueLen = getLen(columnIndex);
                 if (valueLen < 0) {
@@ -746,6 +740,9 @@ public class ORResultSet extends PgResultSet {
                 Blob blob = getBlob(columnIndex);
                 return blob.getBytes(1, (int) blob.length());
             case ORDataType.CLOB:
+                Clob clob = getClob(columnIndex);
+                String value = clob.getSubString(1, (int) clob.length());
+                return value.getBytes(connection.getORStream().getCharset());
             case ORDataType.IMAGE:
             case ORDataType.BINARY:
             case ORDataType.VARBINARY:
@@ -800,7 +797,7 @@ public class ORResultSet extends PgResultSet {
             case Types.TIME:
                 return getTime(columnIndex);
             case Types.TIMESTAMP:
-                return getTimestamp(columnIndex, null);
+                return getTimestamp(columnIndex);
             case Types.BINARY:
             case Types.VARBINARY:
             case Types.LONGVARBINARY:
@@ -862,12 +859,12 @@ public class ORResultSet extends PgResultSet {
     }
 
     private String getORType(int column) {
-        return this.orFields[column].getTypeInfo()[0].toString();
+        return this.orFields[column - 1].getTypeInfo()[0].toString();
     }
 
     @Override
     protected int getSQLType(int column) {
-        Object type = this.orFields[column].getTypeInfo()[2];
+        Object type = this.orFields[column - 1].getTypeInfo()[2];
         return Integer.parseInt(type.toString());
     }
 
@@ -920,12 +917,7 @@ public class ORResultSet extends PgResultSet {
         if (wasNullFlag) {
             return null;
         }
-        try {
-            return new ByteArrayInputStream(getString(columnIndex).getBytes("ASCII"));
-        } catch (UnsupportedEncodingException e) {
-            throw new PSQLException(GT.tr("The JVM claims not to support the encoding: {0}", "ASCII"),
-                    PSQLState.UNEXPECTED_ERROR, e);
-        }
+        return new ByteArrayInputStream(getString(columnIndex).getBytes(connection.getORStream().getCharset()));
     }
 
     @Override
@@ -980,7 +972,7 @@ public class ORResultSet extends PgResultSet {
         }
         int sqlType = getSQLType(columnIndex);
         if (type == BigDecimal.class) {
-            return getBigDecimal(type, sqlType);
+            return getBigDecimal(type, sqlType, columnIndex);
         } else if (type == String.class) {
             return getString(type, sqlType, columnIndex);
         } else if (type == Boolean.class) {
@@ -1029,9 +1021,9 @@ public class ORResultSet extends PgResultSet {
         }
     }
 
-    private <T> T getBigDecimal(Class<T> type, int sqlType) throws SQLException {
+    private <T> T getBigDecimal(Class<T> type, int sqlType, int columnIndex) throws SQLException {
         if (sqlType == Types.NUMERIC || sqlType == Types.DECIMAL) {
-            return type.cast(getBigDecimal(sqlType));
+            return type.cast(getBigDecimal(columnIndex));
         } else {
             throw new PSQLException(GT.tr("conversion to {0} from {1} not supported", type, sqlType),
                     PSQLState.INVALID_PARAMETER_VALUE);
@@ -1113,7 +1105,7 @@ public class ORResultSet extends PgResultSet {
     }
 
     private <T> T getFloat(Class<T> type, int sqlType, int columnIndex) throws SQLException {
-        if (sqlType == Types.REAL) {
+        if (sqlType == Types.REAL || sqlType == Types.FLOAT || sqlType == Types.DOUBLE) {
             float floatValue = getFloat(columnIndex);
             if (wasNull()) {
                 return null;
@@ -1126,7 +1118,7 @@ public class ORResultSet extends PgResultSet {
     }
 
     private <T> T getDouble(Class<T> type, int sqlType, int columnIndex) throws SQLException {
-        if (sqlType == Types.FLOAT || sqlType == Types.DOUBLE) {
+        if (sqlType == Types.REAL || sqlType == Types.FLOAT || sqlType == Types.DOUBLE) {
             double doubleValue = getDouble(columnIndex);
             if (wasNull()) {
                 return null;
@@ -1157,8 +1149,7 @@ public class ORResultSet extends PgResultSet {
     }
 
     private <T> T getTimestamp(Class<T> type, int sqlType, int columnIndex) throws SQLException {
-        if (sqlType == Types.TIMESTAMP
-                || sqlType == Types.TIME_WITH_TIMEZONE) {
+        if (sqlType == Types.TIMESTAMP || sqlType == Types.TIME_WITH_TIMEZONE) {
             return type.cast(getTimestamp(columnIndex));
         } else {
             throw new PSQLException(GT.tr("conversion to {0} from {1} not supported", type, sqlType),
