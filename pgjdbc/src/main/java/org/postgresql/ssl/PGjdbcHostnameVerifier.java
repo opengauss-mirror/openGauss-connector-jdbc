@@ -5,10 +5,17 @@
 
 package org.postgresql.ssl;
 
-import org.postgresql.util.GT;
-import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
+import org.postgresql.log.Logger;
+import org.postgresql.util.GT;
 
+import javax.naming.InvalidNameException;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
+import javax.security.auth.x500.X500Principal;
 import java.net.IDN;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
@@ -17,13 +24,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import javax.naming.InvalidNameException;
-import javax.naming.ldap.LdapName;
-import javax.naming.ldap.Rdn;
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.SSLPeerUnverifiedException;
-import javax.net.ssl.SSLSession;
-import javax.security.auth.x500.X500Principal;
 
 public class PGjdbcHostnameVerifier implements HostnameVerifier {
   private static Log LOGGER = Logger.getLogger(PGjdbcHostnameVerifier.class.getName());
@@ -33,7 +33,7 @@ public class PGjdbcHostnameVerifier implements HostnameVerifier {
   private static final int TYPE_DNS_NAME = 2;
   private static final int TYPE_IP_ADDRESS = 7;
 
-  public static Comparator<String> HOSTNAME_PATTERN_COMPARATOR = new Comparator<String>() {
+  public static final Comparator<String> HOSTNAME_PATTERN_COMPARATOR = new Comparator<String>() {
     private int countChars(String value, char ch) {
       int count = 0;
       int pos = -1;

@@ -39,6 +39,8 @@ public class AESGCMUtil {
     /* length of secret key */
     public static final int AES_KEY_SIZE = 128;
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     /**
      * @description encrypt clear text
      * @param password: secret key
@@ -55,7 +57,7 @@ public class AESGCMUtil {
              * Generate random vectors using secure random numbers. Should not use the same IV encrypted data twice for two encryptions.
              */
             byte[] initVector = new byte[GCM_IV_LENGTH];
-            new SecureRandom().nextBytes(initVector);
+            SECURE_RANDOM.nextBytes(initVector);
 
             GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH * java.lang.Byte.SIZE, initVector);
 

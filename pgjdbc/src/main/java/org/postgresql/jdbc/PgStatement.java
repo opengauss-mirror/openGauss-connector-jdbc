@@ -18,6 +18,7 @@ import org.postgresql.util.PSQLState;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -462,7 +463,7 @@ public class PgStatement implements Statement, BaseStatement {
           for (String mnodifiedParam: modifiedParameters) {
             if (mnodifiedParam != null) {
               //Convert the data to binary
-              byte[] dataInBytes = PGbytea.toBytes(mnodifiedParam.getBytes());
+              byte[] dataInBytes = PGbytea.toBytes(mnodifiedParam.getBytes(StandardCharsets.UTF_8));
               this.setClientLogicBytea(queryParameters, indexParam, dataInBytes, 4402);
             }
             ++indexParam;

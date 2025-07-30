@@ -5,6 +5,8 @@
 
 package org.postgresql.core;
 
+import org.postgresql.log.Log;
+import org.postgresql.log.Logger;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
@@ -12,8 +14,6 @@ import org.postgresql.util.PSQLState;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
-import org.postgresql.log.Logger;
-import org.postgresql.log.Log;
 
 /**
  * Provides constants for well-known backend OIDs for the types we commonly use.
@@ -27,14 +27,14 @@ public class Oid {
   public static final int INT4 = 23;
   public static final int INT4_ARRAY = 1007;
   public static final int INT8 = 20;
-  public static int UINT1 = 4401;
-  public static int UINT1_ARRAY = 3001;
-  public static int UINT2 = 4403;
-  public static int UINT2_ARRAY = 3002;
-  public static int UINT4 = 4405;
-  public static int UINT4_ARRAY = 3003;
-  public static int UINT8 = 4407;
-  public static int UINT8_ARRAY = 3004;
+  public static final int UINT1 = 4401;
+  public static final int UINT1_ARRAY = 3001;
+  public static final int UINT2 = 4403;
+  public static final int UINT2_ARRAY = 3002;
+  public static final int UINT4 = 4405;
+  public static final int UINT4_ARRAY = 3003;
+  public static final int UINT8 = 4407;
+  public static final int UINT8_ARRAY = 3004;
   public static final int INT8_ARRAY = 1016;
   public static final int TEXT = 25;
   public static final int TEXT_ARRAY = 1009;
