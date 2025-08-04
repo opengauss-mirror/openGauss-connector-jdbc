@@ -104,7 +104,6 @@ public class ORResultSet extends PgResultSet {
         this.dataRows = dataRows;
         this.hasRemain = hasRemain;
         this.orFields = fields;
-        this.columnNameIndexMap = new HashMap();
         this.totalRows = dataRows.size();
         if (orStatement.getConnection() instanceof ORBaseConnection) {
             this.connection = (ORBaseConnection) orStatement.getConnection();
@@ -187,7 +186,7 @@ public class ORResultSet extends PgResultSet {
 
         int e = byteValue[1] * 4;
         if (byteValue[1] != 0) {
-            value.append("E+").append(e);
+            value.append("E").append(e);
         }
 
         int round = segments.get(0);
@@ -429,6 +428,38 @@ public class ORResultSet extends PgResultSet {
             return false;
         }
         return currentRow == 0;
+    }
+
+    @Override
+    public int findColumn(String columnName) throws SQLException {
+        checkClosed();
+        if (columnNameIndexMap == null) {
+            columnNameIndexMap = new HashMap<>(orFields.length * 2);
+            for (int i = 0; i < orFields.length; i++) {
+                columnNameIndexMap.put(orFields[i].getColumnName(), i + 1);
+            }
+        }
+
+        Integer columnIndex = columnNameIndexMap.get(columnName);
+        if (columnIndex != null) {
+            return columnIndex;
+        }
+
+        columnIndex = columnNameIndexMap.get(columnName.toLowerCase(Locale.US));
+        if (columnIndex != null) {
+            columnNameIndexMap.put(columnName, columnIndex);
+            return columnIndex;
+        }
+
+        columnIndex = columnNameIndexMap.get(columnName.toUpperCase(Locale.US));
+        if (columnIndex != null) {
+            columnNameIndexMap.put(columnName, columnIndex);
+            return columnIndex;
+        }
+
+        throw new PSQLException(
+                GT.tr("The column name {0} was not found in this ResultSet.", columnName),
+                PSQLState.UNDEFINED_COLUMN);
     }
 
     @Override

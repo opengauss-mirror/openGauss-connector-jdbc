@@ -63,7 +63,6 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   private static final int AUTH_REQ_GSS = 7;
   private static final int AUTH_REQ_GSS_CONTINUE = 8;
   private static final int AUTH_REQ_SSPI = 9;
-  private static final int BUFFER_SIZE = 8192;
 
   public String CLIENT_ENCODING = "UTF8";
   public static String USE_BOOLEAN = "false";
@@ -195,26 +194,28 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     HostSpec hostSpec = candidateHost.hostSpec;
     ORStream orStream = null;
     try {
+      orStream = tryORConnect(hostSpec, info, socketFactory);
+    } catch (SQLException | IOException e) {
+      LOGGER.warn("the connection attempt failed, target host: " + hostSpec);
       try {
         orStream = tryORConnect(hostSpec, info, socketFactory);
-      } catch (SQLException | ConnectException e4) {
-        LOGGER.warn("the connection attempt failed, target host: " + hostSpec);
-        try {
-          orStream = tryORConnect(hostSpec, info, socketFactory);
-        } catch (SQLException e5) {
-          LOGGER.error("SQLException occur, the connection attempt failed, target host: " + hostSpec, e5);
-          return false;
-        }
+      } catch (SQLException e2) {
+        LOGGER.error("SQLException occur, connect to host " + hostSpec + " failed.", e2);
+        closeStream(orStream);
+        return false;
+      } catch (IOException e3) {
+        LOGGER.error("IOException occur, connect to host " + hostSpec + " failed.", e3);
+        closeStream(orStream);
+        return false;
       }
-      ORQueryExecutor queryExecutor = new ORQueryExecutorImpl(orStream, connection);
-      connection.setQueryExecutor(queryExecutor);
-      LOGGER.info("connect to host " + hostSpec + " success.");
-      return true;
-    } catch (ConnectException e6) {
-      LOGGER.error("ConnectException occur, connect to host " + hostSpec + " failed.", e6);
-    } catch (IOException e7) {
-      LOGGER.error("IOException occur, connect to host " + hostSpec + " failed.", e7);
     }
+    ORQueryExecutor queryExecutor = new ORQueryExecutorImpl(orStream, connection);
+    connection.setQueryExecutor(queryExecutor);
+    LOGGER.info("connect to host " + hostSpec + " success.");
+    return true;
+  }
+
+  private void closeStream(ORStream orStream) {
     if (orStream != null) {
       try {
         orStream.close();
@@ -222,13 +223,11 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         LOGGER.warn("IOException occur on close: ", e);
       }
     }
-
-    return false;
   }
 
   private ORStream tryORConnect(HostSpec hostSpec, Properties info, SocketFactory socketFactory)
           throws SQLException, IOException {
-    ORStream orStream = new ORStream(hostSpec, BUFFER_SIZE);
+    ORStream orStream = new ORStream(hostSpec);
     orStream.connect(info, socketFactory);
     connection.setOrStream(orStream);
     ORConnectionHandler handler = new ORConnectionHandler(connection, orStream);

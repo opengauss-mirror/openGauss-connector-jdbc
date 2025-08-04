@@ -17,6 +17,7 @@ package org.postgresql.jdbc;
 
 import org.postgresql.core.ORBaseConnection;
 import org.postgresql.core.ORCachedQuery;
+import org.postgresql.core.ORField;
 import org.postgresql.core.ORParameterList;
 import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
@@ -63,6 +64,7 @@ public class ORStatement implements Statement {
     private int updateCount;
     private int queryFlag;
     private List<Long> resultSets = new LinkedList();
+    private ORField[] field;
     private volatile boolean isClosed;
     private int fetchSize;
     private int mark = -1;
@@ -116,6 +118,15 @@ public class ORStatement implements Statement {
     }
 
     /**
+     * set field
+     *
+     * @param field field info
+     */
+    public void setField(ORField[] field) {
+        this.field = field;
+    }
+
+    /**
      * set updateCount
      *
      * @param updateCount updateCount
@@ -153,6 +164,15 @@ public class ORStatement implements Statement {
     @Override
     public int getUpdateCount() {
         return this.updateCount;
+    }
+
+    /**
+     * get field
+     *
+     * @return field
+     */
+    public ORField[] getField() {
+        return field;
     }
 
     /**
