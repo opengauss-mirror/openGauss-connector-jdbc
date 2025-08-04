@@ -401,7 +401,7 @@ public class PgConnection implements BaseConnection {
     }
 
     /* Get Database GUC parameters when connection established. */
-    Statement stmtGetGuc = null;
+    PreparedStatement stmtGetGuc = null;
     ResultSet rsGetGuc = null;
     Statement stmtSetGuc = null;
     
@@ -409,9 +409,10 @@ public class PgConnection implements BaseConnection {
         String connectionExtraInfo = info.getProperty("connectionExtraInfo");
 
         // If you need to do something as initialization, do it here.
-        String getGucSQL = "select name, setting from pg_settings where name in ('connection_info')";
-        stmtGetGuc = createStatement();
-        rsGetGuc = stmtGetGuc.executeQuery(getGucSQL);
+        String getGucSQL = "select name, setting from pg_settings where name in (?)";
+        stmtGetGuc = prepareStatement(getGucSQL);
+        stmtGetGuc.setString(1, "connection_info");
+        rsGetGuc = stmtGetGuc.executeQuery();
         boolean useConnectionInfo = false;
         boolean useConnectionExtraInfo = false;
         while (rsGetGuc.next()) {
