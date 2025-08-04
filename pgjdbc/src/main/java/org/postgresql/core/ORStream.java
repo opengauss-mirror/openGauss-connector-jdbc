@@ -57,8 +57,6 @@ public class ORStream implements Closeable, Flushable {
     private int serverVersion;
     private int requestFlag;
     private int capacity;
-
-    private int bufferSize;
     private boolean isBigEndian;
     private VisibleBufferedInputStream visibleStream;
     private OutputStream outputStream;
@@ -69,11 +67,9 @@ public class ORStream implements Closeable, Flushable {
      * input/output stream constructor
      *
      * @param hostSpec host address
-     * @param bufferSize bufferSize
      */
-    public ORStream(HostSpec hostSpec, int bufferSize) {
+    public ORStream(HostSpec hostSpec) {
         this.charset = Charset.forName("UTF-8");
-        this.bufferSize = bufferSize;
         this.socketAddress = new InetSocketAddress(hostSpec.getHost(), hostSpec.getPort());
     }
 
@@ -265,10 +261,8 @@ public class ORStream implements Closeable, Flushable {
         int receiveBufferSize = PGProperty.RECEIVE_BUFFER_SIZE.getInt(props);
         if (receiveBufferSize >= 0) {
             this.socket.setReceiveBufferSize(receiveBufferSize);
-        } else if (this.bufferSize > 0) {
-            this.socket.setReceiveBufferSize(this.bufferSize);
         } else {
-            LOGGER.warn("Ignore invalid value for receiveBufferSize: " + receiveBufferSize);
+            this.socket.setReceiveBufferSize(BUFFER_SIZE);
         }
     }
 
@@ -276,10 +270,8 @@ public class ORStream implements Closeable, Flushable {
         int sendBufferSize = PGProperty.SEND_BUFFER_SIZE.getInt(props);
         if (sendBufferSize >= 0) {
             this.socket.setReceiveBufferSize(sendBufferSize);
-        } else if (this.bufferSize > 0) {
-            this.socket.setReceiveBufferSize(this.bufferSize);
         } else {
-            LOGGER.warn("Ignore invalid value for sendBufferSize: " + sendBufferSize);
+            this.socket.setReceiveBufferSize(BUFFER_SIZE);
         }
     }
 

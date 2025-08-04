@@ -68,7 +68,7 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
      * @param connection connection
      * @throws IOException if an I/O error occurs
      */
-    public ORQueryExecutorImpl(ORStream orStream, ORBaseConnection connection) throws IOException {
+    public ORQueryExecutorImpl(ORStream orStream, ORBaseConnection connection) {
         this.orStream = orStream;
         this.connection = connection;
     }
@@ -461,7 +461,7 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
                     orStream.receiveInteger4();
                     int updateCount = orStream.receiveInteger4();
                     cachedQuery.getCtStatement().setUpdateCount(updateCount);
-                    this.handleResult(cachedQuery, new ORField[0]);
+                    this.handleResult(cachedQuery, cachedQuery.getCtStatement().getField());
                 }
             } else {
                 handleData(cachedQuery);
@@ -486,6 +486,7 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
         }
         ORField[] fields = new ORField[cols];
         getFieldInfo(fields);
+        cachedQuery.getCtStatement().setField(fields);
         if (queryMode == 2 || queryMode == 3) {
             stat.setUpdateCount(0);
         } else {
@@ -563,9 +564,6 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
         int index = 0;
         int colIndex = 0;
         while (true) {
-            if (colIndex >= columns) {
-                break;
-            }
             int p = index * 4;
             int mark = lenMark[index];
             for (int k = p; k < p + 4; k++) {
@@ -577,6 +575,9 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
                 handleValue(lenId, lens, value, k);
                 mark = mark >> 2;
                 colIndex = k;
+            }
+            if (colIndex >= columns - 1) {
+                break;
             }
             index++;
         }
