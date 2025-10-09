@@ -14,11 +14,22 @@
       <url>https://jdbc.postgresql.org/about/license.html</url>
     </license>
   </licenses>
-  <parent>
-    <groupId>org.sonatype.oss</groupId>
-    <artifactId>oss-parent</artifactId>
-    <version>7</version>
-  </parent>
+  
+  <developers>
+        <developer>
+            <name>openGauss-connector-jdbc</name>
+            <email>connectors@opengauss.org</email>
+            <organization>https://opengauss.org/zh/</organization>
+        </developer>
+    </developers>
+
+	<scm>
+        <connection>https://gitcode.com/opengauss/openGauss-connector-jdbc.git</connection>
+        <developerConnection>https://gitcode.com/opengauss/openGauss-connector-jdbc.git</developerConnection>
+        <url>https://gitcode.com/opengauss/openGauss-connector-jdbc.git</url>
+    </scm>
+
+
   <organization>
     <name>openGauss</name>
     <url>https://opengauss.org/</url>
@@ -282,18 +293,21 @@
 
   <build>
     <plugins>
-      <plugin>
-        <groupId>org.sonatype.plugins</groupId>
-        <artifactId>nexus-staging-maven-plugin</artifactId>
-        <version>1.6.8</version>
-        <extensions>true</extensions>
-        <configuration>
-          <!-- 与 setting.xml 的 server 配置中的 sonatype-release 对应-->
-          <serverId>sonatype-nexus-staging</serverId>
-          <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-          <autoReleaseAfterClose>true</autoReleaseAfterClose>
-        </configuration>
-      </plugin>
+
+    <plugin>
+          <groupId>org.sonatype.central</groupId>
+          <artifactId>central-publishing-maven-plugin</artifactId>
+          <version>0.9.0</version>
+          <extensions>true</extensions>
+          <configuration>
+            <publishingServerId>central</publishingServerId>
+          </configuration>
+        </plugin>
+        
+
+
+      
+      
       <!--Maven GPG插件用于使用以下配置对组件进行签名-->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -413,7 +427,4 @@
       </plugins>
     </pluginManagement>
   </build>
-  <scm>
-    <tag>REL42.2.5</tag>
-  </scm>
 </project>
