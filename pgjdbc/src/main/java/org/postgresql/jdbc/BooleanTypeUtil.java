@@ -12,6 +12,7 @@ import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
 
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Set;
@@ -71,7 +72,7 @@ class BooleanTypeUtil {
     if (strval.isEmpty()) {
       return false;
     }
-    byte[] newBytes = strval.getBytes();
+    byte[] newBytes = strval.getBytes(StandardCharsets.UTF_8);
 
     if (strval.equalsIgnoreCase("Y") || strval.equalsIgnoreCase("yes")
             || strval.equalsIgnoreCase("T") || strval.equalsIgnoreCase("true")) {

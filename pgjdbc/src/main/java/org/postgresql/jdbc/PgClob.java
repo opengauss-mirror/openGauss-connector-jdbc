@@ -9,11 +9,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.Clob;
 import java.sql.SQLException;
 
 public class PgClob extends AbstractBlobClob implements java.sql.Clob {
-
   public PgClob(org.postgresql.core.BaseConnection conn, long oid) throws java.sql.SQLException {
     super(conn, oid);
   }
@@ -55,7 +55,7 @@ public class PgClob extends AbstractBlobClob implements java.sql.Clob {
   public synchronized String getSubString(long i, int j) throws SQLException {
     assertPosition(i, j);
     getLo(false).seek((int) i - 1);
-    return new String(getLo(false).read(j));
+    return new String(getLo(false).read(j), StandardCharsets.UTF_8);
   }
 
   /**

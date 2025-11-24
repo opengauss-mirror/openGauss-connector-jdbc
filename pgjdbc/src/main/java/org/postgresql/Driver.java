@@ -36,6 +36,7 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Map;
@@ -651,7 +652,7 @@ public class Driver implements java.sql.Driver {
     }
 
     public static String parseIPValid(String address) {
-        if (address == "" || address == null) {
+        if (Objects.equals(address, "") || address == null) {
             return address;
         }
         String regex = "^(1\\d{2}|2[0-4]\\d|25[0-5]|[1-9]\\d|[1-9])\\."

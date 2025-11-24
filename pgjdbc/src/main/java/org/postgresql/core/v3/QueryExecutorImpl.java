@@ -112,6 +112,8 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   private final ReplicationProtocol replicationProtocol;
 
+  private final int preparedStatementCacheQueries;
+
   private int protocolVerion;
 
   private String socketAddress;
@@ -182,6 +184,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     this.replicationProtocol = new V3ReplicationProtocol(this, pgStream);
     this.socketAddress = pgStream.getConnectInfo();
     this.secSocketAddress = pgStream.getSecConnectInfo();
+    this.preparedStatementCacheQueries = PGProperty.PREPARED_STATEMENT_CACHE_QUERIES.getInt(info);
     readStartupMessages();
   }
 
@@ -1683,7 +1686,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
           throws IOException {
     // Already parsed, or we have a Parse pending and the types are right?
     int[] typeOIDs = params.getTypeOIDs();
-    if (query.isPreparedFor(typeOIDs, deallocateEpoch)) {
+    if (query.isPreparedFor(typeOIDs, deallocateEpoch, statementsQueue)) {
       return;
     }
 
@@ -2458,28 +2461,21 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   // process. Then we send a message to the backend to deallocate that statement.
   //
 
-  private final HashMap<PhantomReference<SimpleQuery>, String> parsedQueryMap =
-          new HashMap<PhantomReference<SimpleQuery>, String>();
-  private final ReferenceQueue<SimpleQuery> parsedQueryCleanupQueue =
-          new ReferenceQueue<SimpleQuery>();
+  private final Queue statementsQueue = new ArrayDeque<String>();
 
   private void registerParsedQuery(SimpleQuery query, String statementName) {
     if (statementName == null) {
       return;
     }
-
-    PhantomReference<SimpleQuery> cleanupRef =
-            new PhantomReference<SimpleQuery>(query, parsedQueryCleanupQueue);
-    parsedQueryMap.put(cleanupRef, statementName);
-    query.setCleanupRef(cleanupRef);
+    statementsQueue.add(statementName);
   }
 
   private void processDeadParsedQueries() throws IOException {
-    Reference<? extends SimpleQuery> deadQuery;
-    while ((deadQuery = parsedQueryCleanupQueue.poll()) != null) {
-      String statementName = parsedQueryMap.remove(deadQuery);
-      sendCloseStatement(statementName);
-      deadQuery.clear();
+    while (statementsQueue.size() > preparedStatementCacheQueries) {
+      Object statementName = statementsQueue.poll();
+      if (statementName != null) {
+        sendCloseStatement(statementName.toString());
+      }
     }
   }
 

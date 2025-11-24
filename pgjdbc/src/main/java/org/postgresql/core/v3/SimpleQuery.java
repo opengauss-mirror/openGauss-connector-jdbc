@@ -20,6 +20,7 @@ import org.postgresql.log.Log;
 import java.lang.ref.PhantomReference;
 import java.util.BitSet;
 import java.util.Map;
+import java.util.Queue;
 
 
 /**
@@ -164,8 +165,8 @@ class SimpleQuery implements Query {
     return statementName;
   }
 
-  boolean isPreparedFor(int[] paramTypes, short deallocateEpoch) {
-    if (statementName == null || preparedTypes == null) {
+  boolean isPreparedFor(int[] paramTypes, short deallocateEpoch, Queue statementsQueue) {
+    if (statementName == null || preparedTypes == null || !statementsQueue.contains(statementName)) {
       return false; // Not prepared.
     }
     if (this.deallocateEpoch != deallocateEpoch) {

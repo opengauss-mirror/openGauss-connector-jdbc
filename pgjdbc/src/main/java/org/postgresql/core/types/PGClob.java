@@ -118,6 +118,9 @@ public class PGClob implements Clob {
 
     @Override
     public int setString(long pos, String str) throws SQLException {
+        if (str == null) {
+            return 0;
+        }
         char[] ch = str.toCharArray();
         len = ch.length;
         buf = new char[(int) len];
@@ -229,7 +232,7 @@ public class PGClob implements Clob {
         if (length <= 0) {
             throw new SQLException("Invalid length specified");
         }
-        return new CharArrayReader(buf, (int) pos, (int) length);
+        return new CharArrayReader(buf, (int) pos - 1, (int) length);
     }
 
     private void isValid() throws SQLException {

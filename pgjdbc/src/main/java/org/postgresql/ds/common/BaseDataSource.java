@@ -1207,7 +1207,6 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
         query.append(URLCoder.encode(property.get(properties)));
       }
     }
-    query.append("&binaryTransfer=true");
     query.append("&allowEncodingChanges=").append(allowEncodingChanges);
     query.append("&characterEncoding=").append(characterEncoding);
 	query.append("&connectionExtraInfo=").append(connectionExtraInfo);

@@ -61,7 +61,7 @@ public final class EscapedFunctions2 {
       return method;
     }
     String nameLower = functionName.toLowerCase(Locale.US);
-    if (nameLower == functionName) {
+    if (nameLower.equals(functionName)) {
       // Input name was in lower case, the function is not there
       return null;
     }

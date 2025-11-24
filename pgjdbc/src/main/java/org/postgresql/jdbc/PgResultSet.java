@@ -39,6 +39,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.Clob;
@@ -652,7 +653,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       }
     }
 
-    return connection.getTimestampUtils().toDate(cal, new String(this_row[i - 1]));
+    return connection.getTimestampUtils().toDate(cal, new String(this_row[i - 1], StandardCharsets.UTF_8));
   }
 
 
@@ -2089,11 +2090,11 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       String result = trimString(columnIndex, encoding.decode(this_row[columnIndex - 1]));
       if (("blob".equals(typeName))) {
         if (connection.unwrap(PgConnection.class).isDolphinCmpt()) {
-          return new String(toBytes(result));
+          return new String(toBytes(result), StandardCharsets.UTF_8);
         }
       } else if (blobSet.contains(typeName) || ("raw".equals(typeName)
               && connection.getPgDatabase().isDolphin())) {
-        return new String(toBytes(result));
+        return new String(toBytes(result), StandardCharsets.UTF_8);
       } else if ("time".equals(typeName)) {
         char[] cs = result.toCharArray();
         int start = TimestampUtils.firstDigit(cs, 0);
@@ -2663,7 +2664,7 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     if (oid == Oid.BYTEA) {
       return trimBytes(columnIndex, PGbytea.toBytes(this_row[columnIndex - 1]));
     } else if (oid == Oid.BLOB || blobSet.contains(getPGType(columnIndex))) {
-      String result = new String(this_row[columnIndex - 1]);
+      String result = new String(this_row[columnIndex - 1], StandardCharsets.UTF_8);
       return toBytes(result);
     } else if (oid == Oid.BIT && connection.getPgDatabase().isDec()) {
       return toDecBytes(fields[columnIndex - 1].getMod(), getString(columnIndex));
