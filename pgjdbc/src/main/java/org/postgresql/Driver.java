@@ -95,6 +95,12 @@ public class Driver implements java.sql.Driver {
         } catch (SQLException e) {
             throw new ExceptionInInitializerError(e);
         }
+
+        try {
+            Class.forName("org.postgresql.util.GT");
+        } catch (ClassNotFoundException e) {
+            throw new ExceptionInInitializerError(e);
+        }
     }
 
     // Helper to retrieve default properties from classloader resource
