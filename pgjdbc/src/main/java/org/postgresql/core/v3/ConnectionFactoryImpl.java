@@ -236,7 +236,11 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
 
   @Override
   public QueryExecutor openConnectionImpl(HostSpec[] hostSpecs, String user, String database,
-                                          Properties info) throws SQLException {
+                                          Properties info, String... givenIP) throws SQLException {
+    String newDatabaseIP = null;
+    if (givenIP != null && givenIP.length > 0) {
+      newDatabaseIP = givenIP[0];
+    }
     if (info.getProperty("characterEncoding") != null) {
       setClientEncoding(info.getProperty("characterEncoding").toUpperCase(Locale.ENGLISH));
     }
@@ -277,6 +281,10 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       while (hostIter.hasNext()) {
         CandidateHost candidateHost = hostIter.next();
         HostSpec hostSpec = candidateHost.hostSpec;
+        // find an ip which equals to the given
+        if (newDatabaseIP != null && !hostSpec.getHost().equals(newDatabaseIP)) {
+          continue;
+        }
 
         // Note: per-connect-attempt status map is used here instead of GlobalHostStatusTracker
         // for the case when "no good hosts" match (e.g. all the hosts are known as "connectfail")

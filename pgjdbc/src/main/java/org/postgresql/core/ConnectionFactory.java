@@ -51,17 +51,18 @@ public abstract class ConnectionFactory {
    * @param database the database on the server to connect to; may not be null.
    * @param info extra properties controlling the connection; notably, "password" if present
    *        supplies the password to authenticate with.
+   * @param givenIP an IP for reconnection when using ATF
    * @return the new, initialized, connection
    * @throws SQLException if the connection could not be established.
    */
   public static QueryExecutor openConnection(HostSpec[] hostSpecs, String user,
-      String database, Properties info) throws SQLException {
+      String database, Properties info, String... givenIP) throws SQLException {
     String protoName = PGProperty.PROTOCOL_VERSION.get(info);
 
     if (protoName == null || protoName.isEmpty() || "3".equals(protoName)) {
       ConnectionFactory connectionFactory = new ConnectionFactoryImpl();
       QueryExecutor queryExecutor = connectionFactory.openConnectionImpl(
-          hostSpecs, user, database, info);
+          hostSpecs, user, database, info, givenIP);
       if (queryExecutor != null) {
         return queryExecutor;
       }
@@ -97,13 +98,14 @@ public abstract class ConnectionFactory {
    * @param database the database on the server to connect to; may not be null.
    * @param info extra properties controlling the connection; notably, "password" if present
    *        supplies the password to authenticate with.
+   * @param givenIP an IP for reconnection when using ATF
    * @return the new, initialized, connection, or <code>null</code> if this protocol version is not
    *         supported by the server.
    * @throws SQLException if the connection could not be established for a reason other than
    *         protocol version incompatibility.
    */
   public abstract QueryExecutor openConnectionImpl(HostSpec[] hostSpecs, String user,
-      String database, Properties info) throws SQLException;
+      String database, Properties info, String... givenIP) throws SQLException;
 
   /**
    * Implementation of connection for oGRAC protocol

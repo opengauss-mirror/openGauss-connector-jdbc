@@ -30,6 +30,7 @@ import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
@@ -48,6 +49,21 @@ import java.util.logging.Level;
 import java.util.logging.SimpleFormatter;
 import java.util.logging.StreamHandler;
 import java.util.regex.Pattern;
+import java.io.FileInputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.SSLContext;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 
 
 /**
@@ -86,6 +102,25 @@ public class Driver implements java.sql.Driver {
 
     private static Tracer tracer;
     private static AtomicBoolean tracerInitialized = new AtomicBoolean(false);
+
+    private static final String CERTIFICATE_TYPE_X509 = "X.509";
+    private static final String SSL_PROTOCOL_TLS_V1_2 = "TLSv1.2";
+    private static final String SSL_PROTOCOL_TLS_V1_3 = "TLSv1.3";
+    private static final String[] ENABLED_TLS_PROTOCOLS = {
+        SSL_PROTOCOL_TLS_V1_2,
+        SSL_PROTOCOL_TLS_V1_3
+    };
+
+    private static final int MIN_PORT = 1;
+    private static final int MAX_PORT = 65535;
+    private static final String IPV4_SEGMENT_PATTERN = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)";
+    private static final String IPV4_PATTERN =
+        IPV4_SEGMENT_PATTERN + "\\."
+        + IPV4_SEGMENT_PATTERN + "\\."
+        + IPV4_SEGMENT_PATTERN + "\\."
+        + IPV4_SEGMENT_PATTERN;
+
+    private static int randomATFIndex;
 
     static {
         try {
@@ -576,10 +611,210 @@ public class Driver implements java.sql.Driver {
         if (PGProperty.ENABLE_STATEMENT_LOAD_BALANCE.getBoolean(props)) {
             return new ReadWriteSplittingPgConnection(hostSpecs(props), props, user(props), database(props), url);
         }
-        PgConnection pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props, url);
+        PgConnection pgConnection;
+        if (PGProperty.ATF_LEVEL.get(props).equals("U")) {
+            ArrayList<ATFAddress> addressesATF = parseATFURL(props);
+            SSLSocket socketATF = makeConnectionToATF(addressesATF,
+                PGProperty.ATF_SSLCERT.get(props),
+                PGProperty.ATF_TIMEOUT.getInt(props));
+            pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props,
+                url, socketATF, addressesATF);
+        } else {
+            pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props, url);
+        }
         GlobalConnectionTracker.possessConnectionReference(pgConnection.getQueryExecutor(), props);
         LoadBalanceHeartBeating.setConnection(pgConnection, props);
         return pgConnection;
+    }
+
+    /**
+     * class to record ATFAddress
+     */
+    public static class ATFAddress {
+        private String host;
+        private int port;
+
+        public ATFAddress(String host, int port) {
+            this.host = host;
+            this.port = port;
+        }
+
+        public String getATFHost() {
+            return host;
+        }
+        public void setATFHost(String host) {
+            this.host = host;
+        }
+        public int getATFPort() {
+            return port;
+        }
+        public void setATFPort(int port) {
+            this.port = port;
+        }
+    }
+
+    /**
+     * @param addressesATF an ATFaddress List
+     * @return a suitable socket to ATF
+     */
+    public static SSLSocket makeConnectionToATF(ArrayList<ATFAddress> addressesATF,
+        String atfSslCert, int timeoutMs) throws SQLException {
+        SSLSocketFactory sslSocketFactory = initSSLSocket(atfSslCert);
+        // choose an ATFAddress
+        if (addressesATF == null) {
+            throw new SQLException("ATFAddress List is null.");
+        }
+        int pickedATF = pickATFAddress(addressesATF);
+        // connect to atf server
+        return connectToATF(addressesATF, pickedATF,
+                            sslSocketFactory, timeoutMs);
+    }
+
+    private static SSLSocketFactory initSSLSocket(String certPath) throws SQLException {
+        SSLSocketFactory sslSocketFactory;
+        try (FileInputStream fis = new FileInputStream(certPath)) {
+            CertificateFactory cf = CertificateFactory.getInstance(CERTIFICATE_TYPE_X509);
+            Certificate certObj = cf.generateCertificate(fis);
+            if (certObj instanceof X509Certificate) {
+                X509Certificate cert = (X509Certificate) certObj;
+                KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+                trustStore.load(null);
+                trustStore.setCertificateEntry("atf-server", cert);
+
+                TrustManagerFactory tmf = TrustManagerFactory.getInstance(
+                    TrustManagerFactory.getDefaultAlgorithm()
+                );
+                tmf.init(trustStore);
+                SSLContext sslContext = SSLContext.getInstance(SSL_PROTOCOL_TLS_V1_2);
+                sslContext.init(null, tmf.getTrustManagers(), null);
+                sslSocketFactory = sslContext.getSocketFactory();
+            } else {
+                throw new IllegalArgumentException("ATF cert type wrong.");
+            }
+        } catch (CertificateException | IOException | KeyStoreException
+                 | NoSuchAlgorithmException | KeyManagementException e) {
+            throw new SQLException("SSL fail to initialize（cert path：" + certPath + "）", e);
+        }
+        return sslSocketFactory;
+    }
+
+    private static SSLSocket connectToATF(ArrayList<ATFAddress> addressesATF, int randomIndex,
+        SSLSocketFactory sslSocketFactory, int timeoutMs) throws SQLException {
+        IOException lastException = null;
+        int pickedATF = randomIndex;
+        for (int i = 0; i < addressesATF.size(); i++) {
+            SSLSocket sslSocket = null;
+            Socket socketObj = null;
+            try {
+                socketObj = sslSocketFactory.createSocket();
+                if (socketObj instanceof SSLSocket) {
+                    sslSocket = (SSLSocket) socketObj;
+                    sslSocket.setEnabledProtocols(ENABLED_TLS_PROTOCOLS);
+                    sslSocket.connect(
+                        new InetSocketAddress(
+                            addressesATF.get(pickedATF).getATFHost(),
+                            addressesATF.get(pickedATF).getATFPort()
+                        ),
+                        timeoutMs
+                    );
+                } else {
+                    throw new IllegalArgumentException("Not SSLSocket.");
+                }
+                sslSocket.startHandshake();
+                return sslSocket;
+            } catch (IOException e) {
+                lastException = e;
+                closeSSLSocket(socketObj);
+                pickedATF = (pickedATF + 1) % addressesATF.size();
+            }
+        }
+        throw new SQLException("Fail to connect to any ATFServer", lastException);
+    }
+
+    private static void closeSSLSocket(Socket socketObj) throws SQLException {
+        try {
+            if (socketObj != null) {
+                socketObj.close();
+            }
+        } catch (IOException closeEx) {
+            throw new SQLException("socketObj close faliure");
+        }
+    }
+
+    /**
+     * @param props properties
+     * @return the list of structured ATFURL.
+     * @throws SQLException exception when connecting to Database
+     */
+    public static ArrayList<ATFAddress> parseATFURL(Properties props) throws SQLException {
+        String url = PGProperty.ATF_ADDRESS.get(props).trim();
+        if (url == null || url.isEmpty()) {
+            throw new SQLException("ATFAddress wrong.");
+        }
+        // split the url into individual ones
+        String[] urlStrings = url.split(",");
+        ArrayList<String> validParts = new ArrayList<>();
+        for (String part : urlStrings) {
+            part = part.trim();
+            if (!part.isEmpty()) {
+                validParts.add(part);
+            }
+        }
+        if (validParts.isEmpty()) {
+            throw new SQLException("ATFAddress wrong");
+        }
+        // parse url into list
+        ArrayList<ATFAddress> addressesATF = new ArrayList<>();
+        for (String item : validParts) {
+            int colonIndex = item.lastIndexOf(':');
+            if (colonIndex == -1) {
+                throw new SQLException("ATFAddresses parse wrong.");
+            }
+            if (item.indexOf(':', 0) != colonIndex) {
+                throw new SQLException("ATFAddresses parse wrong.");
+            }
+            String host = item.substring(0, colonIndex);
+            String portStr = item.substring(colonIndex + 1);
+            int port;
+            try {
+                port = Integer.parseInt(portStr);
+                if (!isValidHost(host) || port < MIN_PORT || port > MAX_PORT) {
+                    throw new SQLException("Invalid ATFAddress");
+                }
+            addressesATF.add(new ATFAddress(host, port));
+            } catch (NumberFormatException e) {
+                throw new SQLException("Invaild port");
+            }
+        }
+        return addressesATF;
+    }
+
+    /**
+     * @param host host for checking
+     * @return is a Valid host for IPV4
+     */
+    public static boolean isValidHost(String host) {
+        // IPV4 check
+        if (host != null && host.matches(IPV4_PATTERN)) {
+            return true;
+        }
+        // Check whether it is a valid hostname
+        if (host != null && host.matches("^[a-zA-Z][a-zA-Z0-9\\-]*(\\.[a-zA-Z0-9][a-zA-Z0-9\\-]*)*$")) {
+            return true;
+        }
+        if ("localhost".equalsIgnoreCase(host)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @param addressesATF an url list of ATF for connection
+     * @return a suitable atfaddress
+     */
+    public static int pickATFAddress(ArrayList<ATFAddress> addressesATF) {
+        randomATFIndex = new SecureRandom().nextInt(addressesATF.size());
+        return randomATFIndex;
     }
 
     /**
