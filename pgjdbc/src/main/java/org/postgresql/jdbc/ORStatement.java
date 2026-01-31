@@ -223,7 +223,6 @@ public class ORStatement implements Statement {
             if (generatedKeys != null) {
                 generatedKeys.close();
             }
-            cancel();
             isClosed = true;
         }
     }

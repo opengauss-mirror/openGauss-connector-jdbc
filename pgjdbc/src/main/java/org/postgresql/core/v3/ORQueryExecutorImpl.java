@@ -278,7 +278,6 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
             orStream.sendChar(0);
             orStream.sendChar(0);
             orStream.flush();
-            processResults(null);
         } finally {
             if (orStream.getLock().isHeldByCurrentThread()) {
                 orStream.getLock().unlock();
