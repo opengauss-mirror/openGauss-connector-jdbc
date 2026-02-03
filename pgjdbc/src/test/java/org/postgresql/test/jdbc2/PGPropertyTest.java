@@ -156,6 +156,11 @@ public class PGPropertyTest {
     excluded.add("bitOutput");
     excluded.add("autoReconnect");
     excluded.add("maxReconnects");
+    excluded.add("atfLevel");
+    excluded.add("atfAddress");
+    excluded.add("atfReconnects");
+    excluded.add("atfTimeout");
+    excluded.add("atfSslcert");
 
     // index PropertyDescriptors by name
     Map<String, PropertyDescriptor> propertyDescriptors =

@@ -634,7 +634,45 @@ public enum PGProperty {
      * Maximum number of reconnections when the created connection is disconnected
      */
     MAX_RECONNECTS("maxReconnects", "3", "Maximum number of reconnections when the "
-            + "created connection is disconnected", false)
+            + "created connection is disconnected", false),
+
+    /**
+     * Define the functional level required by the user
+     * C - ATF disabled, U - unplanned primary/standby switchover.
+     */
+    ATF_LEVEL("atfLevel", "C", "The level of the ATF (Automatic Transparent Failover) feature. "
+            + "Valid values are: C (Close), U (Unexpected). Default value is 'C'.", false, new String[]{"C", "U"}),
+
+    /**
+     * Defines the list of ATF server addresses to connect to
+     * The address of the ATF ( Automatic Transparent Failover ) server, in the format of "host:port".
+     * If not set, ATF is considered disabled
+     */
+    ATF_ADDRESS("atfAddress", "", "The address of the ATF ( Automatic Transparent Failover ) server, "
+            + "in the format of host:port. "
+            + "If not set, ATF is considered disabled.", false),
+
+    /**
+     * Maximum number of reconnections for ATF when the created connection is disconnected
+     */
+    ATF_RECONNECTS("atfReconnects", "3", "Maximum number of reconnections for ATF when the "
+            + "created connection is disconnected", false),
+
+    /**
+     * Defines the number of times to attempt reconnecting after an exception occurs. The default is 1000 ms
+     */
+    ATF_TIMEOUT("atfTimeout", "1000", "The timeout in milliseconds for re-establishing the connection when a "
+            + "connection failure occurs, used in ATF ( Automatic Transparent Failover ) scenarios."
+            + "Default value is '1000' milliseconds.", false),
+
+    /**
+     * Defines the path to the SSL certificate file,
+     * which is used for secure connections in ATF (Automatic Transparent Failover) scenarios.
+     * This certificate is used to establish encrypted communication when reconnecting to nodes during failover.
+     */
+    ATF_SSLCERT("atfSslcert", "/data/atf/ssl/server.pem",
+    "The path to the SSL certificate file for secure connections "
+    + " Default value is '/data/atf/ssl/server.pem'.", false)
   ;
 
   private String _name;

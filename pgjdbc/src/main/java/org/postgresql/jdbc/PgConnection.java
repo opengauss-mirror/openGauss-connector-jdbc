@@ -8,6 +8,7 @@ package org.postgresql.jdbc;
 import org.postgresql.Driver;
 import org.postgresql.PGNotification;
 import org.postgresql.PGProperty;
+import org.postgresql.Driver.ATFAddress;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.postgresql.core.BaseStatement;
@@ -44,6 +45,8 @@ import org.postgresql.xml.LegacyInsecurePGXmlFactoryFactory;
 import org.postgresql.xml.PGXmlFactoryFactory;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
@@ -63,6 +66,7 @@ import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
 import java.sql.Types;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -76,9 +80,13 @@ import java.util.TimeZone;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Executor;
+import java.io.OutputStreamWriter;
+import java.io.BufferedReader;
 import java.io.File;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import javax.net.ssl.SSLSocket;
 
 import org.postgresql.core.types.PGClob;
 import org.postgresql.core.types.PGBlob;
@@ -91,6 +99,9 @@ public class PgConnection implements BaseConnection {
   private static final SQLPermission SQL_PERMISSION_ABORT = new SQLPermission("callAbort");
   private static final SQLPermission SQL_PERMISSION_NETWORK_TIMEOUT = new SQLPermission("setNetworkTimeout");
   private static final Map<String,String> CONNECTION_INFO_REPORT_BLACK_LIST;
+
+  private static final int ATF_SOCKET_WAIT_TIME = 50000;
+
   static {
       CONNECTION_INFO_REPORT_BLACK_LIST = new HashMap<>();
       CONNECTION_INFO_REPORT_BLACK_LIST.put("user","");
@@ -204,6 +215,156 @@ public class PgConnection implements BaseConnection {
   private boolean isDolphinCmpt = false;
   private PgDatabase pgDatabase;
   private Properties props;
+
+  private SSLSocket socketATF;
+  private ArrayList<ATFAddress> addressesATF;
+
+  /**
+   * @param info properties
+   * @param e SQLException
+   * @throws SQLException
+   */
+  public boolean reconnectToDatabase(Properties info, SQLException e) throws SQLException {
+    // initialized the param
+    String newDatabaseIP = null;
+    SSLSocket currentATFSocket = null;
+    int maxAtfReconnectAttempts = PGProperty.ATF_RECONNECTS.getInt(info);
+
+    // reconnect to ATF
+    for (int atfAttempt = 0; atfAttempt < maxAtfReconnectAttempts; atfAttempt++) {
+        if (currentATFSocket == null) {
+            currentATFSocket = getATFSocket();
+        }
+        if (currentATFSocket != null) {
+            PrintWriter out = null;
+            BufferedReader in = null;
+            try {
+                out = new PrintWriter(
+                    new OutputStreamWriter(currentATFSocket.getOutputStream(), StandardCharsets.UTF_8),
+                    true);
+                in = new BufferedReader(
+                    new InputStreamReader(currentATFSocket.getInputStream(), StandardCharsets.UTF_8));
+                // construct a JSON string
+                String targetServerType = PGProperty.TARGET_SERVER_TYPE.get(info);
+                String role = "standby";
+                if (targetServerType.equals("any") || targetServerType.equals("master")) {
+                    role = "primary";
+                }
+                String requestJson = String.format(
+                    "{"
+                    + "\"command\":\"query\","
+                    + "\"type\":\"query in excuteInternal FORM JDBC\","
+                    + "\"data\":{"
+                    + "\"role\":\"%s\","
+                    + "\"ERROR\":\"Disconnection between JDBC and Datanode\""
+                    + "}"
+                    + "}",
+                    role);
+                // post to ATF
+                out.println(requestJson);
+                out.flush();
+                // accept response
+                currentATFSocket.setSoTimeout(ATF_SOCKET_WAIT_TIME);
+                String line = in.readLine();
+                if (line == null) {
+                    throw new IOException("ATF returned empty response");
+                }
+                String response = line.trim();
+                // parse JSON
+                if (response.isEmpty()) {
+                    throw new IOException("ATF returned empty response");
+                }
+                newDatabaseIP = parseATFResponse(response);
+                // reconnect to database
+                QueryExecutor currentQueryExecutor = ConnectionFactory.openConnection(
+                    Driver.GetHostSpecs(info),
+                    Driver.GetUser(info),
+                    Driver.GetDatabase(info),
+                    info,
+                    newDatabaseIP);
+                setQueryExecutor(currentQueryExecutor);
+                return true;
+            } catch (IOException ex) {
+                // reconnect to ATF
+                closeStreams(out, in);
+                socketATF = Driver.makeConnectionToATF(addressesATF,
+                    PGProperty.ATF_SSLCERT.get(info),
+                    PGProperty.ATF_TIMEOUT.getInt(info));
+            }
+        }
+    }
+    throw new SQLException("Failed to reconnect after " + maxAtfReconnectAttempts + " ATF attempts");
+  }
+
+  private String parseATFResponse(String jsonStr) throws SQLException {
+    String command = extractFieldFromJson(jsonStr, "command");
+    if (command == null || !command.equals("query")) {
+        throw new SQLException("ATF JSON Parse Wrong: invalid command");
+    }
+
+    String dataStr = extractFieldFromJson(jsonStr, "data");
+    if (dataStr == null) {
+        throw new SQLException("ATF JSON Parse Wrong: missing data");
+    }
+
+    String ip = extractFieldFromJson(dataStr, "ip");
+    if (ip == null) {
+        throw new SQLException("ATF JSON Parse Wrong: missing ip");
+    }
+    return ip.trim();
+  }
+
+  private String extractFieldFromJson(String jsonStr, String fieldName) throws SQLException {
+    String cleanJson = jsonStr.replaceAll("\\s+", "");
+    String keyPattern = "\"" + fieldName + "\":";
+    int keyStartIndex = cleanJson.indexOf(keyPattern);
+
+    if (keyStartIndex == -1) {
+        throw new SQLException("Received Unvaild JSON String");
+    }
+
+    int valueStartIndex = keyStartIndex + keyPattern.length();
+
+    if (valueStartIndex >= cleanJson.length()) {
+        throw new SQLException("Received Unvaild JSON String");
+    }
+    if (cleanJson.charAt(valueStartIndex) == '"') {
+        valueStartIndex++;
+        int valueEndIndex = cleanJson.indexOf("\"", valueStartIndex);
+        while (valueEndIndex > valueStartIndex && cleanJson.charAt(valueEndIndex - 1) == '\\') {
+            valueEndIndex = cleanJson.indexOf("\"", valueEndIndex + 1);
+        }
+
+        if (valueEndIndex == -1) {
+            throw new SQLException("Received Unvaild JSON String");
+        }
+        return cleanJson.substring(valueStartIndex, valueEndIndex);
+    } else {
+        int valueEndIndex = valueStartIndex;
+        while (valueEndIndex < cleanJson.length()) {
+            char c = cleanJson.charAt(valueEndIndex);
+            if (c == ',' || c == '}' || c == ']') {
+                break;
+            }
+            valueEndIndex++;
+        }
+        return cleanJson.substring(valueStartIndex, valueEndIndex);
+    }
+  }
+
+
+  private void closeStreams(PrintWriter out, BufferedReader in) throws SQLException {
+    if (out != null) {
+        out.flush();
+    }
+    try {
+        if (in != null) {
+            in.close();
+        }
+    } catch (IOException e) {
+        throw new SQLException("ATFResponse reads wrong.");
+    }
+  }
 
   public Properties getProps() {
     return props;
@@ -498,6 +659,21 @@ public class PgConnection implements BaseConnection {
     adaptiveSetSQLType = PGProperty.ADAPTIVE_SET_SQL_TYPE.getBoolean(info);
 
     initClientLogic(info);
+  }
+
+  /**
+   * overload the PGConnection
+   */
+  public PgConnection(HostSpec[] hostSpecs,
+                      String user,
+                      String database,
+                      Properties info,
+                      String url,
+                      SSLSocket socketATF,
+                      ArrayList<ATFAddress> addressesATF) throws SQLException {
+    this(hostSpecs, user, database, info, url);
+    this.socketATF = socketATF;
+    this.addressesATF = addressesATF;
   }
 
   /**
@@ -1100,6 +1276,92 @@ public class PgConnection implements BaseConnection {
       throw new PSQLException(GT.tr("This connection has been closed."),
           PSQLState.CONNECTION_DOES_NOT_EXIST);
     }
+  }
+
+  /**
+   * @param e SQLException to judge whether to reconnect to Database
+   * @param info properties
+   * @return whether to reconnect
+   */
+  public int shouldReconnect(SQLException e, Properties info) {
+    String terminateConn = "terminating connection due to administrator command";
+    String ioException = "IO Exception";
+    String ioError = "I/O error";
+    int shouldReconnect = 0;
+    // Determine whether the reconnection conditions specified by the autoreconnect parameter are met
+    if (PGProperty.AUTO_RECONNECT.getBoolean(info) && (e.getMessage().contains(terminateConn))) {
+        shouldReconnect = 1;
+    }
+    // For connections with the ATF function enabled, all IO errors or exceptions should be reconnected.
+    String terminateConn2 = "terminating SyncLocalXactsWithGTM process due to administrator command";
+    // Check whether to use ATF
+    if (PGProperty.ATF_LEVEL.get(props).equals("U")
+        && (e.getMessage().contains(terminateConn)
+        || e.getMessage().contains(terminateConn2)
+        || e.getMessage().contains(ioException)
+        || e.getMessage().contains(ioError))) {
+        shouldReconnect = 2;
+    }
+
+    return shouldReconnect;
+  }
+
+  /**
+   *
+   * @param e SQLException
+   * @param resultSet resultset
+   * @return the result of reconnection
+   * @throws SQLException SQLException
+   */
+  public boolean reconnect(SQLException e, PgResultSet resultSet) throws SQLException {
+    Properties info = getProps();
+
+    int reconnectFlag = shouldReconnect(e, info);
+    switch (reconnectFlag) {
+        case 1:
+            if (autoReconnect(info)) {
+                return true;
+            } else {
+                return false;
+            }
+        case 2:
+            if (reconnectToDatabase(info, e)) {
+                return true;
+            } else {
+                return false;
+            }
+        case 0:
+            return false;
+        default:
+            return false;
+    }
+  }
+
+  private boolean autoReconnect(Properties info) throws SQLException {
+    int maxReconnects = PGProperty.MAX_RECONNECTS.getInt(info);
+        for (int i = 0; i < maxReconnects; i++) {
+            try {
+                QueryExecutor newQueryExecutor = ConnectionFactory.openConnection(Driver.GetHostSpecs(info),
+                    Driver.GetUser(info), Driver.GetDatabase(info), info);
+                setQueryExecutor(newQueryExecutor);
+                if (LOGGER.isInfoEnabled()) {
+                    LOGGER.info("reconnect to server successfully.");
+                }
+                return true;
+            } catch (SQLException e2) {
+                // sleep 1000ms before next retry
+                try {
+                    Thread.sleep(1000);
+                    if (LOGGER.isInfoEnabled()) {
+                        LOGGER.info("try to reconnect to server for " + (i + 1) + " time");
+                    }
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+                continue;
+            }
+        }
+    return false;
   }
 
 
@@ -2135,6 +2397,18 @@ public class PgConnection implements BaseConnection {
 
     public AtomicReferenceFieldUpdater<PgStatement, TimerTask> getTimerUpdater() {
         return CANCEL_TIMER_UPDATER;
+    }
+
+    public SSLSocket getATFSocket() {
+        return socketATF;
+    }
+
+    public void setATFSocket(SSLSocket socketATF) {
+        this.socketATF = socketATF;
+    }
+
+    public ArrayList<ATFAddress> getATFAddresses() {
+        return addressesATF;
     }
 
     @Override
