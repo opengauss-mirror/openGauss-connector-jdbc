@@ -30,7 +30,6 @@ import org.postgresql.util.HostSpec;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.util.PGobject;
-import org.postgresql.util.GT;
 
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -182,7 +181,7 @@ public class ORConnection implements ORBaseConnection {
         try {
             queryExecutor.commit();
         } catch (IOException e) {
-            throw new PSQLException(GT.tr("transaction commit failed."), PSQLState.IO_ERROR);
+            throw new PSQLException("transaction commit failed.", PSQLState.IO_ERROR);
         }
     }
 
@@ -192,7 +191,7 @@ public class ORConnection implements ORBaseConnection {
         try {
             queryExecutor.rollback();
         } catch (IOException e) {
-            throw new PSQLException(GT.tr("transaction rollback failed."), PSQLState.IO_ERROR);
+            throw new PSQLException("transaction rollback failed.", PSQLState.IO_ERROR);
         }
     }
 
@@ -266,7 +265,7 @@ public class ORConnection implements ORBaseConnection {
 
     private void checkClosed() throws SQLException {
         if (isClosed()) {
-            throw new PSQLException(GT.tr("This connection has been closed."),
+            throw new PSQLException("This connection has been closed.",
                     PSQLState.CONNECTION_DOES_NOT_EXIST);
         }
     }

@@ -26,7 +26,6 @@ import org.postgresql.core.OutParams;
 import org.postgresql.jdbc.ORCursorResultSet;
 import org.postgresql.util.ORPackageHead;
 import org.postgresql.util.PSQLState;
-import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ORRequestCommand;
 import org.postgresql.jdbc.ORStatement;
@@ -111,8 +110,8 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
                 headRequestCount = packageHead.getRequestCount();
             }
             if (headRequestCount > requestCount) {
-                throw new PSQLException(GT.tr("request count error, actual request number is "
-                        + requestCount + ", head request count is " + headRequestCount),
+                throw new PSQLException("request count error, actual request number is "
+                        + requestCount + ", head request count is " + headRequestCount,
                         PSQLState.DATA_ERROR);
             }
         } catch (IOException e) {
@@ -123,9 +122,9 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
             }
             isClosed = true;
             String socketStatus = getSocketStatus();
-            throw new PSQLException(GT.tr(socketStatus + "An I/O error occured while "
+            throw new PSQLException(socketStatus + "An I/O error occured while "
                     + "sending to the backend." + " detail: " + e.getMessage() + "; target host: "
-                    + connection.getHostSpec()), PSQLState.CONNECTION_FAILURE, e);
+                    + connection.getHostSpec(), PSQLState.CONNECTION_FAILURE, e);
         } catch (SQLException e2) {
             throw e2;
         } finally {
@@ -579,7 +578,7 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
         }
 
         String errorMsg = new String(errBytes, 0, msgLen, orStream.getCharset());
-        throw new PSQLException(GT.tr(errorMsg), PSQLState.CONNECTION_FAILURE);
+        throw new PSQLException(errorMsg, PSQLState.CONNECTION_FAILURE);
     }
 
     private void handleData(ORCachedQuery cachedQuery) throws SQLException, IOException {
@@ -774,9 +773,9 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
             }
             isClosed = true;
             String socketStatus = getSocketStatus();
-            throw new PSQLException(GT.tr(socketStatus + "An I/O error occured while "
+            throw new PSQLException(socketStatus + "An I/O error occured while "
                     + "sending to the backend." + " detail: " + e.getMessage() + "; target host: "
-                    + connection.getHostSpec()), PSQLState.CONNECTION_FAILURE, e);
+                    + connection.getHostSpec(), PSQLState.CONNECTION_FAILURE, e);
         } catch (SQLException e2) {
             throw e2;
         } finally {

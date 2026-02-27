@@ -197,7 +197,7 @@ public class ORPreparedStatement extends ORStatement implements PreparedStatemen
     @Override
     public ResultSet executeQuery() throws SQLException {
         if (!executeWithFlags()) {
-            throw new PSQLException(GT.tr("No results were returned by the query."), PSQLState.NO_DATA);
+            throw new PSQLException("No results were returned by the query.", PSQLState.NO_DATA);
         }
         return rs;
     }
@@ -591,7 +591,7 @@ public class ORPreparedStatement extends ORStatement implements PreparedStatemen
             }
             return result.toString();
         } catch (IOException ioe) {
-            throw new PSQLException(GT.tr("Provided Reader failed."), PSQLState.UNEXPECTED_ERROR, ioe);
+            throw new PSQLException("Provided Reader failed.", PSQLState.UNEXPECTED_ERROR, ioe);
         }
     }
 
