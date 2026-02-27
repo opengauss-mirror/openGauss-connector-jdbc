@@ -496,7 +496,7 @@ public class ORResultSet extends PgResultSet {
     public boolean relative(int rows) throws SQLException {
         checkRsType();
         if (isInsertRow) {
-            throw new PSQLException(GT.tr("Can''t use relative move methods while on the insert row."),
+            throw new PSQLException("Can't use relative move methods while on the insert row.",
                     PSQLState.INVALID_CURSOR_STATE);
         }
         return absolute(this.currentRow + 1 + rows);
@@ -525,8 +525,7 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public synchronized void cancelRowUpdates() throws SQLException {
-        throw new PSQLException(GT.tr("Cannot call cancelRowUpdates()."),
-                PSQLState.INVALID_CURSOR_STATE);
+        throw new PSQLException("Can't call cancelRowUpdates().", PSQLState.INVALID_CURSOR_STATE);
     }
 
     @Override
@@ -542,20 +541,17 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public void moveToInsertRow() throws SQLException {
-        throw new PSQLException(GT.tr("Cannot call moveToInsertRow()."),
-                PSQLState.INVALID_CURSOR_STATE);
+        throw new PSQLException("Can't call moveToInsertRow().", PSQLState.INVALID_CURSOR_STATE);
     }
 
     @Override
     public synchronized void deleteRow() throws SQLException {
-        throw new PSQLException(GT.tr("Cannot call deleteRow()."),
-                PSQLState.INVALID_CURSOR_STATE);
+        throw new PSQLException("Can't call deleteRow().", PSQLState.INVALID_CURSOR_STATE);
     }
 
     @Override
     public synchronized void insertRow() throws SQLException {
-        throw new PSQLException(GT.tr("Cannot call insertRow()."),
-                PSQLState.INVALID_CURSOR_STATE);
+        throw new PSQLException("Can't call insertRow().", PSQLState.INVALID_CURSOR_STATE);
     }
 
     @Override
@@ -651,22 +647,20 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public void moveToCurrentRow() throws SQLException {
-        throw new PSQLException(GT.tr("Cannot call moveToCurrentRow()."),
-                PSQLState.INVALID_CURSOR_STATE);
+        throw new PSQLException("Can't call moveToCurrentRow().", PSQLState.INVALID_CURSOR_STATE);
     }
 
     @Override
     public synchronized void updateAsciiStream(int columnIndex, InputStream x, int length)
             throws SQLException {
-        throw new PSQLException(GT.tr("Cannot call updateAsciiStream()."),
-                PSQLState.INVALID_CURSOR_STATE);
+        throw new PSQLException("Can't call updateAsciiStream().", PSQLState.INVALID_CURSOR_STATE);
     }
 
     @Override
     public boolean previous() throws SQLException {
         checkRsType();
         if (isInsertRow) {
-            throw new PSQLException(GT.tr("Can''t use relative move methods while on the insert row."),
+            throw new PSQLException("Can't use relative move methods while on the insert row.",
                     PSQLState.INVALID_CURSOR_STATE);
         }
         if (currentRow < 1) {
@@ -696,14 +690,12 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public void refreshRow() throws SQLException {
-        throw new PSQLException(GT.tr("Cannot call refreshRow()."),
-                PSQLState.INVALID_CURSOR_STATE);
+        throw new PSQLException("Can't call refreshRow().", PSQLState.INVALID_CURSOR_STATE);
     }
 
     @Override
     public synchronized void updateRow() throws SQLException {
-        throw new PSQLException(GT.tr("Cannot call updateRow()."),
-                PSQLState.INVALID_CURSOR_STATE);
+        throw new PSQLException("Can't call updateRow().", PSQLState.INVALID_CURSOR_STATE);
     }
 
     @Override
@@ -714,8 +706,7 @@ public class ORResultSet extends PgResultSet {
             try {
                 statement.fetch(this, sql);
             } catch (IOException e) {
-                throw new PSQLException(GT.tr("fetch more rows failed."),
-                        PSQLState.IO_ERROR);
+                throw new PSQLException("fetch more rows failed.", PSQLState.IO_ERROR);
             }
             hasNext = hasNext();
         }
@@ -1042,7 +1033,7 @@ public class ORResultSet extends PgResultSet {
             case ORDataType.VARCHAR:
                 return Arrays.copyOf(getByteValue(columnIndex), getLen(columnIndex));
             default:
-                throw new PSQLException(GT.tr("conversion to bytes value from " + type[3] + " is not supported."),
+                throw new PSQLException("conversion to bytes value from " + type[3] + " is not supported.",
                         PSQLState.NUMERIC_VALUE_OUT_OF_RANGE);
         }
     }
@@ -1255,14 +1246,13 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     protected void updateValue(int columnIndex, Object value) throws SQLException {
-        throw new PSQLException(
-                GT.tr("Cannot update the ResultSet."), PSQLState.INVALID_CURSOR_STATE);
+        throw new PSQLException("Can‘t update the ResultSet.", PSQLState.INVALID_CURSOR_STATE);
     }
 
     @Override
     protected void checkClosed() throws SQLException {
         if (isClosed) {
-            throw new PSQLException(GT.tr("This ResultSet is closed."), PSQLState.OBJECT_NOT_IN_STATE);
+            throw new PSQLException("This ResultSet is closed.", PSQLState.OBJECT_NOT_IN_STATE);
         }
     }
 
@@ -1299,8 +1289,7 @@ public class ORResultSet extends PgResultSet {
     protected void checkResultSet(int column) throws SQLException {
         checkClosed();
         if (this.dataRows == null) {
-            throw new PSQLException(
-                    GT.tr("ResultSet not positioned properly, perhaps you need to call next."),
+            throw new PSQLException("ResultSet not positioned properly, perhaps you need to call next.",
                     PSQLState.INVALID_CURSOR_STATE);
         }
         checkColumnIndex(column);

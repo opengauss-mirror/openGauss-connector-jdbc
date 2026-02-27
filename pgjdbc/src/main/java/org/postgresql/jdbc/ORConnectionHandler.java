@@ -19,7 +19,6 @@ import org.postgresql.core.ORBaseConnection;
 import org.postgresql.core.ORStream;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
-import org.postgresql.util.GT;
 import org.postgresql.util.ORPackageHead;
 import org.postgresql.util.MD5Digest;
 import org.postgresql.util.ORRequestCommand;
@@ -120,7 +119,7 @@ public class ORConnectionHandler {
             sendAuthQuery();
             processResults(false);
         } catch (IOException | SQLException e) {
-            throw new PSQLException(GT.tr("handshake and authentication failed."),
+            throw new PSQLException("handshake and authentication failed.",
                     PSQLState.CONNECTION_UNABLE_TO_CONNECT, e);
         }
     }
@@ -132,8 +131,7 @@ public class ORConnectionHandler {
             sendLoginQuery();
             processResults(true);
         } catch (SQLException | IOException e) {
-            throw new PSQLException(GT.tr("login database failed."),
-                    PSQLState.CONNECTION_UNABLE_TO_CONNECT, e);
+            throw new PSQLException("login database failed.", PSQLState.CONNECTION_UNABLE_TO_CONNECT, e);
         }
     }
 
@@ -176,8 +174,7 @@ public class ORConnectionHandler {
         String userName = this.connection.getClientInfo("user");
         String password = this.connection.getClientInfo("password");
         if (userName == null || password == null) {
-            throw new PSQLException(GT.tr("user or password is null."),
-                    PSQLState.CONNECTION_UNABLE_TO_CONNECT);
+            throw new PSQLException("user or password is null.", PSQLState.CONNECTION_UNABLE_TO_CONNECT);
         }
         byte[] userByte = userName.getBytes(charset);
         len += userByte.length;
@@ -420,7 +417,7 @@ public class ORConnectionHandler {
         }
 
         String err = new String(errBytes, 0, msgLen, charset);
-        throw new PSQLException(GT.tr(err), PSQLState.CONNECTION_FAILURE);
+        throw new PSQLException(err, PSQLState.CONNECTION_FAILURE);
     }
 
     private void getLoginMsg() throws SQLException, IOException {
@@ -469,7 +466,7 @@ public class ORConnectionHandler {
             }
             for (int i = 0; i < this.clientKey.length; i++) {
                 if (this.scramble[i] != this.clientKey[i]) {
-                    throw new PSQLException(GT.tr("client key error, handshake failed."), PSQLState.CONNECTION_FAILURE);
+                    throw new PSQLException("client key error, handshake failed.", PSQLState.CONNECTION_FAILURE);
                 }
             }
         }

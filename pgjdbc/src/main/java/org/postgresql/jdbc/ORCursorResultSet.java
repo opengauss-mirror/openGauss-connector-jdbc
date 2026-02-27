@@ -16,7 +16,6 @@
 package org.postgresql.jdbc;
 
 import org.postgresql.core.ORField;
-import org.postgresql.util.GT;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 
@@ -105,8 +104,7 @@ public class ORCursorResultSet extends ORResultSet {
             try {
                 this.statement.connection.getQueryExecutor().fetchCursor(this);
             } catch (SQLException e) {
-                throw new PSQLException(GT.tr("fetch more rows failed."),
-                        PSQLState.IO_ERROR);
+                throw new PSQLException("fetch more rows failed.", PSQLState.IO_ERROR);
             }
             hasNext = hasNext();
         }
