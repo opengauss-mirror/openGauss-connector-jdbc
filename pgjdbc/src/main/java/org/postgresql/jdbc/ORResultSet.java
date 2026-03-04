@@ -1078,10 +1078,9 @@ public class ORResultSet extends PgResultSet {
             case Types.VARCHAR:
             case Types.LONGVARCHAR:
                 return getString(columnIndex);
-            case Types.DATE:
-                return getDate(columnIndex);
             case Types.TIME:
                 return getTime(columnIndex);
+            case Types.DATE:
             case Types.TIMESTAMP:
                 return getTimestamp(columnIndex);
             case Types.BINARY:
