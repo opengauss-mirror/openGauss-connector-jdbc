@@ -241,8 +241,8 @@ public class ORResultSet extends PgResultSet {
         if (valueLen < 0) {
             return null;
         }
-        double value = getDouble(columnIndex);
-        return new BigDecimal(String.valueOf(value));
+        String value = getNumber(columnIndex);
+        return new BigDecimal(value);
     }
 
     private String getNumber(int columnIndex) {
