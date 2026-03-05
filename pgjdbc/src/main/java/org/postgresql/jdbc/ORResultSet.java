@@ -70,6 +70,7 @@ import java.net.URL;
  */
 public class ORResultSet extends PgResultSet {
     private static final int SEGMENT_LENGTH = 13;
+    private static final int[] SEGMENT_SIZE = new int[]{10, 100, 1000, 10000, 32767};
 
     /**
      * statement
@@ -245,6 +246,14 @@ public class ORResultSet extends PgResultSet {
         return new BigDecimal(value);
     }
 
+    private int getSegmentSize(int segment) {
+        int size = 1;
+        while (segment >= SEGMENT_SIZE[size - 1]) {
+            size++;
+        }
+        return size;
+    }
+
     private String getNumber(int columnIndex) {
         byte[] byteValue = getByteValue(columnIndex);
         if ((byte) (byteValue[0] >> 1) == 0) {
@@ -267,6 +276,12 @@ public class ORResultSet extends PgResultSet {
         while (i <= segmentCount) {
             int segment = connection.getORStream().bytesToShort(byteValue, i * 2);
             segments[i - 1] = segment;
+            int size = getSegmentSize(segment);
+            int scale = 0;
+            while (scale < 4 - size) {
+                value.append('0');
+                scale++;
+            }
             value.append(segment);
             i++;
         }
