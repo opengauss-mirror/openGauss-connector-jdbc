@@ -58,41 +58,29 @@ public class ORTimestampUtils {
      * @return day-hms date String
      */
     public static String getDateDayHMS(long dhTime) {
+        StringBuilder value = new StringBuilder();
         long usTime = dhTime;
         if (usTime < 0) {
             usTime = Math.abs(usTime);
+            value.append('-');
         }
         int day = (int) (usTime / ONE_DAY_US);
         usTime = usTime % ONE_DAY_US;
         int hour = (int) (usTime / ONE_HOUR_US);
         usTime = usTime % ONE_HOUR_US;
-        StringBuilder value = new StringBuilder();
-        if (day < 10) {
-            value.append(0);
-        }
-        value.append(day).append(' ');
-        if (hour < 10) {
-            value.append(0);
-        }
-        value.append(hour).append(':');
-
         int min = (int) (usTime / ONE_MINUTE_US);
         usTime = usTime % ONE_MINUTE_US;
         int sec = (int) (usTime / ONE_SECONDS_US);
         usTime = usTime % ONE_SECONDS_US;
-        if (min < 10) {
-            value.append(0);
-        }
-        value.append(min).append(':');
-        if (sec < 10) {
-            value.append(0);
-        }
-        value.append(sec);
 
+        value.append(day).append(' ');
+        value.append(hour).append(':');
+        value.append(min).append(':').append(sec);
         if (usTime <= 0) {
             return value.append(".0").toString();
         }
-        String us = "0." + usTime;
+        String milliSec = String.format("%06d", usTime);
+        String us = "0." + milliSec;
         BigDecimal usBd = new BigDecimal(us);
         String usFormat = usBd.stripTrailingZeros().toPlainString();
         return value.append(usFormat.substring(1)).toString();
