@@ -650,7 +650,7 @@ public class ORResultSet extends PgResultSet {
         if (valueLen < 0) {
             return null;
         }
-        byte[] value = Arrays.copyOf(getByteValue(columnIndex), getLen(columnIndex));
+        byte[] value = Arrays.copyOf(getByteValue(columnIndex), valueLen);
         int dataLen = connection.getORStream().bytesToInt(value);
         byte[] data = new byte[dataLen];
         System.arraycopy(value, 12, data, 0, dataLen);

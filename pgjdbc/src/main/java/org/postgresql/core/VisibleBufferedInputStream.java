@@ -273,6 +273,15 @@ public class VisibleBufferedInputStream extends InputStream {
   }
 
   /**
+   * Returns the end position in the buffer.
+   *
+   * @return the end position in the buffer.
+   */
+  public int getEndIndex() {
+    return endIndex;
+  }
+
+  /**
    * Scans the length of the next null terminated string (C-style string) from the stream.
    *
    * @return The length of the next null terminated string.
