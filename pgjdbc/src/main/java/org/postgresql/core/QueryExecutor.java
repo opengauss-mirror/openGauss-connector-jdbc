@@ -535,4 +535,47 @@ public interface QueryExecutor extends TypeTransferModeRegistry {
    * @return encoding str
    */
   String getClientEncoding();
+
+    /**
+     * Cache the given ATFCachedQuery.
+     *
+     * @param cachedQuery the ATFCachedQuery to cache
+     */
+    void cacheQuery(ATFCachedQuery cachedQuery);
+
+    /**
+     * Clear the ATF cache.
+     */
+    void clearATFCache();
+
+    /**
+     * Get the ATFCache instance.
+     *
+     * @return the ATFCache instance
+     */
+    ATFCache getATFCache();
+
+    /**
+     * Set the ATFCache instance.
+     *
+     * @param atfCache the ATFCache instance to set
+     */
+    void setATFCache(ATFCache atfCache);
+
+    /**
+     * Get the unique ID of the QueryExecutor.
+     *
+     * @return the unique ID of the QueryExecutor
+     */
+    long getUniqueID();
+
+    /**
+     * Set the unique ID of the QueryExecutor. The uniqueID is used to tag each query,
+     * preventing duplicate queries or repeated parsing of the same query. After a reconnect,
+     * the uniqueID must be 0, and the new uniqueID must be set to the value it had before the failure,
+     * to avoid ID conflicts between cached queries and newly added queries.
+     *
+     * @param uniqueID the unique ID to set
+     */
+    void setUniqueID(long uniqueID);
 }
