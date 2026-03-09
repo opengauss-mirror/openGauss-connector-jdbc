@@ -484,6 +484,7 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
                 getResult(cachedQuery, remainLen);
             }
 
+            orStream.receive(orStream.getRemainingBufLen());
             if ((packageHead.getFlags() & CURSOR_FLAG) == 0) {
                 break;
             }

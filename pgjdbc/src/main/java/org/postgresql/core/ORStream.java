@@ -796,4 +796,13 @@ public class ORStream implements Closeable, Flushable {
     public Socket getSocket() {
         return socket;
     }
+
+    /**
+     * get the remaining length in the buffer.
+     *
+     * @return the remaining length in the buffer.
+     */
+    public int getRemainingBufLen() {
+        return visibleStream.getEndIndex() - visibleStream.getIndex();
+    }
 }
