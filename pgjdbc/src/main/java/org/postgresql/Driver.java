@@ -620,9 +620,7 @@ public class Driver implements java.sql.Driver {
         PgConnection pgConnection;
         if (PGProperty.ATF_LEVEL.get(props).equals("U")) {
             ArrayList<ATFAddress> addressesATF = parseATFURL(props);
-            SSLSocket socketATF = makeConnectionToATF(addressesATF,
-                PGProperty.ATF_SSLCERT.get(props),
-                PGProperty.ATF_TIMEOUT.getInt(props));
+            SSLSocket socketATF = makeConnectionToATF(addressesATF, PGProperty.ATF_TIMEOUT.getInt(props));
             pgConnection = new PgConnection(hostSpecs(props), user(props), database(props), props,
                 url, socketATF, addressesATF);
         } else {
@@ -639,10 +637,12 @@ public class Driver implements java.sql.Driver {
     public static class ATFAddress {
         private String host;
         private int port;
+        private String sslCert;
 
-        public ATFAddress(String host, int port) {
+        public ATFAddress(String host, int port, String sslCert) {
             this.host = host;
             this.port = port;
+            this.sslCert = sslCert;
         }
 
         public String getATFHost() {
@@ -657,20 +657,25 @@ public class Driver implements java.sql.Driver {
         public void setATFPort(int port) {
             this.port = port;
         }
+        public String getSslCert() {
+            return sslCert;
+        }
+        public void setSslCert(String sslCert) {
+            this.sslCert = sslCert;
+        }
     }
 
     /**
      * @param addressesATF an ATFaddress List
      * @return a suitable socket to ATF
      */
-    public static SSLSocket makeConnectionToATF(ArrayList<ATFAddress> addressesATF,
-        String atfSslCert, int timeoutMs) throws SQLException {
-        SSLSocketFactory sslSocketFactory = initSSLSocket(atfSslCert);
+    public static SSLSocket makeConnectionToATF(ArrayList<ATFAddress> addressesATF, int timeoutMs) throws SQLException {
         // choose an ATFAddress
         if (addressesATF == null) {
             throw new SQLException("ATFAddress List is null.");
         }
         int pickedATF = pickATFAddress(addressesATF);
+        SSLSocketFactory sslSocketFactory = initSSLSocket(addressesATF.get(pickedATF).getSslCert());
         // connect to atf server
         return connectToATF(addressesATF, pickedATF,
                             sslSocketFactory, timeoutMs);
@@ -749,16 +754,24 @@ public class Driver implements java.sql.Driver {
 
     /**
      * @param props properties
-     * @return the list of structured ATFURL.
+     * @return the list of structured ATFURL
      * @throws SQLException exception when connecting to Database
      */
     public static ArrayList<ATFAddress> parseATFURL(Properties props) throws SQLException {
         String url = PGProperty.ATF_ADDRESS.get(props).trim();
+        String sslCert = PGProperty.ATF_SSLCERT.get(props).trim();
         if (url == null || url.isEmpty()) {
             throw new SQLException("ATFAddress wrong.");
         }
-        // split the url into individual ones
+        if (sslCert == null || sslCert.isEmpty()) {
+            throw new SQLException("ATFSslcertpath wrong.");
+        }
+        // split the url and the sslcertpath into individual ones
         String[] urlStrings = url.split(",");
+        String[] sslcertpaths = sslCert.split(",");
+        if (urlStrings.length != sslcertpaths.length) {
+            throw new SQLException("less or more ATFsslcertpath.");
+        }
         ArrayList<String> validParts = new ArrayList<>();
         for (String part : urlStrings) {
             part = part.trim();
@@ -771,7 +784,8 @@ public class Driver implements java.sql.Driver {
         }
         // parse url into list
         ArrayList<ATFAddress> addressesATF = new ArrayList<>();
-        for (String item : validParts) {
+        for (int i = 0; i < validParts.size(); i++) {
+            String item = validParts.get(i);
             int colonIndex = item.lastIndexOf(':');
             if (colonIndex == -1) {
                 throw new SQLException("ATFAddresses parse wrong.");
@@ -787,7 +801,7 @@ public class Driver implements java.sql.Driver {
                 if (!isValidHost(host) || port < MIN_PORT || port > MAX_PORT) {
                     throw new SQLException("Invalid ATFAddress");
                 }
-            addressesATF.add(new ATFAddress(host, port));
+                addressesATF.add(new ATFAddress(host, port, sslcertpaths[i]));
             } catch (NumberFormatException e) {
                 throw new SQLException("Invaild port");
             }

@@ -535,6 +535,21 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     if (options != null) {
         paramList.add(new String[]{"options", options});
     }
+
+    boolean isEnableATF = PGProperty.ENABLE_ATF.getBoolean(info);
+    if (isEnableATF) {
+        paramList.add(new String[]{"enable_atf", "true"});
+    }
+
+    boolean isAtfRecovery = PGProperty.ATF_RECOVERY.getBoolean(info);
+    if (isAtfRecovery) {
+        paramList.add(new String[]{"atf_recovery", "true"});
+        String atfSqlCount = PGProperty.ATF_SQL_COUNT.get(info);
+        if (atfSqlCount != null) {
+            paramList.add(new String[]{"atf_sql_count", atfSqlCount});
+        }
+    }
+
     return paramList;
   }
 

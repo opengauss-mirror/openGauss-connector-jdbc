@@ -9,6 +9,7 @@ import org.postgresql.util.GT;
 import org.postgresql.util.HostSpec;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.util.MD5Digest;
 
 import java.io.BufferedOutputStream;
 import java.io.Closeable;
@@ -460,6 +461,75 @@ public class PGStream implements Closeable, Flushable {
 
     return answer;
   }
+
+    /**
+     * Computes the Message-Digest Algorithm 5 hash of a byte array.
+     *
+     * @param buf the byte array to hash
+     * @param index the index of the first byte to hash
+     * @param size the number of bytes to hash
+     * @return the Message-Digest Algorithm 5 hash of the byte array
+     */
+    public byte[] hashBytes(byte[] buf, int index, int size) {
+        return MD5Digest.md5DigestBytes(buf, index, size);
+    }
+
+    /**
+     * Computes the Message-Digest Algorithm 5 hash of a string.
+     *
+     * @param input the string to hash
+     * @return the Message-Digest Algorithm 5 hash of the string
+     */
+    public byte[] hashChars(String input) {
+        try {
+            return MD5Digest.md5DigestBytes(encoding.encode(input));
+        } catch (IOException e) {
+            return new byte[16];
+        }
+    }
+
+    /**
+     * ATF:
+     * Read a tuple from the back end. A tuple is a two dimensional array of bytes. This variant reads
+     * the V3 protocol's tuple representation. And it updates the hash of the query execution result.
+     *
+     * @param queryExecutionResult the query execution result to update the hash
+     * @return tuple from the back end
+     * @throws IOException if a data I/O error occurs
+     * @throws OutOfMemoryError if the tuple is too large to fit in memory
+     */
+    public byte[][] receiveTupleV3(QueryExecutionResult queryExecutionResult) throws IOException, OutOfMemoryError {
+        int msgSize = receiveInteger4();
+        int nf = receiveInteger2();
+        byte[][] answer = new byte[nf][];
+        byte[] buf = pg_input.getBuffer();
+        int index = pg_input.getIndex();
+        byte[] resultHash = null;
+        if (msgSize > 6 && index + msgSize - 6 <= buf.length) {
+            int len = msgSize - 6;
+            resultHash = hashBytes(buf, index, len);
+            queryExecutionResult.updateHash(resultHash);
+        }
+        OutOfMemoryError oom = null;
+        for (int i = 0; i < nf; ++i) {
+            int lSize = receiveInteger4();
+            if (lSize != -1) {
+                try {
+                    answer[i] = new byte[lSize];
+                    receive(answer[i], 0, lSize);
+                } catch (OutOfMemoryError oome) {
+                    oom = oome;
+                    skip(lSize);
+                }
+            }
+        }
+
+        if (oom != null) {
+            throw oom;
+        }
+
+        return answer;
+    }
 
   /**
    * Reads in a given number of bytes from the backend.

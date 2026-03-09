@@ -22,6 +22,7 @@ import org.postgresql.core.PGStream;
 import org.postgresql.core.ParameterList;
 import org.postgresql.core.Parser;
 import org.postgresql.core.Query;
+import org.postgresql.core.QueryExecutionResult;
 import org.postgresql.core.QueryExecutor;
 import org.postgresql.core.QueryExecutorBase;
 import org.postgresql.core.ReplicationProtocol;
@@ -1562,6 +1563,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
                          int flags, ResultHandler resultHandler,
                          BatchResultHandler batchHandler) throws IOException, SQLException {
     // Now the query itself.
+    query.setQueryResult(null);
     Query[] subqueries = query.getSubqueries();
     SimpleParameterList[] subparams = parameters.getSubparams();
 
@@ -2185,6 +2187,28 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     query.setPortalDescribed(true);
   }
 
+  private void sendSnapshot(SimpleQuery query, Portal portal) throws IOException {
+    QueryExecutionResult queryExecutionResult = query.getQueryResult();
+    if (queryExecutionResult == null) {
+      return;
+    }
+    QueryExecutionResult.SnapShot snapShot = queryExecutionResult.getSnapShot();
+    if (snapShot == null) {
+      return;
+    }
+
+    pgStream.sendChar('v'); // SnapShot
+    int size = 4 + 8 + 8 + 8 + 4 + 1 + 8 + 1;
+    pgStream.sendInteger4(size); // message size
+    pgStream.sendLong(snapShot.csn);
+    pgStream.sendLong(snapShot.xmin);
+    pgStream.sendLong(snapShot.xmax);
+    pgStream.sendInteger4(snapShot.timeline);
+    pgStream.sendChar(snapShot.isTakenDuringRecovery ? 1 : 0);
+    pgStream.sendLong(snapShot.xid);
+    pgStream.sendChar(queryExecutionResult.getIsLastQuery() ? 1 : 0);
+  }
+
   private void sendExecute(SimpleQuery query, Portal portal, int limit) throws IOException {
     //
     // Send Execute.
@@ -2262,6 +2286,8 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   //
   private void sendOneQuery(SimpleQuery query, SimpleParameterList params, int maxRows,
                             int fetchSize, int flags) throws IOException {
+    // a new query must clear queryExecuteResult, otherwides
+    query.setQueryResult(null);
     boolean asSimple = isSimpleQuery(flags);
     if (asSimple) {
       assert (flags & QueryExecutor.QUERY_DESCRIBE_ONLY) == 0
@@ -2345,6 +2371,11 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       portal = new Portal(query, portalName, getClientEncoding());
     }
 
+    QueryExecutionResult queryExecutionResult = query.getQueryResult();
+    if (queryExecutionResult != null && queryExecutionResult.getIsRecovery()) {
+        sendSnapshot(query, portal);
+    }
+
     sendBind(query, params, portal, noBinaryTransfer);
 
     // A statement describe will also output a RowDescription,
@@ -2381,26 +2412,21 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     boolean noMeta = (flags & QueryExecutor.QUERY_NO_METADATA) != 0;
     boolean describeOnly = (flags & QueryExecutor.QUERY_DESCRIBE_ONLY) != 0;
     // extended queries always use a portal
-    // the usePortal flag controls whether or not we use a *named* portal
-    boolean usePortal =
-            (flags & QueryExecutor.QUERY_FORWARD_CURSOR) != 0
-                    && !noResults
-                    && !noMeta
-                    && fetchSize > 0
-                    && !describeOnly;
+    // the shouldUsePortal flag controls whether or not we use a *named* portal
+    boolean shouldUsePortal = (flags & QueryExecutor.QUERY_FORWARD_CURSOR) != 0
+                    && !noResults && !noMeta && fetchSize > 0 && !describeOnly;
     boolean oneShot = (flags & QueryExecutor.QUERY_ONESHOT) != 0;
     boolean noBinaryTransfer = (flags & QUERY_NO_BINARY_TRANSFER) != 0;
-    boolean forceDescribePortal = (flags & QUERY_FORCE_DESCRIBE_PORTAL) != 0;
 
     // Work out how many rows to fetch in this pass.
-
+    query.setQueryResult(null);
     int rows;
     if (noResults) {
       rows = 1; // We're discarding any results anyway, so limit data transfer to a minimum
-    } else if (!usePortal) {
+    } else if (!shouldUsePortal) {
       rows = maxRows; // Not using a portal -- fetchSize is irrelevant
     } else if (maxRows != 0 && fetchSize > maxRows) {
-      // fetchSize > maxRows, use maxRows (nb: fetchSize cannot be 0 if usePortal == true)
+      // fetchSize > maxRows, use maxRows (nb: fetchSize cannot be 0 if shouldUsePortal == true)
       rows = maxRows;
     } else {
       rows = fetchSize; // maxRows > fetchSize
@@ -2441,11 +2467,14 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     // Construct a new portal if needed.
     Portal portal = null;
-    if (usePortal) {
+    if (shouldUsePortal) {
       String portalName = "C_" + (nextUniqueID++);
       portal = new Portal(query, portalName, getClientEncoding());
     }
-
+    QueryExecutionResult queryExecutionResult = query.getQueryResult();
+    if (queryExecutionResult != null && queryExecutionResult.getIsRecovery()) {
+        sendSnapshot(query, portal);
+    }
     sendBatchBind(query, parameterLists, portal, noBinaryTransfer, batchnum, rows);
   }
 
@@ -2543,11 +2572,27 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     }
   }
 
+  private boolean getEnableATF() {
+    ExecuteRequest executeData = pendingExecuteQueue.peekFirst();
+    SimpleQuery currentQuery = executeData.query;
+    return currentQuery.getIsEnableATF();
+  }
+
+  public long getUniqueID() {
+    return nextUniqueID;
+  }
+
+  public void setUniqueID(long uniqueID) {
+    nextUniqueID = uniqueID;
+  }
+
   protected void processResults(ResultHandler handler, int flags) throws IOException {
     boolean noResults = (flags & QueryExecutor.QUERY_NO_RESULTS) != 0;
     boolean bothRowsAndStatus = (flags & QueryExecutor.QUERY_BOTH_ROWS_AND_STATUS) != 0;
 
     List<byte[][]> tuples = null;
+    QueryExecutionResult queryExecutionResult = new QueryExecutionResult();
+    boolean isEnableATF = getEnableATF();
     int lastPacketType=-1;
     int receivedPacketType = -1;
     int c;
@@ -2668,14 +2713,22 @@ public class QueryExecutorImpl extends QueryExecutorBase {
           case 's': { // Portal Suspended (end of Execute)
             // nb: this appears *instead* of CommandStatus.
             // Must be a SELECT if we suspended, so don't worry about it.
-
             pgStream.receiveInteger4(); // len, discarded
             LOGGER.trace("[" + secSocketAddress + "]" + " <=BE PortalSuspended");
-
-
             ExecuteRequest executeData = pendingExecuteQueue.removeFirst();
             SimpleQuery currentQuery = executeData.query;
             Portal currentPortal = executeData.portal;
+            isEnableATF = currentQuery.getIsEnableATF();
+            if (isEnableATF) {
+              if (currentQuery.getQueryResult() == null) {
+                currentQuery.setQueryResult(queryExecutionResult);
+              } else {
+                currentQuery.getQueryResult().addHash(queryExecutionResult.getResultHash());
+              }
+              if (tuples != null) {
+                currentQuery.getQueryResult().updateRowCount(tuples.size());
+              }
+            }
 
             Field[] fields = currentQuery.getFields();
             if (fields != null && tuples == null) {
@@ -2698,12 +2751,25 @@ public class QueryExecutorImpl extends QueryExecutorBase {
             }
 
             doneAfterRowDescNoData = false;
-
-
             ExecuteRequest executeData = pendingExecuteQueue.peekFirst();
             SimpleQuery currentQuery = executeData.query;
             Portal currentPortal = executeData.portal;
-
+            isEnableATF = currentQuery.getIsEnableATF();
+            if (isEnableATF) {
+              if (status != null) {
+                byte[] hashResult = pgStream.hashChars(status);
+                queryExecutionResult.updateHash(hashResult);
+              }
+              if (currentQuery.getQueryResult() == null) {
+                currentQuery.setQueryResult(queryExecutionResult);
+              } else {
+                currentQuery.getQueryResult().addHash(queryExecutionResult.getResultHash());
+                queryExecutionResult = currentQuery.getQueryResult();
+              }
+              if (tuples != null) {
+                currentQuery.getQueryResult().updateRowCount(tuples.size());
+              }
+            }
             if (status.startsWith("SET")) {
               String nativeSql = currentQuery.getNativeQuery().nativeSql;
               // Scan only the first 1024 characters to
@@ -2767,10 +2833,32 @@ public class QueryExecutorImpl extends QueryExecutorBase {
             break;
           }
 
+          case 'v': { // SnapShot for ATF(end of Command Status)
+            int len = pgStream.receiveInteger4();
+            long csn = pgStream.receiveLong();
+            long xmin = pgStream.receiveLong();
+            long xmax = pgStream.receiveLong();
+            int timeline = pgStream.receiveInteger4();
+            boolean isTakenDuringRecovery = pgStream.receiveChar() == 1;
+            long xid = 0L;
+            if (len == 41) {
+              xid = pgStream.receiveLong();
+            }
+            QueryExecutionResult.SnapShot snapShot = new QueryExecutionResult.SnapShot(
+              xmin, xmax, csn, isTakenDuringRecovery, timeline, xid
+            );
+            queryExecutionResult.setSnapShot(snapShot);
+            break;
+          }
           case 'D': // Data Transfer (ongoing Execute response)
             byte[][] tuple = null;
             try {
-              tuple = pgStream.receiveTupleV3();
+              isEnableATF = getEnableATF();
+              if (isEnableATF) {
+                tuple = pgStream.receiveTupleV3(queryExecutionResult);
+              } else {
+                tuple = pgStream.receiveTupleV3();
+              }
             } catch (OutOfMemoryError oome) {
               if (!noResults) {
                 handler.handleError(
@@ -2778,7 +2866,6 @@ public class QueryExecutorImpl extends QueryExecutorBase {
                                 PSQLState.OUT_OF_MEMORY, oome));
               }
             }
-
 
             if (!noResults) {
               if (tuples == null) {
@@ -2989,16 +3076,22 @@ public class QueryExecutorImpl extends QueryExecutorBase {
           throws SQLException {
     waitOnLock();
     final Portal portal = (Portal) cursor;
-
+    SimpleQuery query = portal.getQuery();
     // Insert a ResultHandler that turns bare command statuses into empty datasets
     // (if the fetch returns no rows, we see just a CommandStatus..)
     final ResultHandler delegateHandler = handler;
     handler = new ResultHandlerDelegate(delegateHandler) {
       @Override
       public void handleCommandStatus(String status, long updateCount, long insertOID) {
-        handleResultRows(portal.getQuery(), null, new ArrayList<byte[][]>(), null);
+        handleResultRows(query, null, new ArrayList<byte[][]>(), null);
       }
     };
+
+    if (query.getIsEnableATF()) {
+      if (query.getQueryResult() != null) {
+        query.getQueryResult().setFetchSize(fetchSize);
+      }
+    }
 
     // Now actually run it.
 
@@ -3008,7 +3101,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       processDeadPortals();
 
       recordAndSendTrace(0);
-      sendExecute(portal.getQuery(), portal, fetchSize);
+      sendExecute(query, portal, fetchSize);
       sendSync();
 
       processResults(handler, 0);

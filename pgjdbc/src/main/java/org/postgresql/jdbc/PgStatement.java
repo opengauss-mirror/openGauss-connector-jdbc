@@ -15,6 +15,7 @@ import org.postgresql.util.GT;
 import org.postgresql.util.PGbytea;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.util.LinkedListCache;
 import org.postgresql.log.Logger;
 import org.postgresql.log.Log;
 
@@ -25,6 +26,7 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.TimerTask;
@@ -397,6 +399,7 @@ public class PgStatement implements Statement, BaseStatement {
   protected final void execute(CachedQuery cachedQuery, ParameterList queryParameters, int flags)
       throws SQLException {
     try {
+      cachedQuery.query.setIsEnableATF(connection.getIsEnableATF());
       executeInternal(cachedQuery, queryParameters, flags);
     } catch (SQLException e) {
       // Don't retry composite queries as it might get partially executed
@@ -407,6 +410,16 @@ public class PgStatement implements Statement, BaseStatement {
       cachedQuery.query.close();
       // Execute the query one more time
       executeInternal(cachedQuery, queryParameters, flags);
+    } finally {
+      if (connection.getIsEnableATF()) {
+        // cache the query only if not in recovery mode
+        if (cachedQuery.query.getQueryResult() != null && !cachedQuery.query.getQueryResult().getIsRecovery()) {
+          ATFCachedQuery aCachedQuery = new ATFCachedQuery(
+            cachedQuery.query, queryParameters, flags, connection.getAutoCommit()
+          );
+          connection.getQueryExecutor().cacheQuery(aCachedQuery);
+        }
+      }
     }
   }
 
@@ -549,28 +562,18 @@ public class PgStatement implements Statement, BaseStatement {
 
   private void handleTerminateConn(SQLException e, CachedQuery cachedQuery,
                                    ParameterList queryParameters, int flags) throws SQLException {
-    Properties info;
-    if (connection instanceof PgConnection) {
-      info = ((PgConnection) connection).getProps();
-    } else {
+    if (!(connection instanceof PgConnection)) {
       throw new IllegalArgumentException("Connection is not an instance of PgConnection");
     }
-    String terminateConn = "terminating connection due to administrator command";
-    int maxReconnects = PGProperty.MAX_RECONNECTS.getInt(info);
-    if (PGProperty.AUTO_RECONNECT.getBoolean(info) && e.getMessage().contains(terminateConn)) {
-      for (int i = 0; i < maxReconnects; i++) {
-        try {
-          QueryExecutor queryExecutor = ConnectionFactory.openConnection(Driver.GetHostSpecs(info),
-                  Driver.GetUser(info), Driver.GetDatabase(info), info);
-          connection.setQueryExecutor(queryExecutor);
-          executeInternal(cachedQuery, queryParameters, flags);
-          return;
-        } catch (SQLException e2) {
-          continue;
-        }
+    try {
+      if (((PgConnection) connection).reconnect(e, null)) {
+        cachedQuery.query.unprepare();
+        executeInternal(cachedQuery, queryParameters, flags);
+      } else {
+        throw e;
       }
-    } else {
-      throw e;
+    } catch (SQLException e2) {
+      throw e2;
     }
   }
 
@@ -947,17 +950,7 @@ public class PgStatement implements Statement, BaseStatement {
         wantsGeneratedKeysAlways);
   }
 
-  private BatchResultHandler internalExecuteBatch() throws SQLException {
-
-    // Construct query/parameter arrays.
-    transformQueriesAndParameters();
-    // Empty arrays should be passed to toArray
-    // see http://shipilev.net/blog/2016/arrays-wisdom-ancients/
-    Query[] queries = batchStatements.toArray(new Query[0]);
-    ParameterList[] parameterLists = batchParameters.toArray(new ParameterList[0]);
-    batchStatements.clear();
-    batchParameters.clear();
-
+  private BatchResultHandler doExecuteBatch(Query[] queries, ParameterList[] parameterLists) throws SQLException {
     int flags;
 
     // Force a Describe before any execution? We need to do this if we're going
@@ -1089,6 +1082,34 @@ public class PgStatement implements Statement, BaseStatement {
     return handler;
   }
 
+    private BatchResultHandler internalExecuteBatch(Query[] queries, ParameterList[] parameterLists)
+      throws SQLException {
+        try {
+            return doExecuteBatch(queries, parameterLists);
+        } catch (SQLException e) {
+            return handleBatchTerminateConn(e, queries, parameterLists);
+        }
+    }
+
+    private BatchResultHandler handleBatchTerminateConn(SQLException e, Query[] queries,
+        ParameterList[] parameterLists) throws SQLException {
+        if (!(connection instanceof PgConnection)) {
+            throw new IllegalArgumentException("Connection is not an instance of PgConnection");
+        }
+        try {
+            if (((PgConnection) connection).reconnect(e, null)) {
+                for (int i = 0; i < queries.length; i++) {
+                    queries[i].unprepare();
+                }
+                return internalExecuteBatch(queries, parameterLists);
+            } else {
+                throw e;
+            }
+        } catch (SQLException e2) {
+            throw e2;
+        }
+    }
+
   private void handleQueriesForClientLogic(Query[] queries, ParameterList[] parameterLists) throws SQLException {
     ClientLogic clientLogic = this.connection.getClientLogic();
 
@@ -1132,8 +1153,20 @@ public class PgStatement implements Statement, BaseStatement {
                 PSQLState.NOT_IMPLEMENTED);
       }
     }
-
-    return internalExecuteBatch().getUpdateCount();
+    // Construct query/parameter arrays.
+    transformQueriesAndParameters();
+    Query[] queries = batchStatements.toArray(new Query[0]);
+    ParameterList[] parameterLists = batchParameters.toArray(new ParameterList[0]);
+    batchStatements.clear();
+    batchParameters.clear();
+    int [] res = internalExecuteBatch(queries, parameterLists).getUpdateCount();
+    if (!connection.getAutoCommit() && connection.getIsEnableATF()) {
+      if (queries[0].getQueryResult() != null && !queries[0].getQueryResult().getIsRecovery()) {
+        ATFCachedQuery aCachedQuery = new ATFCachedQuery(queries, parameterLists, 0, connection.getAutoCommit());
+        connection.getQueryExecutor().cacheQuery(aCachedQuery);
+      }
+    }
+    return res;
   }
 
 	public boolean checkParameterList(ParameterList[] paramlist){
@@ -1330,8 +1363,20 @@ public class PgStatement implements Statement, BaseStatement {
     if (batchStatements == null || batchStatements.isEmpty()) {
       return new long[0];
     }
-
-    return internalExecuteBatch().getLargeUpdateCount();
+    // Construct query/parameter arrays.
+    transformQueriesAndParameters();
+    Query[] queries = batchStatements.toArray(new Query[0]);
+    ParameterList[] parameterLists = batchParameters.toArray(new ParameterList[0]);
+    batchStatements.clear();
+    batchParameters.clear();
+    long [] res = internalExecuteBatch(queries, parameterLists).getLargeUpdateCount();
+    if (!connection.getAutoCommit() && connection.getIsEnableATF()) {
+      if (queries[0].getQueryResult() != null && !queries[0].getQueryResult().getIsRecovery()) {
+        ATFCachedQuery aCachedQuery = new ATFCachedQuery(queries, parameterLists, 0, connection.getAutoCommit());
+        connection.getQueryExecutor().cacheQuery(aCachedQuery);
+      }
+    }
+    return res;
   }
 
   @Override
@@ -1541,4 +1586,107 @@ public class PgStatement implements Statement, BaseStatement {
 	  noticeListenerlist.add(listener);
   }
 
+    private void executeOneATFInternal(ATFCachedQuery cachedATFQuery, PgResultSet resultSet, boolean hasNext)
+      throws SQLException {
+        Query query = cachedATFQuery.query;
+        CachedQuery cachedQuery1 = new CachedQuery(query.getNativeSql(), query, query.getIsFunction(), false);
+        int fetchNum = query.getQueryResult().getFetchNum(); // Number of fetch executions
+        int cachedFetchSize = query.getQueryResult().getFetchSize();
+
+        if (!hasNext && resultSet != null) {
+            // the first is common execute
+            if (resultSet.statement instanceof PgPreparedStatement) {
+                resultSet.statement.executeWithFlags(cachedATFQuery.flags);
+            } else {
+                resultSet.statement.executeWithFlags(cachedQuery1, cachedATFQuery.flags);
+            }
+            try (ResultSet rs = resultSet.statement.getResultSet()) {
+                if (!(rs instanceof PgResultSet)) {
+                    throw new IllegalArgumentException("ResultSet is not an instance of PgResultSet");
+                }
+                resultSet.setCursor(((PgResultSet) rs).getCursor());
+                ((PgResultSet) rs).setCursor(null);
+            }
+            // and then, fetch (fetchNum - 1) times
+            for (int i = 1; i < fetchNum; i++) {
+                connection.getQueryExecutor().fetch(
+                  resultSet.getCursor(), resultSet.getCursorResultHandler(), cachedFetchSize
+                );
+            }
+        } else {
+            executeInternal(cachedQuery1, cachedATFQuery.parameterList, cachedATFQuery.flags);
+        }
+    }
+
+    private void executeOneATFQuery(ATFCachedQuery cachedATFQuery,
+      PgResultSet resultSet, boolean shouldCheckLastQuery, boolean hasNext) {
+        cachedATFQuery.setIsRecovery(true);
+        if (shouldCheckLastQuery && !hasNext) {
+            // the last query to recovery
+            cachedATFQuery.setIsLastQuery(true);
+        }
+        try {
+          QueryExecutionResult queryExecutionResult;
+          QueryExecutionResult newQueryExecutionResult;
+          if (cachedATFQuery.isBatch()) {
+              queryExecutionResult = cachedATFQuery.queries[0].getQueryResult().copy();
+              cachedATFQuery.queries[0].getQueryResult().clear();
+              internalExecuteBatch(cachedATFQuery.queries, cachedATFQuery.parameterLists);
+              newQueryExecutionResult = cachedATFQuery.queries[0].getQueryResult();
+          } else {
+              queryExecutionResult = cachedATFQuery.query.getQueryResult().copy();
+              cachedATFQuery.query.getQueryResult().clear();
+              executeOneATFInternal(cachedATFQuery, resultSet, hasNext);
+              newQueryExecutionResult = cachedATFQuery.query.getQueryResult();
+          }
+          if (queryExecutionResult.isQueryResultConsistent(newQueryExecutionResult)) {
+              if (LOGGER.isInfoEnabled()) {
+                  LOGGER.info("Result check success after recovery");
+              }
+          } else {
+              if (LOGGER.isInfoEnabled()) {
+                  LOGGER.info("Result check failed after recovery");
+              }
+          }
+          closeForNextExecution();
+        } catch (SQLException e) {
+            LOGGER.error("Failed to execute batch during recovery: " + e.getMessage());
+            try {
+                connection.rollback();
+            } catch (SQLException e2) {
+                LOGGER.error("Failed to rollback during recovery: " + e2.getMessage());
+            }
+        }
+        cachedATFQuery.setIsRecovery(false);
+    }
+
+    /**
+     * Execute the ATFCachedQuery in the cache.
+     *
+     * @param atfCache the ATFCachedQuery cache
+     * @param resultSet the ResultSet for fetch()
+     * @param shouldCheckLastQuery whether to check the last query
+     */
+    public void executeATFCache(LinkedListCache<ATFCachedQuery> atfCache,
+      PgResultSet resultSet, boolean shouldCheckLastQuery) {
+        if (atfCache == null) {
+            return;
+        }
+        try {
+            closeForNextExecution();
+        } catch (SQLException e) {
+            LOGGER.error("Failed during recovery: " + e.getMessage());
+        }
+        Iterator<ATFCachedQuery> iterator = atfCache.iterator();
+        while (iterator.hasNext()) {
+            ATFCachedQuery cachedATFQuery = iterator.next();
+            if (LOGGER.isInfoEnabled()) {
+                LOGGER.info("recovery:" + cachedATFQuery.toString());
+            }
+            if (cachedATFQuery == null) {
+                break;
+            }
+            executeOneATFQuery(cachedATFQuery, resultSet, shouldCheckLastQuery, iterator.hasNext());
+          }
+    }
 }
