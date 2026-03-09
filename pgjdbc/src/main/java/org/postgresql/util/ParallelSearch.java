@@ -20,6 +20,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.ResultSetMetaData;
+import java.sql.DriverManager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,9 +38,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Logger;
 import java.util.logging.Level;
-
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
 
 /**
  * parallel search
@@ -60,26 +58,23 @@ public class ParallelSearch {
         "<->|<=>|<#>|<\\+>|<~>|<%>"
     );
 
-    private HikariDataSource dataSource;
-
+    private String jdbcUrl;
+    private String username;
+    private String auth;
     private ExecutorService executorService;
 
     /**
-     * init connection pool
+     * init without connection pool
      *
      * @param jdbcUrl url of jdbc
      * @param username user name
      * @param auth database password
      * @param maxworkers max thread workers
      */
-    public void initConnectionPool(String jdbcUrl, String username, String auth, int maxworkers) {
-        HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(jdbcUrl);
-        config.setUsername(username);
-        config.setPassword(auth);
-        config.setMaximumPoolSize(maxworkers);
-        dataSource = new HikariDataSource(config);
-
+    public void init(String jdbcUrl, String username, String auth, int maxworkers) {
+        this.jdbcUrl = jdbcUrl;
+        this.username = username;
+        this.auth = auth;
         executorService = new ThreadPoolExecutor(maxworkers, maxworkers, 60L, TimeUnit.SECONDS,
             new LinkedBlockingQueue<>());
     }
@@ -114,36 +109,31 @@ public class ParallelSearch {
 
         int threads = Math.min(parameters.size(), threadCount);
 
-        String jdbcUrl = dbConfig.get("jdbcUrl");
-        String username = dbConfig.get("username");
-        String auth = dbConfig.get("auth");
+        String url = dbConfig.get("jdbcUrl");
+        String name = dbConfig.get("username");
+        String pass = dbConfig.get("auth");
+
+        Boolean isInit = false;
+        if (executorService == null || executorService.isShutdown()) {
+            init(url, name, pass, threads);
+            isInit = true;
+        }
+
+        List<Future<List<Map<String, Object>>>> futures = new ArrayList<>();
+        for (List<Object> param : parameters) {
+            QueryTask task = new QueryTask(this.jdbcUrl, this.username, this.auth, sqlTemplate, param, scanParams);
+            futures.add(executorService.submit(task));
+        }
 
         List<List<Map<String, Object>>> results = new ArrayList<>();
-        Boolean isInit = false;
-
-        try {
-            if (dataSource == null || dataSource.isClosed()) {
-                initConnectionPool(jdbcUrl, username, auth, threads);
-                isInit = true;
-            }
-
-            List<Future<List<Map<String, Object>>>> futures = new ArrayList<>();
-            for (List<Object> param : parameters) {
-                QueryTask task = new QueryTask(dataSource, sqlTemplate, param, scanParams);
-                futures.add(executorService.submit(task));
-            }
-
-            for (Future<List<Map<String, Object>>> future : futures) {
-                results.add(future.get());
-            }
-            return results;
-        } catch (InterruptedException | ExecutionException e) {
-            throw new IllegalStateException("search failed: " + e.getMessage(), e);
-        } finally {
-            if (isInit) {
-                closeConnectionPool();
-            }
+        for (Future<List<Map<String, Object>>> future : futures) {
+            results.add(future.get());
         }
+
+        if (isInit) {
+            close();
+        }
+        return results;
     }
 
     private void validateSqlTemplate(String sqlTemplate) {
@@ -162,7 +152,7 @@ public class ParallelSearch {
         Matcher commentMatcher = COMMENT_PATTERN.matcher(processedSql);
         processedSql = commentMatcher.replaceAll("").trim();
 
-        String[] statements = processedSql.split(";");
+        String[] statements = processedSql.split(";\\s*");
         int validStatementCount = 0;
         for (String stmt : statements) {
             if (!stmt.trim().isEmpty()) {
@@ -186,29 +176,29 @@ public class ParallelSearch {
     }
 
     /**
-     * close connection pool
+     * close resources
      */
-    public void closeConnectionPool() {
+    public void close() {
         if (executorService != null) {
             executorService.shutdown();
             executorService = null;
-        }
-        if (dataSource != null && !dataSource.isClosed()) {
-            dataSource.close();
-            dataSource = null;
         }
     }
 }
 
 class QueryTask implements Callable<List<Map<String, Object>>> {
-    private final HikariDataSource dataSource;
+    private final String jdbcUrl;
+    private final String username;
+    private final String auth;
     private final String sqlTemplate;
     private final List<Object> parameters;
     private final Map<String, Object> scanParams;
 
-    public QueryTask(HikariDataSource dataSource, String sqlTemplate, List<Object> parameters,
+    public QueryTask(String jdbcUrl, String username, String auth, String sqlTemplate, List<Object> parameters,
         Map<String, Object> scanParams) {
-        this.dataSource = dataSource;
+        this.jdbcUrl = jdbcUrl;
+        this.username = username;
+        this.auth = auth;
         this.sqlTemplate = sqlTemplate;
         this.parameters = parameters;
         this.scanParams = scanParams;
@@ -216,8 +206,8 @@ class QueryTask implements Callable<List<Map<String, Object>>> {
 
     @Override
     public List<Map<String, Object>> call() throws SQLException {
-        List<Map<String, Object>> result = new ArrayList<>();
-        try (Connection connection = dataSource.getConnection();
+        Logger logger = Logger.getLogger(QueryTask.class.getName());
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, auth);
             Statement st = connection.createStatement()) {
             StringBuilder sqlBuilder = new StringBuilder();
             for (Map.Entry<String, Object> entry : scanParams.entrySet()) {
@@ -228,19 +218,19 @@ class QueryTask implements Callable<List<Map<String, Object>>> {
                     .append("; ");
             }
             String configSql = sqlBuilder.toString().trim();
-            st.execute(configSql);
+            if (!configSql.isEmpty()) {
+                st.execute(configSql);
+            }
 
             String sql = generateSql(sqlTemplate, parameters);
             ResultSet rs = st.executeQuery(sql);
-
             return resultSetToMapList(rs);
         } catch (SQLException e) {
-            Map<String, Object> errorMap = new HashMap<>();
-            errorMap.put("error", true);
-            errorMap.put("message", e.getMessage());
-            errorMap.put("exception", e.getClass().getSimpleName());
-            result.add(errorMap);
-            return result;
+            logger.log(Level.SEVERE, "SQLException occurred while executing query: " + e.getMessage(), e);
+            throw e;
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected exception occurred: " + e.getMessage(), e);
+            throw new SQLException("Unexpected error during query execution", e);
         }
     }
 
@@ -259,7 +249,7 @@ class QueryTask implements Callable<List<Map<String, Object>>> {
         while (rs.next()) {
             Map<String, Object> row = new HashMap<>();
             for (int i = 1; i <= columnCount; i++) {
-                row.put(metaData.getColumnName(i), rs.getString(i));
+                row.put(metaData.getColumnName(i), rs.getObject(i));
             }
             result.add(row);
         }
