@@ -105,4 +105,45 @@ public interface Query {
    *
    */
   boolean getIsFunction();
+
+    /**
+     * Set the query result
+     *
+     * @param queryExecutionResult the query execution result
+     */
+    void setQueryResult(QueryExecutionResult queryExecutionResult);
+
+    /**
+     * Get the query result
+     *
+     * @return the query execution result
+     */
+    QueryExecutionResult getQueryResult();
+
+    /**
+     * Returns whether the current statement is enabled for ATF
+     *
+     * @return true or false
+     *
+     */
+    boolean getIsEnableATF();
+
+    /**
+     * Set whether the current statement is enabled for ATF
+     *
+     * @param isEnableATF true or false
+     */
+    void setIsEnableATF(boolean isEnableATF);
+
+    /**
+     * Create a copy of this query
+     *
+     * @return a copy of this query
+     */
+    Query copy();
+
+    /**
+     * Unprepare this query. This method is called when the query is no longer needed.
+     */
+    void unprepare();
 }
