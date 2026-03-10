@@ -1714,7 +1714,12 @@ public class TimestampUtils {
   public static Timestamp getTimestamp(long ms, Calendar cal) {
     long totalSeconds = ms / (1000 * 1000);
     long day = totalSeconds / (24 * 60 * 60);
+    long us = ms % (24 * 60 * 60 * 1000 * 1000L);
 
+    if (us < 0) {
+      us = us + 24 * 60 * 60 * 1000 * 1000L;
+      day = day - 1;
+    }
     day += DAYS;
     int[] ds;
     int year = 1;
@@ -1741,16 +1746,16 @@ public class TimestampUtils {
       ds = new int[]{year, index + 1, (int) day};
     }
 
-    long remainingSec = totalSeconds % (24 * 60 * 60);
+    long remSec = us / (1000 * 1000L);
     Calendar calendar = cal == null ? Calendar.getInstance() : cal;
-    int hours = (int) (remainingSec / (60 * 60));
-    remainingSec %= (60 * 60);
-    int minutes = (int) (remainingSec / 60);
-    int seconds = (int) (remainingSec % 60);
+    int hours = (int) (remSec / (60 * 60));
+    remSec %= (60 * 60);
+    int minutes = (int) (remSec / 60);
+    int seconds = (int) (remSec % 60);
     calendar.set(ds[0], ds[1] - 1, ds[2], hours, minutes, seconds);
     long mills = calendar.getTimeInMillis();
     Timestamp result = new Timestamp(mills);
-    int remainingMicrosec = (int) (ms % 1000000L);
+    int remainingMicrosec = (int) (us % 1000000L);
     result.setNanos(remainingMicrosec * 1000);
     return result;
   }
