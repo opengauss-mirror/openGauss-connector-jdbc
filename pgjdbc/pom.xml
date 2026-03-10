@@ -48,11 +48,6 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.zaxxer</groupId>
-      <artifactId>HikariCP</artifactId>
-      <version>4.0.3</version>
-    </dependency>
-    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>4.13.2</version>
@@ -63,11 +58,6 @@
       <artifactId>semver4j</artifactId>
       <version>3.1.0</version>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-simple</artifactId>
-      <version>1.7.36</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
