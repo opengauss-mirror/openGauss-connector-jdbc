@@ -196,7 +196,7 @@ public class ORDataType {
         types.add(new Object[]{"VARBINARY", VARBINARY, Types.VARBINARY, "[B"});
         types.add(new Object[]{"INT", INT, Types.INTEGER, "java.lang.Integer"});
         types.add(new Object[]{"BIGINT", BIGINT, Types.BIGINT, "java.lang.Long"});
-        types.add(new Object[]{"UINT", UINT, Types.INTEGER, "java.lang.Long"});
+        types.add(new Object[]{"UINT", UINT, Types.BIGINT, "java.lang.Long"});
         types.add(new Object[]{"DATE", DATE, Types.DATE, "java.sql.Date"});
         types.add(new Object[]{"DATE_YEAR_MONTH", DATE_YEAR_MONTH, Types.OTHER, "java.sql.Date"});
         types.add(new Object[]{"DATE_DAY_HMS", DATE_DAY_HMS, Types.OTHER, "java.sql.Date"});
