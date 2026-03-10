@@ -794,7 +794,8 @@ public class ORResultSet extends PgResultSet {
             case Types.REAL:
             case Types.FLOAT:
             case Types.DOUBLE:
-                return String.valueOf(getDouble(columnIndex));
+                double dv = getDouble(columnIndex);
+                return dv == 0.0 ? "0" : String.valueOf(dv);
             case Types.DATE:
                 return String.valueOf(getDate(columnIndex));
             case Types.TIME:
@@ -948,19 +949,28 @@ public class ORResultSet extends PgResultSet {
         }
         Object[] type = this.orFields[columnIndex - 1].getTypeInfo();
         int sqlType = Integer.parseInt(type[2].toString());
+        double value;
         switch (sqlType) {
             case Types.DOUBLE:
             case Types.FLOAT:
             case Types.REAL:
-                return getReal(columnIndex);
+                value = getReal(columnIndex);
+                break;
             case Types.DECIMAL:
-                return Double.valueOf(getDecimal(columnIndex));
+                value = Double.valueOf(getDecimal(columnIndex));
+                break;
             case Types.NUMERIC:
                 String num = getNumber(columnIndex);
-                return Double.valueOf(num);
+                value = Double.valueOf(num);
+                break;
             default:
                 throw new SQLException("conversion to double type from " + type[0] + " is not supported.");
         }
+
+        if (value == -0.0) {
+            return 0.0;
+        }
+        return value;
     }
 
     @Override
