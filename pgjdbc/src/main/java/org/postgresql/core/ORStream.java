@@ -522,9 +522,9 @@ public class ORStream implements Closeable, Flushable {
             throw new EOFException("EOF Exception");
         }
         if (isBigEndian) {
-            return ((bf2[0] << 8) | (bf2[1] & 0xff));
+            return ((bf2[0] & 0xFF) << 8) | (bf2[1] & 0xFF);
         }
-        return ((bf2[1] << 8) | (bf2[0] & 0xff));
+        return ((bf2[1] & 0xFF) << 8) | (bf2[0] & 0xFF);
     }
 
     /**
