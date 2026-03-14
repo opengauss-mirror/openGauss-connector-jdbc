@@ -580,6 +580,25 @@ public class ORStatement implements Statement {
         connection.getQueryExecutor().fetch(cachedQuery);
     }
 
+    /**
+     * fetch lob data
+     *
+     * @param dataLen lob data length
+     * @param value lob value
+     * @return lob data
+     * @throws IOException if an I/O error occurs
+     * @throws SQLException if a database access error occurs
+     */
+    public byte[] fetchLob(int dataLen, byte[] value) throws IOException, SQLException {
+        ORCachedQuery cachedQuery = new ORCachedQuery(connection, this, false);
+        cachedQuery.setLobDataLen(dataLen);
+        cachedQuery.setLobValue(value);
+        while (cachedQuery.getHasLob()) {
+            connection.getQueryExecutor().handleLobRead(cachedQuery);
+        }
+        return cachedQuery.getLobData();
+    }
+
     @Override
     public boolean isClosed() throws SQLException {
         return isClosed;
