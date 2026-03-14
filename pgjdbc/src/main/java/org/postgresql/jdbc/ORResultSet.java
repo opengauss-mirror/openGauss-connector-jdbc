@@ -652,9 +652,24 @@ public class ORResultSet extends PgResultSet {
         }
         byte[] value = Arrays.copyOf(getByteValue(columnIndex), valueLen);
         int dataLen = connection.getORStream().bytesToInt(value);
-        byte[] data = new byte[dataLen];
-        System.arraycopy(value, 12, data, 0, dataLen);
-        String str = new String(data, connection.getORStream().getCharset());
+        int lobRead = connection.getORStream().bytesToInt(value, 4);
+        int lobDataFlag = connection.getORStream().bytesToInt(value, 8);
+        boolean isFetchLob = lobRead == 0 && (lobDataFlag & 1) == 0;
+        byte[] data;
+        String str = null;
+        if (!isFetchLob) {
+            try {
+                data = statement.fetchLob(dataLen, value);
+                str = new String(data, connection.getORStream().getCharset());
+            } catch (IOException e) {
+                throw new PSQLException("fetch lob data failed.", PSQLState.IO_ERROR);
+            }
+        } else {
+            data = new byte[dataLen];
+            System.arraycopy(value, 12, data, 0, dataLen);
+            str = new String(data, connection.getORStream().getCharset());
+        }
+
         PGClob clob = new PGClob();
         clob.setString(1, str);
         return clob;
@@ -1350,7 +1365,7 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public Reader getNCharacterStream(int columnIndex) throws SQLException {
-        throw org.postgresql.Driver.notImplemented(this.getClass(), "getNCharacterStream(int)");
+        throw Driver.notImplemented(this.getClass(), "getNCharacterStream(int)");
     }
 
     @Override
@@ -1661,7 +1676,7 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public NClob getNClob(int columnIndex) throws SQLException {
-        throw org.postgresql.Driver.notImplemented(this.getClass(), "getNClob(int)");
+        throw Driver.notImplemented(this.getClass(), "getNClob(int)");
     }
 
     @Override
@@ -1671,6 +1686,6 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public RowId getRowId(int columnIndex) throws SQLException {
-        throw org.postgresql.Driver.notImplemented(this.getClass(), "getRowId(int)");
+        throw Driver.notImplemented(this.getClass(), "getRowId(int)");
     }
 }

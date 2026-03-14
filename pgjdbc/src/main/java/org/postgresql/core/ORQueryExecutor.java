@@ -107,4 +107,13 @@ public interface ORQueryExecutor {
      * @throws SQLException if a database access error occurs
      */
     void cancel() throws IOException, SQLException;
+
+    /**
+     * fetch lob data
+     *
+     * @param cachedQuery query info
+     * @throws IOException if an I/O error occurs
+     * @throws SQLException if a database access error occurs
+     */
+    void handleLobRead(ORCachedQuery cachedQuery) throws IOException, SQLException;
 }
