@@ -2194,7 +2194,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     }
     QueryExecutionResult.SnapShot snapShot = queryExecutionResult.getSnapShot();
     if (snapShot == null) {
-      return;
+      snapShot = new QueryExecutionResult.SnapShot(0, 0, 0, false, 0, 0);
     }
 
     pgStream.sendChar('v'); // SnapShot
