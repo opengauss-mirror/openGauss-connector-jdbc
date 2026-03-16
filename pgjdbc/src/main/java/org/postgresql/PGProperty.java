@@ -681,28 +681,37 @@ public enum PGProperty {
         "Enable ATF feature."),
 
     /**
+     * Whether to strictly validate the results of SQL replay in ATF.
+     */
+    ATF_ENABLE_RESULT_CHECK("atfEnableResultCheck", "false",
+        "Whether to strictly validate the results of SQL replay in ATF. Default is false. "
+        + "If set to true, each SQL result will be validated during replay to ensure consistency."),
+
+    /**
      * Specifies the maximum size (in megabytes) of the atf statement cache.
      */
-    ATF_STATEMENT_CACHE_SIZE_MIB("ATFStatementCacheSizeMiB", "5",
+    ATF_STATEMENT_CACHE_SIZE_MIB("atfStatementCacheSizeMiB", "5",
         "Specifies the maximum size (in megabytes) of the atf statement cache."),
 
     /**
      * Specifies the maximum number of entries in cache of atf statements.
      */
-    ATF_STATEMENT_CACHE_QUERIES("ATFStatementCacheQueries", "256",
+    ATF_STATEMENT_CACHE_QUERIES("atfStatementCacheQueries", "256",
         "Specifies the maximum number of entries in cache of atf statements."),
 
     /**
      * GUC: Whether ATF is recovering a transaction.
      */
-    ATF_RECOVERY("ATFRecovery", "false",
-        "Whether ATF is recovering a transaction."),
+    ATF_RECOVERY("atfRecovery", "false",
+        "Whether ATF is recovering a transaction."
+        + " It is automatically set internally by the JDBC driver and should not be manually configured."),
 
     /**
      * GUC: Specifies the maximum number of SQL statements that ATF can release per transaction.
      */
-    ATF_SQL_COUNT("ATFSqlCount", "0",
-        "Specifies the maximum number of SQL statements that ATF can release per transaction."),
+    ATF_SQL_COUNT("atfSqlCount", "0",
+        "Specifies the maximum number of SQL statements that ATF can release per transaction."
+        + " It is automatically set internally by the JDBC driver and should not be manually configured."),
   ;
 
   private String _name;
