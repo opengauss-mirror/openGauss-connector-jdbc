@@ -33,6 +33,8 @@ import java.util.List;
  * @since  2025-06-29
  */
 public class ORStatement implements Statement {
+    private static final int TC_SQL = 4;
+
     /**
      * connection info
      */
@@ -543,8 +545,43 @@ public class ORStatement implements Statement {
         if (resultSet != null) {
             resultSets.add(resultSet);
             this.rs = resultSet;
+        } else if (queryMode == TC_SQL) {
+            getCursorResultSet();
         }
         rsIndex = resultSets.size() - 1;
+    }
+
+    private void getCursorResultSet() throws SQLException {
+        for (long cursorId : cursorSets) {
+            ResultSet cursorRs = getRefCursor(cursorId);
+            resultSets.add(cursorRs);
+        }
+        if (!resultSets.isEmpty()) {
+            this.rs = resultSets.get(0);
+        }
+    }
+
+    /**
+     * get cursor ResultSet
+     *
+     * @param cursorId cursorId
+     * @return ResultSet
+     * @throws SQLException if a database access error occurs
+     */
+    protected ResultSet getRefCursor(long cursorId) throws SQLException {
+        ORCursorResultSet cursorRs = null;
+        try (Statement stmt = connection.createStatement()) {
+            if (stmt instanceof ORStatement) {
+                long statId = cursorId >> 32;
+                ORStatement orStmt = (ORStatement) stmt;
+                orStmt.setMark((int) statId);
+                long cursorMode = cursorId & -1L;
+                cursorRs = new ORCursorResultSet(orStmt, (int) cursorMode);
+                connection.getQueryExecutor().fetchCursor(cursorRs);
+                cursorRs.setFetched(true);
+            }
+        }
+        return cursorRs;
     }
 
     @Override
