@@ -1619,7 +1619,8 @@ public class PgStatement implements Statement, BaseStatement {
     }
 
     private void executeOneATFQuery(ATFCachedQuery cachedATFQuery,
-      PgResultSet resultSet, boolean shouldCheckLastQuery, boolean hasNext) {
+      PgResultSet resultSet, boolean shouldCheckLastQuery, boolean hasNext)
+      throws SQLException {
         cachedATFQuery.setIsRecovery(true);
         if (shouldCheckLastQuery && !hasNext) {
             // the last query to recovery
@@ -1644,8 +1645,13 @@ public class PgStatement implements Statement, BaseStatement {
                   LOGGER.info("Result check success after recovery");
               }
           } else {
-              if (LOGGER.isInfoEnabled()) {
-                  LOGGER.info("Result check failed after recovery");
+              if (connection.getIsEnableResultCheck()) {
+                  LOGGER.error("Result check failed after recovery. cachedATFQuery: " + cachedATFQuery.toString());
+                  throw new SQLException(GT.tr("Result check failed after recovery"));
+              } else {
+                  if (LOGGER.isInfoEnabled()) {
+                      LOGGER.info("Result check failed after recovery. cachedATFQuery: " + cachedATFQuery.toString());
+                  }
               }
           }
           closeForNextExecution();
@@ -1668,7 +1674,8 @@ public class PgStatement implements Statement, BaseStatement {
      * @param shouldCheckLastQuery whether to check the last query
      */
     public void executeATFCache(LinkedListCache<ATFCachedQuery> atfCache,
-      PgResultSet resultSet, boolean shouldCheckLastQuery) {
+      PgResultSet resultSet, boolean shouldCheckLastQuery)
+      throws SQLException {
         if (atfCache == null) {
             return;
         }

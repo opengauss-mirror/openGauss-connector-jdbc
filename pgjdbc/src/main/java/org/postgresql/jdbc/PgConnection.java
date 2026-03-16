@@ -199,6 +199,7 @@ public class PgConnection implements BaseConnection {
 
   // ATF
   private boolean isEnableATF = false;
+  private boolean isEnableResultCheck = false;
 
   // Timer for scheduling TimerTasks for this connection.
   // Only instantiated if a task is actually scheduled.
@@ -475,6 +476,7 @@ public class PgConnection implements BaseConnection {
 
     bitToString = PGProperty.BIT_TO_STRING.getBoolean(info);
     isEnableATF = PGProperty.ENABLE_ATF.getBoolean(info);
+    isEnableResultCheck = PGProperty.ATF_ENABLE_RESULT_CHECK.getBoolean(info);
     setDefaultFetchSize(PGProperty.DEFAULT_ROW_FETCH_SIZE.getInt(info));
 
     setPrepareThreshold(PGProperty.PREPARE_THRESHOLD.getInt(info));
@@ -1360,8 +1362,8 @@ public class PgConnection implements BaseConnection {
         && (e.getMessage().contains(terminateConn) || e.getMessage().contains(terminateConn2)
         || e.getMessage().contains(ioException) || e.getMessage().contains(ioError))) {
           shouldReconnect = 2;
-          info.setProperty("ATFRecovery", "true");
-          info.setProperty("ATFSqlCount", String.valueOf(queryExecutor.getATFCache().size()));
+          info.setProperty("atfRecovery", "true");
+          info.setProperty("atfSqlCount", String.valueOf(queryExecutor.getATFCache().size()));
       }
     // Check whether to use ATF
     if (PGProperty.ATF_LEVEL.get(props).equals("U")
@@ -1370,8 +1372,8 @@ public class PgConnection implements BaseConnection {
         || e.getMessage().contains(ioException)
         || e.getMessage().contains(ioError))) {
         shouldReconnect = 3;
-        info.setProperty("ATFRecovery", "true");
-        info.setProperty("ATFSqlCount", String.valueOf(queryExecutor.getATFCache().size()));
+        info.setProperty("atfRecovery", "true");
+        info.setProperty("atfSqlCount", String.valueOf(queryExecutor.getATFCache().size()));
     }
 
     return shouldReconnect;
@@ -1410,8 +1412,8 @@ public class PgConnection implements BaseConnection {
                   }
                   boolean isSuccess = executeATFCache(resultSet);
                   if (isSuccess) {
-                      info.setProperty("ATFRecovery", "false");
-                      info.setProperty("ATFSqlCount", "0");
+                      info.setProperty("atfRecovery", "false");
+                      info.setProperty("atfSqlCount", "0");
                       return true;
                   } else {
                       return false;
@@ -1433,8 +1435,8 @@ public class PgConnection implements BaseConnection {
             if (reconnectToDatabase(info, e)) {
                 boolean isSuccess = executeATFCache(resultSet);
                 if (isSuccess) {
-                    info.setProperty("ATFRecovery", "false");
-                    info.setProperty("ATFSqlCount", "0");
+                    info.setProperty("atfRecovery", "false");
+                    info.setProperty("atfSqlCount", "0");
                     return true;
                 } else {
                     return false;
@@ -1722,6 +1724,11 @@ public class PgConnection implements BaseConnection {
   @Override
   public boolean getIsEnableATF() {
       return isEnableATF;
+  }
+
+  @Override
+  public boolean getIsEnableResultCheck() {
+      return isEnableResultCheck;
   }
 
   public int getPrepareThreshold() {
