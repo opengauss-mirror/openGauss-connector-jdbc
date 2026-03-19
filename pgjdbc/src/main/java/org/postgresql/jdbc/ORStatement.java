@@ -570,16 +570,15 @@ public class ORStatement implements Statement {
      */
     protected ResultSet getRefCursor(long cursorId) throws SQLException {
         ORCursorResultSet cursorRs = null;
-        try (Statement stmt = connection.createStatement()) {
-            if (stmt instanceof ORStatement) {
-                long statId = cursorId >> 32;
-                ORStatement orStmt = (ORStatement) stmt;
-                orStmt.setMark((int) statId);
-                long cursorMode = cursorId & -1L;
-                cursorRs = new ORCursorResultSet(orStmt, (int) cursorMode);
-                connection.getQueryExecutor().fetchCursor(cursorRs);
-                cursorRs.setFetched(true);
-            }
+        Statement stmt = connection.createStatement();
+        if (stmt instanceof ORStatement) {
+            long statId = cursorId >> 32;
+            ORStatement orStmt = (ORStatement) stmt;
+            orStmt.setMark((int) statId);
+            long cursorMode = cursorId & -1L;
+            cursorRs = new ORCursorResultSet(orStmt, (int) cursorMode);
+            connection.getQueryExecutor().fetchCursor(cursorRs);
+            cursorRs.setFetched(true);
         }
         return cursorRs;
     }
