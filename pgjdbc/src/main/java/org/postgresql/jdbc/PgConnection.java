@@ -1419,6 +1419,9 @@ public class PgConnection implements BaseConnection {
                       return false;
                   }
               } catch (SQLException e2) {
+                if (e2.getMessage().contains("current transaction is committed")) {
+                    throw e2;
+                }
                 // sleep 1000ms before next retry
                 try {
                     Thread.sleep(1000);

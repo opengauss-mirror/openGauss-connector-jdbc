@@ -2205,7 +2205,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     pgStream.sendLong(snapShot.xmax);
     pgStream.sendInteger4(snapShot.timeline);
     pgStream.sendChar(snapShot.isTakenDuringRecovery ? 1 : 0);
-    pgStream.sendLong(snapShot.xid);
+    pgStream.sendLong(queryExecutionResult.getIsSessionQuery() ? 0 : snapShot.xid);
     pgStream.sendChar(queryExecutionResult.getIsLastQuery() ? 1 : 0);
   }
 

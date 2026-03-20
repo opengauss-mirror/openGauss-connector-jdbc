@@ -1618,7 +1618,7 @@ public class PgStatement implements Statement, BaseStatement {
         }
     }
 
-    private void executeOneATFQuery(ATFCachedQuery cachedATFQuery,
+    private boolean executeOneATFQuery(ATFCachedQuery cachedATFQuery,
       PgResultSet resultSet, boolean shouldCheckLastQuery, boolean hasNext)
       throws SQLException {
         cachedATFQuery.setIsRecovery(true);
@@ -1656,14 +1656,18 @@ public class PgStatement implements Statement, BaseStatement {
           }
           closeForNextExecution();
         } catch (SQLException e) {
-            LOGGER.error("Failed to execute batch during recovery: " + e.getMessage());
+            cachedATFQuery.setIsRecovery(false);
+            // throw e;
+            LOGGER.error("Failed to execute cached query: " + cachedATFQuery.toString() + "\n" + e.getMessage());
             try {
                 connection.rollback();
             } catch (SQLException e2) {
                 LOGGER.error("Failed to rollback during recovery: " + e2.getMessage());
             }
+            return false;
         }
         cachedATFQuery.setIsRecovery(false);
+        return true;
     }
 
     /**
@@ -1693,7 +1697,9 @@ public class PgStatement implements Statement, BaseStatement {
             if (cachedATFQuery == null) {
                 break;
             }
-            executeOneATFQuery(cachedATFQuery, resultSet, shouldCheckLastQuery, iterator.hasNext());
+            if (!executeOneATFQuery(cachedATFQuery, resultSet, shouldCheckLastQuery, iterator.hasNext())) {
+                break;
+            }
           }
     }
 }
