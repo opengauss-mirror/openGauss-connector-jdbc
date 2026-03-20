@@ -414,6 +414,7 @@ public class PgStatement implements Statement, BaseStatement {
       if (connection.getIsEnableATF()) {
         // cache the query only if not in recovery mode
         if (cachedQuery.query.getQueryResult() != null && !cachedQuery.query.getQueryResult().getIsRecovery()) {
+          cachedQuery.query.getQueryResult().setFetchSize(fetchSize);
           ATFCachedQuery aCachedQuery = new ATFCachedQuery(
             cachedQuery.query, queryParameters, flags, connection.getAutoCommit()
           );
@@ -1592,7 +1593,7 @@ public class PgStatement implements Statement, BaseStatement {
         CachedQuery cachedQuery1 = new CachedQuery(query.getNativeSql(), query, query.getIsFunction(), false);
         int fetchNum = query.getQueryResult().getFetchNum(); // Number of fetch executions
         int cachedFetchSize = query.getQueryResult().getFetchSize();
-
+        setFetchSize(cachedFetchSize);
         if (!hasNext && resultSet != null) {
             // the first is common execute
             if (resultSet.statement instanceof PgPreparedStatement) {
