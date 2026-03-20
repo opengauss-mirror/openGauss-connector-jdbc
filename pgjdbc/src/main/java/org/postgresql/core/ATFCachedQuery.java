@@ -132,6 +132,23 @@ public class ATFCachedQuery implements CanEstimateSize {
     }
 
     /**
+     * Set the isSessionQuery flag for the query result.
+     *
+     * @param isSessionQuery true if the query is session query, false otherwise.
+     */
+    public void setIsSessionQuery(boolean isSessionQuery) {
+        if (isBatch) {
+            for (Query q : queries) {
+                q.getQueryResult().setIsSessionQuery(isSessionQuery);
+            }
+        } else {
+            if (query != null) {
+                query.getQueryResult().setIsSessionQuery(isSessionQuery);
+            }
+        }
+    }
+
+    /**
      * Set the isLastQuery flag for the query result.
      *
      * @param isLastQuery true if the query is the last query, false otherwise.

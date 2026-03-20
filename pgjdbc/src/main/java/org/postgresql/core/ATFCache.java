@@ -90,10 +90,12 @@ public class ATFCache {
                     ATFCachedQuery newAtfCachedQuery = new ATFCachedQuery(
                         subQuery, cachedQuery.parameterList, cachedQuery.flags, cachedQuery.isAutoCommit()
                     );
+                    newAtfCachedQuery.setIsSessionQuery(true);
                     sessionCache.append(newAtfCachedQuery);
                 }
             }
         } else {
+            cachedQuery.setIsSessionQuery(true);
             sessionCache.append(cachedQuery);
         }
     }
@@ -109,6 +111,7 @@ public class ATFCache {
         }
         if (cachedQuery.isAutoCommit()) {
             if (cachedQuery.isSessionQuery()) {
+                cachedQuery.setIsSessionQuery(true);
                 // session level query
                 if (!sessionCache.append(cachedQuery)) {
                     isSessionCacheOverLimit = true;
