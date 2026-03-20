@@ -1657,7 +1657,6 @@ public class PgStatement implements Statement, BaseStatement {
           closeForNextExecution();
         } catch (SQLException e) {
             cachedATFQuery.setIsRecovery(false);
-            // throw e;
             LOGGER.error("Failed to execute cached query: " + cachedATFQuery.toString() + "\n" + e.getMessage());
             try {
                 connection.rollback();
