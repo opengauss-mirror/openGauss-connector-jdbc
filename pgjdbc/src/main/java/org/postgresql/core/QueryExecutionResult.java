@@ -27,6 +27,7 @@ public class QueryExecutionResult {
     private long size = 120L;
     private boolean isRecovery = false;
     private boolean isLastQuery = false;
+    private boolean isSessionQuery = false;
     private byte[] resultHash; // statement result hash for evaluation
     private int rowCount; // the number of rows in the result set
     private SnapShot snapShot;
@@ -138,6 +139,14 @@ public class QueryExecutionResult {
 
     public void setIsLastQuery(boolean isLastQuery) {
         this.isLastQuery = isLastQuery;
+    }
+
+    public void setIsSessionQuery(boolean isSessionQuery) {
+        this.isSessionQuery = isSessionQuery;
+    }
+
+    public boolean getIsSessionQuery() {
+        return isSessionQuery;
     }
 
     public boolean getIsLastQuery() {
