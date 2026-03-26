@@ -1594,6 +1594,7 @@ public class PgStatement implements Statement, BaseStatement {
         int fetchNum = query.getQueryResult().getFetchNum(); // Number of fetch executions
         int cachedFetchSize = query.getQueryResult().getFetchSize();
         setFetchSize(cachedFetchSize);
+        query.getQueryResult().clear();
         if (!hasNext && resultSet != null) {
             // the first is common execute
             if (resultSet.statement instanceof PgPreparedStatement) {
@@ -1637,7 +1638,6 @@ public class PgStatement implements Statement, BaseStatement {
               newQueryExecutionResult = cachedATFQuery.queries[0].getQueryResult();
           } else {
               queryExecutionResult = cachedATFQuery.query.getQueryResult().copy();
-              cachedATFQuery.query.getQueryResult().clear();
               executeOneATFInternal(cachedATFQuery, resultSet, hasNext);
               newQueryExecutionResult = cachedATFQuery.query.getQueryResult();
           }
