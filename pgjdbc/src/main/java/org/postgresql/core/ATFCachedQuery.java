@@ -171,11 +171,7 @@ public class ATFCachedQuery implements CanEstimateSize {
      * @return true if the query is session query, false otherwise.
      */
     public boolean isSessionQuery() {
-        if (isBatch) {
-            return false;
-        }
-
-        if (query == null) {
+        if (isBatch || query == null) {
             return false;
         }
 
@@ -238,26 +234,23 @@ public class ATFCachedQuery implements CanEstimateSize {
     public boolean isSessionQuery(String sql) {
         String remaining = formatSql(sql);
 
-        if (remaining == null) {
+        if (remaining == null
+            || remaining.startsWith("SET LOCAL")
+            || remaining.startsWith("SET TRANSACTION")) {
             return false;
         }
 
-        if (remaining.startsWith("SET LOCAL") || remaining.startsWith("SET TRANSACTION")) {
-            return false;
-        }
-        if (remaining.startsWith("SET") || remaining.startsWith("RESET")) {
-            return true;
-        }
-        if (remaining.startsWith("DISCARD")
+        if (remaining.startsWith("SET")
+            || remaining.startsWith("RESET")
+            || remaining.startsWith("DISCARD")
             || remaining.startsWith("PREPARE")
-            || remaining.startsWith("DEALLOCATE")) {
-            return true;
-        }
-        if (remaining.startsWith("LISTEN")
+            || remaining.startsWith("DEALLOCATE")
+            ||remaining.startsWith("LISTEN")
             || remaining.startsWith("UNLISTEN")
             || remaining.startsWith("LOAD")) {
             return true;
         }
+
         return false;
     }
 

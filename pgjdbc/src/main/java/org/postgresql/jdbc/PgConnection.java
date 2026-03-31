@@ -1448,7 +1448,6 @@ public class PgConnection implements BaseConnection {
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             }
-            continue;
         }
       }
       return false;
@@ -1475,7 +1474,6 @@ public class PgConnection implements BaseConnection {
               } catch (InterruptedException ie) {
                   Thread.currentThread().interrupt();
               }
-              continue;
           }
       }
       return false;

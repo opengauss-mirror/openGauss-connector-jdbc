@@ -2198,8 +2198,8 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     }
 
     pgStream.sendChar('v'); // SnapShot
-    int size = 4 + 8 + 8 + 8 + 4 + 1 + 8 + 1;
-    pgStream.sendInteger4(size); // message size
+    int msgSize = 42;
+    pgStream.sendInteger4(msgSize); // message size
     pgStream.sendLong(snapShot.csn);
     pgStream.sendLong(snapShot.xmin);
     pgStream.sendLong(snapShot.xmax);
