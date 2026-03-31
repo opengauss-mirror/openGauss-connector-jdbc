@@ -1388,52 +1388,12 @@ public class PgConnection implements BaseConnection {
    */
   public boolean reconnect(SQLException e, PgResultSet resultSet) throws SQLException {
     Properties info = getProps();
-
     int reconnectFlag = shouldReconnect(e, info);
     switch (reconnectFlag) {
         case 1:
-          if (autoReconnect(info)) {
-                return true;
-            } else {
-                return false;
-            }
+            return autoReconnect(info);
         case 2:
-            int atfReconnects = PGProperty.ATF_RECONNECTS.getInt(info);
-            if (LOGGER.isInfoEnabled()) {
-                LOGGER.info("try to reconnect to server···");
-            }
-            for (int i = 0; i < atfReconnects; i++) {
-              try {
-                  QueryExecutor newQueryExecutor = ConnectionFactory.openConnection(Driver.GetHostSpecs(info),
-                                Driver.GetUser(info), Driver.GetDatabase(info), info);
-                  setQueryExecutor(newQueryExecutor);
-                  if (LOGGER.isInfoEnabled()) {
-                      LOGGER.info("reconnect to server successfully.");
-                  }
-                  boolean isSuccess = executeATFCache(resultSet);
-                  if (isSuccess) {
-                      info.setProperty("atfRecovery", "false");
-                      info.setProperty("atfSqlCount", "0");
-                      return true;
-                  } else {
-                      return false;
-                  }
-              } catch (SQLException e2) {
-                if (e2.getMessage().contains("current transaction is committed")) {
-                    throw e2;
-                }
-                // sleep 1000ms before next retry
-                try {
-                    Thread.sleep(1000);
-                    if (LOGGER.isInfoEnabled()) {
-                        LOGGER.info("try to reconnect to server for " + (i + 1) + " time");
-                    }
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                }
-                    continue;
-              }
-            }
+            return atfReconnect(info, resultSet);
         case 3:
             if (reconnectToDatabase(info, e)) {
                 boolean isSuccess = executeATFCache(resultSet);
@@ -1454,31 +1414,71 @@ public class PgConnection implements BaseConnection {
     }
   }
 
-  private boolean autoReconnect(Properties info) throws SQLException {
-    int maxReconnects = PGProperty.MAX_RECONNECTS.getInt(info);
-        for (int i = 0; i < maxReconnects; i++) {
-            try {
-                QueryExecutor newQueryExecutor = ConnectionFactory.openConnection(Driver.GetHostSpecs(info),
-                              Driver.GetUser(info), Driver.GetDatabase(info), info);
-                setQueryExecutor(newQueryExecutor);
-                if (LOGGER.isInfoEnabled()) {
-                    LOGGER.info("reconnect to server successfully.");
-                }
-                return true;
-            } catch (SQLException e2) {
-                // sleep 1000ms before next retry
-                try {
-                    Thread.sleep(1000);
-                    if (LOGGER.isInfoEnabled()) {
-                        LOGGER.info("try to reconnect to server for " + (i + 1) + " time");
-                    }
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                }
-                continue;
+  private boolean atfReconnect(Properties info, PgResultSet resultSet) throws SQLException {
+      int atfReconnects = PGProperty.ATF_RECONNECTS.getInt(info);
+      if (LOGGER.isInfoEnabled()) {
+          LOGGER.info("try to reconnect to server···");
+      }
+      for (int i = 0; i < atfReconnects; i++) {
+        try {
+            QueryExecutor newQueryExecutor = ConnectionFactory.openConnection(Driver.GetHostSpecs(info),
+                          Driver.GetUser(info), Driver.GetDatabase(info), info);
+            setQueryExecutor(newQueryExecutor);
+            if (LOGGER.isInfoEnabled()) {
+                LOGGER.info("reconnect to server successfully.");
             }
+            boolean isSuccess = executeATFCache(resultSet);
+            if (isSuccess) {
+                info.setProperty("atfRecovery", "false");
+                info.setProperty("atfSqlCount", "0");
+                return true;
+            } else {
+                return false;
+            }
+        } catch (SQLException e2) {
+            if (e2.getMessage().contains("current transaction is committed")) {
+                throw e2;
+            }
+            // sleep 1000ms before next retry
+            try {
+                Thread.sleep(1000);
+                if (LOGGER.isInfoEnabled()) {
+                    LOGGER.info("try to reconnect to server for " + (i + 1) + " time");
+                }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+            continue;
         }
-    return false;
+      }
+      return false;
+  }
+
+  private boolean autoReconnect(Properties info) throws SQLException {
+      int maxReconnects = PGProperty.MAX_RECONNECTS.getInt(info);
+      for (int i = 0; i < maxReconnects; i++) {
+          try {
+              QueryExecutor newQueryExecutor = ConnectionFactory.openConnection(Driver.GetHostSpecs(info),
+                            Driver.GetUser(info), Driver.GetDatabase(info), info);
+              setQueryExecutor(newQueryExecutor);
+              if (LOGGER.isInfoEnabled()) {
+                  LOGGER.info("reconnect to server successfully.");
+              }
+              return true;
+          } catch (SQLException e2) {
+              // sleep 1000ms before next retry
+              try {
+                  Thread.sleep(1000);
+                  if (LOGGER.isInfoEnabled()) {
+                      LOGGER.info("try to reconnect to server for " + (i + 1) + " time");
+                  }
+              } catch (InterruptedException ie) {
+                  Thread.currentThread().interrupt();
+              }
+              continue;
+          }
+      }
+      return false;
   }
 
 

@@ -1676,6 +1676,7 @@ public class PgStatement implements Statement, BaseStatement {
      * @param atfCache the ATFCachedQuery cache
      * @param resultSet the ResultSet for fetch()
      * @param shouldCheckLastQuery whether to check the last query
+     * @throws SQLException if the query execution fails
      */
     public void executeATFCache(LinkedListCache<ATFCachedQuery> atfCache,
       PgResultSet resultSet, boolean shouldCheckLastQuery)
