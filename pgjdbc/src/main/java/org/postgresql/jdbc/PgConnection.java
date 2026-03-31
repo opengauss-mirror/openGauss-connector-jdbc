@@ -10,6 +10,8 @@ import org.postgresql.PGNotification;
 import org.postgresql.PGProperty;
 import org.postgresql.Driver.ATFAddress;
 import org.postgresql.copy.CopyManager;
+import org.postgresql.core.ATFCache;
+import org.postgresql.core.ATFCachedQuery;
 import org.postgresql.core.BaseConnection;
 import org.postgresql.core.BaseStatement;
 import org.postgresql.core.CachedQuery;
@@ -35,6 +37,7 @@ import org.postgresql.replication.PGReplicationConnection;
 import org.postgresql.replication.PGReplicationConnectionImpl;
 import org.postgresql.util.GT;
 import org.postgresql.util.HostSpec;
+import org.postgresql.util.LinkedListCache;
 import org.postgresql.util.LruCache;
 import org.postgresql.util.PGBinaryObject;
 import org.postgresql.util.PGobject;
@@ -101,7 +104,7 @@ public class PgConnection implements BaseConnection {
   private static final Map<String,String> CONNECTION_INFO_REPORT_BLACK_LIST;
 
   private static final int ATF_SOCKET_WAIT_TIME = 50000;
-
+  
   static {
       CONNECTION_INFO_REPORT_BLACK_LIST = new HashMap<>();
       CONNECTION_INFO_REPORT_BLACK_LIST.put("user","");
@@ -193,6 +196,10 @@ public class PgConnection implements BaseConnection {
 
   // True if bit to string else bit to boolean.
   private boolean bitToString = false;
+
+  // ATF
+  private boolean isEnableATF = false;
+  private boolean isEnableResultCheck = false;
 
   // Timer for scheduling TimerTasks for this connection.
   // Only instantiated if a task is actually scheduled.
@@ -287,9 +294,8 @@ public class PgConnection implements BaseConnection {
             } catch (IOException ex) {
                 // reconnect to ATF
                 closeStreams(out, in);
-                socketATF = Driver.makeConnectionToATF(addressesATF,
-                    PGProperty.ATF_SSLCERT.get(info),
-                    PGProperty.ATF_TIMEOUT.getInt(info));
+                currentATFSocket = null;
+                socketATF = Driver.makeConnectionToATF(addressesATF, PGProperty.ATF_TIMEOUT.getInt(info));
             }
         }
     }
@@ -375,22 +381,49 @@ public class PgConnection implements BaseConnection {
   }
 
   final CachedQuery borrowQuery(String sql) throws SQLException {
-    return queryExecutor.borrowQuery(sql);
+    CachedQuery cachedQuery = queryExecutor.borrowQuery(sql);
+    cachedQuery.query.setIsEnableATF(isEnableATF);
+    return cachedQuery;
+  }
+
+  final CachedQuery borrowQueryByKey(Object key) throws SQLException {
+    CachedQuery cachedQuery = queryExecutor.borrowQueryByKey(key);
+    cachedQuery.query.setIsEnableATF(isEnableATF);
+    return cachedQuery;
   }
 
   final CachedQuery borrowCallableQuery(String sql) throws SQLException {
-    return queryExecutor.borrowCallableQuery(sql);
+    CachedQuery cachedQuery = queryExecutor.borrowCallableQuery(sql);
+    cachedQuery.query.setIsEnableATF(isEnableATF);
+    return cachedQuery;
   }
 
   private CachedQuery borrowReturningQuery(String sql, String[] columnNames) throws SQLException {
-    return queryExecutor.borrowReturningQuery(sql, columnNames);
+    CachedQuery cachedQuery = queryExecutor.borrowReturningQuery(sql, columnNames);
+    cachedQuery.query.setIsEnableATF(isEnableATF);
+    return cachedQuery;
   }
 
   @Override
   public CachedQuery createQuery(String sql, boolean escapeProcessing, boolean isParameterized,
       String... columnNames)
       throws SQLException {
-    return queryExecutor.createQuery(sql, escapeProcessing, isParameterized, columnNames);
+    CachedQuery cachedQuery = queryExecutor.createQuery(sql, escapeProcessing, isParameterized, columnNames);
+    cachedQuery.query.setIsEnableATF(isEnableATF);
+    return cachedQuery;
+  }
+
+  /**
+   * Create a query by key.
+   *
+   * @param key the key to create the query by
+   * @return the created CachedQuery
+   * @throws SQLException if a database access error occurs
+   */
+  public CachedQuery createQueryByKey(Object key) throws SQLException {
+    CachedQuery cachedQuery = queryExecutor.createQueryByKey(key);
+    cachedQuery.query.setIsEnableATF(isEnableATF);
+    return cachedQuery;
   }
 
   void releaseQuery(CachedQuery cachedQuery) {
@@ -442,6 +475,8 @@ public class PgConnection implements BaseConnection {
     setProps(info);
 
     bitToString = PGProperty.BIT_TO_STRING.getBoolean(info);
+    isEnableATF = PGProperty.ENABLE_ATF.getBoolean(info);
+    isEnableResultCheck = PGProperty.ATF_ENABLE_RESULT_CHECK.getBoolean(info);
     setDefaultFetchSize(PGProperty.DEFAULT_ROW_FETCH_SIZE.getInt(info));
 
     setPrepareThreshold(PGProperty.PREPARE_THRESHOLD.getInt(info));
@@ -866,6 +901,11 @@ public class PgConnection implements BaseConnection {
   }
 
   public void setQueryExecutor(QueryExecutor queryExecutor) {
+    // Restore the SQL statements used by ATFCache for repeated caching
+    queryExecutor.setATFCache(this.queryExecutor.getATFCache());
+    // Restore the original uniqueID to avoid duplicate StatementName, which would cause a bind error.
+    queryExecutor.setUniqueID(this.queryExecutor.getUniqueID());
+    // and then, set the queryExecutor
     this.queryExecutor = queryExecutor;
   }
 
@@ -1159,6 +1199,7 @@ public class PgConnection implements BaseConnection {
       return;
     }
     releaseTimer();
+    queryExecutor.getATFCache().close();
     queryExecutor.close();
     openStackTrace = null;
   }
@@ -1242,18 +1283,34 @@ public class PgConnection implements BaseConnection {
   }
 
   private void executeTransactionCommand(Query query) throws SQLException {
-
-
     try {
-      getQueryExecutor().execute(query, null, new TransactionCommandHandler(), 0, 0, QueryExecutor.QUERY_NO_METADATA | QueryExecutor.QUERY_NO_RESULTS | QueryExecutor.QUERY_SUPPRESS_BEGIN);
-    } catch (SQLException e) {
-      // Don't retry composite queries as it might get partially executed
-      if (query.getSubqueries() != null || !queryExecutor.willHealOnRetry(e)) {
-        throw e;
+      try {
+        getQueryExecutor().execute(
+          query, null, new TransactionCommandHandler(), 0, 0,
+          QueryExecutor.QUERY_NO_METADATA | QueryExecutor.QUERY_NO_RESULTS | QueryExecutor.QUERY_SUPPRESS_BEGIN
+        );
+      } catch (SQLException e) {
+        // Don't retry composite queries as it might get partially executed
+        if (query.getSubqueries() != null || !queryExecutor.willHealOnRetry(e)) {
+          throw e;
+        }
+        query.close();
+        // retry
+        getQueryExecutor().execute(
+          query, null, new TransactionCommandHandler(), 0, 0,
+          QueryExecutor.QUERY_NO_METADATA | QueryExecutor.QUERY_NO_RESULTS | QueryExecutor.QUERY_SUPPRESS_BEGIN
+        );
       }
-      query.close();
-      // retry
-      getQueryExecutor().execute(query, null, new TransactionCommandHandler(), 0, 0, QueryExecutor.QUERY_NO_METADATA | QueryExecutor.QUERY_NO_RESULTS | QueryExecutor.QUERY_SUPPRESS_BEGIN);
+    } catch (SQLException e2) {
+      if (reconnect(e2, null)) {
+        // retry for ATF
+        getQueryExecutor().execute(
+          query, null, new TransactionCommandHandler(), 0, 0,
+          QueryExecutor.QUERY_NO_METADATA | QueryExecutor.QUERY_NO_RESULTS | QueryExecutor.QUERY_SUPPRESS_BEGIN
+        );
+      } else {
+        throw e2;
+      }
     }
   }
 
@@ -1268,6 +1325,9 @@ public class PgConnection implements BaseConnection {
 
     if (queryExecutor.getTransactionState() != TransactionState.IDLE) {
       executeTransactionCommand(commitQuery);
+    }
+    if (getIsEnableATF()) {
+      getQueryExecutor().clearATFCache();
     }
   }
 
@@ -1285,22 +1345,35 @@ public class PgConnection implements BaseConnection {
    */
   public int shouldReconnect(SQLException e, Properties info) {
     String terminateConn = "terminating connection due to administrator command";
+    String terminateConn2 = "terminating SyncLocalXactsWithGTM process due to administrator command";
     String ioException = "IO Exception";
     String ioError = "I/O error";
     int shouldReconnect = 0;
     // Determine whether the reconnection conditions specified by the autoreconnect parameter are met
-    if (PGProperty.AUTO_RECONNECT.getBoolean(info) && (e.getMessage().contains(terminateConn))) {
+    if (PGProperty.AUTO_RECONNECT.getBoolean(info)
+        && PGProperty.ATF_LEVEL.get(props).equals("C")
+        && (!getIsEnableATF())
+        && (e.getMessage().contains(terminateConn))) {
         shouldReconnect = 1;
     }
     // For connections with the ATF function enabled, all IO errors or exceptions should be reconnected.
-    String terminateConn2 = "terminating SyncLocalXactsWithGTM process due to administrator command";
+    if (PGProperty.ATF_LEVEL.get(props).equals("C")
+        && (getIsEnableATF())
+        && (e.getMessage().contains(terminateConn) || e.getMessage().contains(terminateConn2)
+        || e.getMessage().contains(ioException) || e.getMessage().contains(ioError))) {
+          shouldReconnect = 2;
+          info.setProperty("atfRecovery", "true");
+          info.setProperty("atfSqlCount", String.valueOf(queryExecutor.getATFCache().size()));
+      }
     // Check whether to use ATF
     if (PGProperty.ATF_LEVEL.get(props).equals("U")
         && (e.getMessage().contains(terminateConn)
         || e.getMessage().contains(terminateConn2)
         || e.getMessage().contains(ioException)
         || e.getMessage().contains(ioError))) {
-        shouldReconnect = 2;
+        shouldReconnect = 3;
+        info.setProperty("atfRecovery", "true");
+        info.setProperty("atfSqlCount", String.valueOf(queryExecutor.getATFCache().size()));
     }
 
     return shouldReconnect;
@@ -1310,7 +1383,7 @@ public class PgConnection implements BaseConnection {
    *
    * @param e SQLException
    * @param resultSet resultset
-   * @return the result of reconnection
+   * @return true if the reconnection is successful, false otherwise
    * @throws SQLException SQLException
    */
   public boolean reconnect(SQLException e, PgResultSet resultSet) throws SQLException {
@@ -1319,14 +1392,58 @@ public class PgConnection implements BaseConnection {
     int reconnectFlag = shouldReconnect(e, info);
     switch (reconnectFlag) {
         case 1:
-            if (autoReconnect(info)) {
+          if (autoReconnect(info)) {
                 return true;
             } else {
                 return false;
             }
         case 2:
+            int atfReconnects = PGProperty.ATF_RECONNECTS.getInt(info);
+            if (LOGGER.isInfoEnabled()) {
+                LOGGER.info("try to reconnect to server···");
+            }
+            for (int i = 0; i < atfReconnects; i++) {
+              try {
+                  QueryExecutor newQueryExecutor = ConnectionFactory.openConnection(Driver.GetHostSpecs(info),
+                                Driver.GetUser(info), Driver.GetDatabase(info), info);
+                  setQueryExecutor(newQueryExecutor);
+                  if (LOGGER.isInfoEnabled()) {
+                      LOGGER.info("reconnect to server successfully.");
+                  }
+                  boolean isSuccess = executeATFCache(resultSet);
+                  if (isSuccess) {
+                      info.setProperty("atfRecovery", "false");
+                      info.setProperty("atfSqlCount", "0");
+                      return true;
+                  } else {
+                      return false;
+                  }
+              } catch (SQLException e2) {
+                if (e2.getMessage().contains("current transaction is committed")) {
+                    throw e2;
+                }
+                // sleep 1000ms before next retry
+                try {
+                    Thread.sleep(1000);
+                    if (LOGGER.isInfoEnabled()) {
+                        LOGGER.info("try to reconnect to server for " + (i + 1) + " time");
+                    }
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+                    continue;
+              }
+            }
+        case 3:
             if (reconnectToDatabase(info, e)) {
-                return true;
+                boolean isSuccess = executeATFCache(resultSet);
+                if (isSuccess) {
+                    info.setProperty("atfRecovery", "false");
+                    info.setProperty("atfSqlCount", "0");
+                    return true;
+                } else {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -1342,7 +1459,7 @@ public class PgConnection implements BaseConnection {
         for (int i = 0; i < maxReconnects; i++) {
             try {
                 QueryExecutor newQueryExecutor = ConnectionFactory.openConnection(Driver.GetHostSpecs(info),
-                    Driver.GetUser(info), Driver.GetDatabase(info), info);
+                              Driver.GetUser(info), Driver.GetDatabase(info), info);
                 setQueryExecutor(newQueryExecutor);
                 if (LOGGER.isInfoEnabled()) {
                     LOGGER.info("reconnect to server successfully.");
@@ -1376,6 +1493,9 @@ public class PgConnection implements BaseConnection {
 
     if (queryExecutor.getTransactionState() != TransactionState.IDLE) {
       executeTransactionCommand(rollbackQuery);
+    }
+    if (getIsEnableATF()) {
+        getQueryExecutor().clearATFCache();
     }
   }
 
@@ -1556,6 +1676,9 @@ public class PgConnection implements BaseConnection {
 
   @Override
   public boolean isClosed() throws SQLException {
+    if (getIsEnableATF()) {
+      return false;
+    }
     return queryExecutor.isClosed();
   }
 
@@ -1599,6 +1722,16 @@ public class PgConnection implements BaseConnection {
   @Override
   public boolean getBitToString() {
       return bitToString;
+  }
+
+  @Override
+  public boolean getIsEnableATF() {
+      return isEnableATF;
+  }
+
+  @Override
+  public boolean getIsEnableResultCheck() {
+      return isEnableResultCheck;
   }
 
   public int getPrepareThreshold() {
@@ -2437,5 +2570,51 @@ public class PgConnection implements BaseConnection {
         checkClosed();
         updateDolphinCmpt(isDolphinCmpt);
         this.isDolphinCmpt = isDolphinCmpt;
+    }
+
+    /**
+     * Execute the ATF cache.
+     *
+     * @param resultSet the PgResultSet is used to fetch()
+     * @return true if the ATF cache is executed successfully, false otherwise
+     * @throws SQLException if a database access error occurs
+     */
+    public boolean executeATFCache(PgResultSet resultSet) throws SQLException {
+        boolean isAutoCommit = getAutoCommit();
+        Statement stmt = null;
+        ATFCache atfCache = getQueryExecutor().getATFCache();
+        if (atfCache.isSessionCacheOverLimit() || atfCache.isTransactionCacheOverLimit()) {
+            LOGGER.error(
+              "ERROR! ATF recovery failed because the cache exceeded the limit. maxCacheSize: "
+              + atfCache.getMaxCacheSize()
+              + ", maxCacheNum: " + atfCache.getMaxCacheNum()
+            );
+            return false;
+        }
+        try {
+            stmt = createStatement();
+            if (!(stmt instanceof PgStatement)) {
+                throw new IllegalArgumentException("Statement is not an instance of PgStatement.");
+            }
+            this.autoCommit = true;
+            PgStatement pgStmt = (PgStatement) stmt;
+            atfCache.setIsRecovery(true);
+            // replay session level cache cache first
+            LinkedListCache<ATFCachedQuery> atfCache1 = atfCache.sessionCache;
+            pgStmt.executeATFCache(atfCache1, null, false);
+            this.autoCommit = isAutoCommit;
+            // then statement level cache
+            LinkedListCache<ATFCachedQuery> atfCache2 = atfCache.transactionCache;
+            pgStmt.executeATFCache(atfCache2, resultSet, true);
+            pgStmt.close();
+            atfCache.setIsRecovery(false);
+        } catch (SQLException e) {
+            throw e;
+        } finally {
+            if (stmt != null) {
+                stmt.close();
+            }
+        }
+        return true;
     }
 }
