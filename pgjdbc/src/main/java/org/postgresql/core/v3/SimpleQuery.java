@@ -11,6 +11,7 @@ import org.postgresql.core.NativeQuery;
 import org.postgresql.core.Oid;
 import org.postgresql.core.ParameterList;
 import org.postgresql.core.Query;
+import org.postgresql.core.QueryExecutionResult;
 import org.postgresql.core.SqlCommand;
 import org.postgresql.core.Utils;
 import org.postgresql.jdbc.PgResultSet;
@@ -71,6 +72,14 @@ class SimpleQuery implements Query {
   @Override
   public void setIsFunction(boolean isFunction) {
     this.isFunction = isFunction;
+  }
+
+  @Override
+  public Query copy() {
+    Query query = new SimpleQuery(this);
+    query.setQueryResult(queryExecutionResult);
+    query.setIsEnableATF(isEnableATF);
+    return query;
   }
 
   @Override
@@ -307,7 +316,8 @@ class SimpleQuery implements Query {
     this.cleanupRef = cleanupRef;
   }
 
-  void unprepare() {
+  @Override
+  public void unprepare() {
     if (cleanupRef != null) {
       cleanupRef.clear();
       cleanupRef.enqueue();
@@ -324,6 +334,9 @@ class SimpleQuery implements Query {
     portalDescribed = false;
     statementDescribed = false;
     cachedMaxResultRowSize = null;
+    if (queryExecutionResult != null && !queryExecutionResult.getIsRecovery()) {
+        queryExecutionResult = null;
+    }
   }
 
   public int getBatchSize() {
@@ -379,8 +392,32 @@ class SimpleQuery implements Query {
   private BitSet unspecifiedParams;
   private short deallocateEpoch;
   private boolean isFunction;
-
+  private QueryExecutionResult queryExecutionResult;
+  private boolean isEnableATF = false;
   private Integer cachedMaxResultRowSize;
 
   static final SimpleParameterList NO_PARAMETERS = new SimpleParameterList(0, null);
+
+    @Override
+    public void setQueryResult(QueryExecutionResult queryExecutionResult) {
+        if (this.queryExecutionResult != null && this.queryExecutionResult.getIsRecovery()) {
+            return;
+        }
+        this.queryExecutionResult = queryExecutionResult;
+    }
+
+    @Override
+    public QueryExecutionResult getQueryResult() {
+        return queryExecutionResult;
+    }
+
+    @Override
+    public void setIsEnableATF(boolean isEnableATF) {
+        this.isEnableATF = isEnableATF;
+    }
+
+    @Override
+    public boolean getIsEnableATF() {
+        return isEnableATF;
+    }
 }
