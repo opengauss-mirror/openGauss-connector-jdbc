@@ -650,11 +650,26 @@ public class ORResultSet extends PgResultSet {
         if (valueLen < 0) {
             return null;
         }
-        byte[] value = Arrays.copyOf(getByteValue(columnIndex), getLen(columnIndex));
+        byte[] value = Arrays.copyOf(getByteValue(columnIndex), valueLen);
         int dataLen = connection.getORStream().bytesToInt(value);
-        byte[] data = new byte[dataLen];
-        System.arraycopy(value, 12, data, 0, dataLen);
-        String str = new String(data, connection.getORStream().getCharset());
+        int lobRead = connection.getORStream().bytesToInt(value, 4);
+        int lobDataFlag = connection.getORStream().bytesToInt(value, 8);
+        boolean isFetchLob = lobRead == 0 && (lobDataFlag & 1) == 0;
+        byte[] data;
+        String str = null;
+        if (!isFetchLob) {
+            try {
+                data = statement.fetchLob(dataLen, value);
+                str = new String(data, connection.getORStream().getCharset());
+            } catch (IOException e) {
+                throw new PSQLException("fetch lob data failed.", PSQLState.IO_ERROR);
+            }
+        } else {
+            data = new byte[dataLen];
+            System.arraycopy(value, 12, data, 0, dataLen);
+            str = new String(data, connection.getORStream().getCharset());
+        }
+
         PGClob clob = new PGClob();
         clob.setString(1, str);
         return clob;
@@ -794,7 +809,8 @@ public class ORResultSet extends PgResultSet {
             case Types.REAL:
             case Types.FLOAT:
             case Types.DOUBLE:
-                return String.valueOf(getDouble(columnIndex));
+                double dv = getDouble(columnIndex);
+                return dv == 0.0 ? "0" : String.valueOf(dv);
             case Types.DATE:
                 return String.valueOf(getDate(columnIndex));
             case Types.TIME:
@@ -948,19 +964,28 @@ public class ORResultSet extends PgResultSet {
         }
         Object[] type = this.orFields[columnIndex - 1].getTypeInfo();
         int sqlType = Integer.parseInt(type[2].toString());
+        double value;
         switch (sqlType) {
             case Types.DOUBLE:
             case Types.FLOAT:
             case Types.REAL:
-                return getReal(columnIndex);
+                value = getReal(columnIndex);
+                break;
             case Types.DECIMAL:
-                return Double.valueOf(getDecimal(columnIndex));
+                value = Double.valueOf(getDecimal(columnIndex));
+                break;
             case Types.NUMERIC:
                 String num = getNumber(columnIndex);
-                return Double.valueOf(num);
+                value = Double.valueOf(num);
+                break;
             default:
                 throw new SQLException("conversion to double type from " + type[0] + " is not supported.");
         }
+
+        if (value == -0.0) {
+            return 0.0;
+        }
+        return value;
     }
 
     @Override
@@ -1340,7 +1365,7 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public Reader getNCharacterStream(int columnIndex) throws SQLException {
-        throw org.postgresql.Driver.notImplemented(this.getClass(), "getNCharacterStream(int)");
+        throw Driver.notImplemented(this.getClass(), "getNCharacterStream(int)");
     }
 
     @Override
@@ -1651,7 +1676,7 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public NClob getNClob(int columnIndex) throws SQLException {
-        throw org.postgresql.Driver.notImplemented(this.getClass(), "getNClob(int)");
+        throw Driver.notImplemented(this.getClass(), "getNClob(int)");
     }
 
     @Override
@@ -1661,6 +1686,6 @@ public class ORResultSet extends PgResultSet {
 
     @Override
     public RowId getRowId(int columnIndex) throws SQLException {
-        throw org.postgresql.Driver.notImplemented(this.getClass(), "getRowId(int)");
+        throw Driver.notImplemented(this.getClass(), "getRowId(int)");
     }
 }

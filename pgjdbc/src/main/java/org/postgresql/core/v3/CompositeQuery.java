@@ -8,6 +8,7 @@ package org.postgresql.core.v3;
 
 import org.postgresql.core.ParameterList;
 import org.postgresql.core.Query;
+import org.postgresql.core.QueryExecutionResult;
 import org.postgresql.core.SqlCommand;
 
 import java.util.Map;
@@ -115,4 +116,56 @@ class CompositeQuery implements Query {
 
   private final SimpleQuery[] subqueries;
   private final int[] offsets;
+
+    @Override
+    public void setQueryResult(QueryExecutionResult queryExecutionResult) {
+        for (SimpleQuery subquery : subqueries) {
+            subquery.setQueryResult(queryExecutionResult);
+        }
+    }
+
+    @Override
+    public QueryExecutionResult getQueryResult() {
+        for (SimpleQuery subquery : subqueries) {
+            return subquery.getQueryResult();
+        }
+        return null;
+    }
+
+    @Override
+    public void setIsEnableATF(boolean isEnableATF) {
+        for (int i = 0; i < subqueries.length; ++i) {
+            subqueries[i].setIsEnableATF(isEnableATF);
+        }
+    }
+
+    @Override
+    public boolean getIsEnableATF() {
+        for (int i = 0; i < subqueries.length; ++i) {
+            if (subqueries[i].getIsEnableATF()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public Query copy() {
+        SimpleQuery[] simpleQueries = new SimpleQuery[subqueries.length];
+        Query query = new CompositeQuery(simpleQueries, offsets);
+        for (int i = 0; i < subqueries.length; ++i) {
+            Query subquery = subqueries[i].copy();
+            if (subquery instanceof SimpleQuery) {
+                simpleQueries[i] = (SimpleQuery) subquery;
+            }
+        }
+        return query;
+    }
+
+    @Override
+    public void unprepare() {
+        for (int i = 0; i < subqueries.length; ++i) {
+            subqueries[i].unprepare();
+        }
+    }
 }

@@ -522,9 +522,9 @@ public class ORStream implements Closeable, Flushable {
             throw new EOFException("EOF Exception");
         }
         if (isBigEndian) {
-            return ((bf2[0] << 8) | (bf2[1] & 0xff));
+            return ((bf2[0] & 0xFF) << 8) | (bf2[1] & 0xFF);
         }
-        return ((bf2[1] << 8) | (bf2[0] & 0xff));
+        return ((bf2[1] & 0xFF) << 8) | (bf2[0] & 0xFF);
     }
 
     /**
@@ -665,6 +665,29 @@ public class ORStream implements Closeable, Flushable {
     }
 
     /**
+     * Convert byte[4] to int type value
+     *
+     * @param bytes byte[4]
+     * @param start offset
+     * @return int type value
+     */
+    public int bytesToInt(byte[] bytes, int start) {
+        if (bytes == null || bytes.length < 4) {
+            throw new IllegalArgumentException("Byte array must have at least 4 elements");
+        }
+        if (isBigEndian) {
+            return (bytes[start] & 0xFF) << 24
+                    | (bytes[1 + start] & 0xFF) << 16
+                    | (bytes[2 + start] & 0xFF) << 8
+                    | (bytes[3 + start] & 0xFF);
+        }
+        return (bytes[3 + start] & 0xFF) << 24
+                | (bytes[2 + start] & 0xFF) << 16
+                | (bytes[1 + start] & 0xFF) << 8
+                | (bytes[start] & 0xFF);
+    }
+
+    /**
      * Convert byte[4] to uint type value
      *
      * @param bytes byte[4]
@@ -795,5 +818,14 @@ public class ORStream implements Closeable, Flushable {
      */
     public Socket getSocket() {
         return socket;
+    }
+
+    /**
+     * get the remaining length in the buffer.
+     *
+     * @return the remaining length in the buffer.
+     */
+    public int getRemainingBufLen() {
+        return visibleStream.getEndIndex() - visibleStream.getIndex();
     }
 }

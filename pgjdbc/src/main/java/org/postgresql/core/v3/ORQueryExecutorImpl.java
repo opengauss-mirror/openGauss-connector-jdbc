@@ -67,6 +67,7 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
     private static final int TC_SQL = 4;
     private static final int EXPLAIN_SQL = 5;
     private static final int VERSION_23 = 23;
+    private static final int RW_SIZE = 1024 * 64;
 
     private ORStream orStream;
     private ORBaseConnection connection;
@@ -127,6 +128,40 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
                     + connection.getHostSpec(), PSQLState.CONNECTION_FAILURE, e);
         } catch (SQLException e2) {
             throw e2;
+        } finally {
+            if (orStream.getLock().isHeldByCurrentThread()) {
+                orStream.getLock().unlock();
+            }
+        }
+    }
+
+    @Override
+    public void handleLobRead(ORCachedQuery cachedQuery) throws IOException, SQLException {
+        orStream.getLock().lock();
+        try {
+            packageHead.init(orStream.getServerVersion());
+            packageHead.setExecCmd((byte) ORRequestCommand.READ_LOB_DATA);
+            packageHead.setRequestCount(orStream.addRequestCount());
+            int msgLen = PACKAGE_HEAD_SIZE;
+            short statId = (short) cachedQuery.getStatement().getMark();
+            msgLen += 2;
+            msgLen += 2;
+            msgLen += 4;
+            msgLen += 4;
+            byte[] lobValue = cachedQuery.getLobValue();
+            msgLen += lobValue.length;
+            byte[] headBytes = getHeadBytes();
+            orStream.sendInteger4(msgLen);
+            orStream.send(headBytes);
+            orStream.sendInteger2(statId);
+            orStream.sendChar(0);
+            orStream.sendChar(0);
+            orStream.sendInteger4(RW_SIZE);
+            int offset = cachedQuery.getLobOffset();
+            orStream.sendInteger4(offset);
+            orStream.send(lobValue);
+            orStream.flush();
+            processResults(cachedQuery);
         } finally {
             if (orStream.getLock().isHeldByCurrentThread()) {
                 orStream.getLock().unlock();
@@ -277,6 +312,7 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
             orStream.sendChar(0);
             orStream.sendChar(0);
             orStream.flush();
+            processResults(null);
         } finally {
             if (orStream.getLock().isHeldByCurrentThread()) {
                 orStream.getLock().unlock();
@@ -484,6 +520,7 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
                 getResult(cachedQuery, remainLen);
             }
 
+            orStream.receive(orStream.getRemainingBufLen());
             if ((packageHead.getFlags() & CURSOR_FLAG) == 0) {
                 break;
             }
@@ -532,10 +569,25 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
                     cachedQuery.getStatement().setUpdateCount(updateCount);
                     this.handleResult(cachedQuery, cachedQuery.getStatement().getField());
                 }
+            } else if (packageHead.getExecCmd() == ORRequestCommand.READ_LOB_DATA) {
+                handleLobData(cachedQuery);
             } else {
                 handleData(cachedQuery);
             }
         }
+    }
+
+    private void handleLobData(ORCachedQuery cachedQuery) throws IOException {
+        int dataLen = orStream.receiveInteger4();
+        int hasData = orStream.receiveInteger4();
+        if (dataLen == 0) {
+            cachedQuery.setHasLob(false);
+        } else {
+            cachedQuery.setHasLob(hasData == 0);
+        }
+        byte[] lobData = orStream.receive(dataLen);
+        cachedQuery.setLobData(lobData);
+        cachedQuery.setLobOffset(dataLen);
     }
 
     private void handleException(int remainLen) throws IOException, SQLException {

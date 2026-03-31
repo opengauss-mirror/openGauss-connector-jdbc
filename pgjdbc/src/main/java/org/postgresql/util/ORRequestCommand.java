@@ -78,6 +78,11 @@ public class ORRequestCommand {
     public static final int PREP_AND_EXECUTE = 12;
 
     /**
+     * fetch lob data
+     */
+    public static final int READ_LOB_DATA = 13;
+
+    /**
      * handleshake
      */
     public static final int HANDLE_SHAKE = 19;
