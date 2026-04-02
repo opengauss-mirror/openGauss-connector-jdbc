@@ -245,7 +245,7 @@ public class ATFCachedQuery implements CanEstimateSize {
             || remaining.startsWith("DISCARD")
             || remaining.startsWith("PREPARE")
             || remaining.startsWith("DEALLOCATE")
-            ||remaining.startsWith("LISTEN")
+            || remaining.startsWith("LISTEN")
             || remaining.startsWith("UNLISTEN")
             || remaining.startsWith("LOAD")) {
             return true;
