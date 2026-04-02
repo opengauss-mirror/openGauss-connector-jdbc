@@ -37,10 +37,10 @@ public class MD5Digest {
     private static Log LOGGER = Logger.getLogger(MD5Digest.class.getName());
 
     private static final String SM3_PROVIDER_NAME = "BC";
-    private static final String MD5_ALGORITHM = "MD5";
+    private static final String ATF_HASH_ALGORITHM = "MD5";
     private static final ThreadLocal<MessageDigest> MD5_THREAD_LOCAL = ThreadLocal.withInitial(() -> {
         try {
-            return MessageDigest.getInstance(MD5_ALGORITHM);
+            return MessageDigest.getInstance(ATF_HASH_ALGORITHM);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("Unable to create MD5_MD5encode instance", e);
         }
