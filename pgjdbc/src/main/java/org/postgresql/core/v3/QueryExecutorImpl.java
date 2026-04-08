@@ -2855,7 +2855,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
             try {
               isEnableATF = getEnableATF();
               if (isEnableATF) {
-                tuple = pgStream.receiveTupleV3(queryExecutionResult);
+                tuple = pgStream.receiveTuple(queryExecutionResult);
               } else {
                 tuple = pgStream.receiveTupleV3();
               }

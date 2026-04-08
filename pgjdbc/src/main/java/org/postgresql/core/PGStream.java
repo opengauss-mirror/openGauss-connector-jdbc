@@ -491,14 +491,14 @@ public class PGStream implements Closeable, Flushable {
     /**
      * ATF:
      * Read a tuple from the back end. A tuple is a two dimensional array of bytes. This variant reads
-     * the V3 protocol's tuple representation. And it updates the hash of the query execution result.
+     * the protocol's tuple representation. And it updates the hash of the query execution result.
      *
      * @param queryExecutionResult the query execution result to update the hash
      * @return tuple from the back end
      * @throws IOException if a data I/O error occurs
      * @throws OutOfMemoryError if the tuple is too large to fit in memory
      */
-    public byte[][] receiveTupleV3(QueryExecutionResult queryExecutionResult) throws IOException, OutOfMemoryError {
+    public byte[][] receiveTuple(QueryExecutionResult queryExecutionResult) throws IOException, OutOfMemoryError {
         int msgSize = receiveInteger4();
         int nf = receiveInteger2();
         byte[][] answer = new byte[nf][];
@@ -507,6 +507,8 @@ public class PGStream implements Closeable, Flushable {
         byte[] resultHash = null;
         if (msgSize > 6 && index + msgSize - 6 <= buf.length) {
             int len = msgSize - 6;
+            // ATF: To verify the integrity of replayed SQL results,
+            // calculate the hash of the tuple and update the hash value in queryExecutionResult
             resultHash = hashBytes(buf, index, len);
             queryExecutionResult.updateHash(resultHash);
         }

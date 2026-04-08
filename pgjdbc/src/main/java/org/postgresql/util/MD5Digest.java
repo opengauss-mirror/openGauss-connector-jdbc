@@ -38,6 +38,10 @@ public class MD5Digest {
 
     private static final String SM3_PROVIDER_NAME = "BC";
     private static final ThreadLocal<MessageDigest> MD5_THREAD_LOCAL = ThreadLocal.withInitial(() -> {
+        // ATF: Use Message-Digest Algorithm 5 to calculate
+        // the hash value of SQL results for verifying the integrity of SQL results.
+        // Message-Digest Algorithm 5 is not secure for encryption,
+        // but here it is only used to verify the integrity of SQL results, so security issues are not considered
         try {
             return MessageDigest.getInstance("MD5");
         } catch (NoSuchAlgorithmException e) {
