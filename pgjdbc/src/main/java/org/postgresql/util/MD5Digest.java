@@ -37,6 +37,17 @@ public class MD5Digest {
     private static Log LOGGER = Logger.getLogger(MD5Digest.class.getName());
 
     private static final String SM3_PROVIDER_NAME = "BC";
+    private static final ThreadLocal<MessageDigest> MD5_THREAD_LOCAL = ThreadLocal.withInitial(() -> {
+        // ATF: Use Message-Digest Algorithm 5 to calculate
+        // the hash value of SQL results for verifying the integrity of SQL results.
+        // Message-Digest Algorithm 5 is not secure for encryption,
+        // but here it is only used to verify the integrity of SQL results, so security issues are not considered
+        try {
+            return MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Unable to create MD5_MD5encode instance", e);
+        }
+    });
 
   private MD5Digest() {
   }
@@ -141,6 +152,40 @@ public class MD5Digest {
 
         md.update(str);
         return md.digest();
+    }
+
+    /**
+     * Computes the Message-Digest Algorithm 5 digest of the specified byte array.
+     *
+     * @param str the byte array to compute the digest for
+     * @param index the index of the first byte to include in the digest
+     * @param len the number of bytes to include in the digest
+     * @return the computed Message-Digest Algorithm 5 digest
+     */
+    public static byte[] md5DigestBytes(byte[] str) {
+        MessageDigest md5Instance = MD5_THREAD_LOCAL.get();
+        if (md5Instance == null) {
+            return new byte[0];
+        }
+        return md5Instance.digest(str);
+    }
+
+    /**
+     * Computes the Message-Digest Algorithm 5 digest of the specified byte array.
+     *
+     * @param str the byte array to compute the digest for
+     * @param index the index of the first byte to include in the digest
+     * @param len the number of bytes to include in the digest
+     * @return the computed Message-Digest Algorithm 5 digest
+     */
+    public static byte[] md5DigestBytes(byte[] str, int index, int len) {
+        MessageDigest md5Instance = MD5_THREAD_LOCAL.get();
+        if (md5Instance == null) {
+            return new byte[0];
+        }
+        md5Instance.reset();
+        md5Instance.update(str, index, len);
+        return md5Instance.digest();
     }
 
     private static byte[] sm3(byte[] str) {

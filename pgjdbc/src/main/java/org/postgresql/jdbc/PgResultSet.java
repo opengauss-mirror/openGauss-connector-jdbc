@@ -1007,8 +1007,19 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
       }
     }
 
-    // Do the actual fetch.
-    connection.getQueryExecutor().fetch(cursor, new CursorResultHandler(), fetchRows);
+    try {
+        // Do the actual fetch.
+        connection.getQueryExecutor().fetch(cursor, new CursorResultHandler(), fetchRows);
+    } catch (SQLException e) {
+        if (!(connection instanceof PgConnection)) {
+            throw new IllegalArgumentException("Connection is not an instance of PgConnection");
+        }
+        if (((PgConnection) connection).reconnect(e, this)) {
+            connection.getQueryExecutor().fetch(cursor, new CursorResultHandler(), fetchRows);
+        } else {
+            throw e;
+        }
+    }
 
     // Now prepend our one saved row and move to it.
     rows.add(0, this_row);
@@ -2046,8 +2057,19 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
         }
       }
 
-      // Execute the fetch and update this resultset.
-      connection.getQueryExecutor().fetch(cursor, new CursorResultHandler(), fetchRows);
+      try {
+          // Execute the fetch and update this resultset.
+          connection.getQueryExecutor().fetch(cursor, new CursorResultHandler(), fetchRows);
+      } catch (SQLException e) {
+          if (!(connection instanceof PgConnection)) {
+              throw new IllegalArgumentException("Connection is not an instance of PgConnection");
+          }
+          if (((PgConnection) connection).reconnect(e, this)) {
+              connection.getQueryExecutor().fetch(cursor, new CursorResultHandler(), fetchRows);
+          } else {
+              throw e;
+          }
+      }
 
       current_row = 0;
 
@@ -4033,4 +4055,31 @@ public class PgResultSet implements ResultSet, org.postgresql.PGRefCursorResultS
     }
     return sharedCalendar;
   }
+
+    /**
+     * Returns the cursor associated with this result set.
+     *
+     * @return the cursor associated with this result set
+     */
+    public ResultCursor getCursor() {
+        return cursor;
+    }
+
+    /**
+     * Sets the cursor associated with this result set.
+     *
+     * @param cursor the cursor to set
+     */
+    public void setCursor(ResultCursor cursor) {
+        this.cursor = cursor;
+    }
+
+    /**
+     * Returns the cursor result handler associated with this result set.
+     *
+     * @return the cursor result handler associated with this result set
+     */
+    public CursorResultHandler getCursorResultHandler() {
+        return new CursorResultHandler();
+    }
 }

@@ -156,6 +156,12 @@ public class PGPropertyTest {
     excluded.add("bitOutput");
     excluded.add("autoReconnect");
     excluded.add("maxReconnects");
+    excluded.add("enableATF");
+    excluded.add("atfEnableResultCheck");
+    excluded.add("atfStatementCacheSizeMiB");
+    excluded.add("atfStatementCacheQueries");
+    excluded.add("atfRecovery");
+    excluded.add("atfSqlCount");
     excluded.add("atfLevel");
     excluded.add("atfAddress");
     excluded.add("atfReconnects");

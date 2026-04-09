@@ -254,4 +254,18 @@ public interface BaseConnection extends PGConnection, Connection {
   public boolean isAdaptiveSetSQLType();
 
   PgDatabase getPgDatabase();
+
+    /**
+     * True if enable ATF feature, default is false.
+     *
+     * @return true if enable ATF feature, default is false.
+     */
+    boolean getIsEnableATF();
+
+    /**
+     * True if enable atf result check feature, default is false.
+     *
+     * @return true if enable atf result check feature, default is false.
+     */
+    boolean getIsEnableResultCheck();
 }

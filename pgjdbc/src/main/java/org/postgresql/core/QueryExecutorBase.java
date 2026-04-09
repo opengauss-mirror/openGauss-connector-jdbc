@@ -57,6 +57,8 @@ public abstract class QueryExecutorBase implements QueryExecutor {
   private final LruCache<Object, CachedQuery> statementCache;
   private final CachedQueryCreateAction cachedQueryCreateAction;
 
+  private ATFCache atfCache;
+
   protected QueryExecutorBase(PGStream pgStream, String user,
                               String database, int cancelSignalTimeout, Properties info) throws SQLException {
     this.pgStream = pgStream;
@@ -88,6 +90,7 @@ public abstract class QueryExecutorBase implements QueryExecutor {
         }
       }
     });
+    atfCache = new ATFCache(info);
   }
 
   protected abstract void sendSupportTrace() throws IOException;
@@ -300,24 +303,32 @@ public abstract class QueryExecutorBase implements QueryExecutor {
 
   @Override
   public final CachedQuery borrowQuery(String sql) throws SQLException {
-    return statementCache.borrow(sql);
+    CachedQuery cachedQuery = statementCache.borrow(sql);
+    cachedQuery.query.setQueryResult(null);
+    return cachedQuery;
   }
 
   @Override
   public final CachedQuery borrowCallableQuery(String sql) throws SQLException {
-    return statementCache.borrow(new CallableQueryKey(sql));
+    CachedQuery cachedQuery = statementCache.borrow(new CallableQueryKey(sql));
+    cachedQuery.query.setQueryResult(null);
+    return cachedQuery;
   }
 
   @Override
   public final CachedQuery borrowReturningQuery(String sql, String[] columnNames) throws SQLException {
-    return statementCache.borrow(new QueryWithReturningColumnsKey(sql, true, true,
+    CachedQuery cachedQuery = statementCache.borrow(new QueryWithReturningColumnsKey(sql, true, true,
             columnNames
     ));
+    cachedQuery.query.setQueryResult(null);
+    return cachedQuery;
   }
 
   @Override
   public CachedQuery borrowQueryByKey(Object key) throws SQLException {
-    return statementCache.borrow(key);
+    CachedQuery cachedQuery = statementCache.borrow(key);
+    cachedQuery.query.setQueryResult(null);
+    return cachedQuery;
   }
 
   @Override
@@ -424,4 +435,26 @@ public abstract class QueryExecutorBase implements QueryExecutor {
   protected boolean hasNotifications() {
     return notifications.size() > 0;
   }
+
+    @Override
+    public void cacheQuery(ATFCachedQuery cachedQuery) {
+        atfCache.cacheQuery(cachedQuery);
+    }
+
+    @Override
+    public void clearATFCache() {
+        atfCache.clear();
+    }
+
+    @Override
+    public void setATFCache(ATFCache atfCache) {
+        // This is only used when a new QueryExecutor is created on the fly to replace a closed one
+        // in that case we want to keep the ATF cache
+        this.atfCache = atfCache;
+    }
+
+    @Override
+    public ATFCache getATFCache() {
+        return atfCache;
+    }
 }
