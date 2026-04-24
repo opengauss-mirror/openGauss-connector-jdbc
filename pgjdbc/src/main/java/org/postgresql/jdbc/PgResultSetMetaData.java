@@ -289,7 +289,7 @@ public class PgResultSetMetaData implements ResultSetMetaData, PGResultSetMetaDa
       }
 
       sql.append("SELECT ");
-      sql.append(field.getTableOid());
+      sql.append(Integer.toUnsignedString(field.getTableOid()));
       if (!hasSourceInfo) {
         sql.append(" AS oid ");
       }
