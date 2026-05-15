@@ -63,6 +63,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
   private static final int AUTH_REQ_GSS = 7;
   private static final int AUTH_REQ_GSS_CONTINUE = 8;
   private static final int AUTH_REQ_SSPI = 9;
+  private static final int MAX_ITERATIONS = 10000000;
 
   public String CLIENT_ENCODING = "UTF8";
   public static String USE_BOOLEAN = "false";
@@ -797,6 +798,12 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                           result = MD5Digest.RFC5802Algorithm(password, random64code, token);
                       } else {
                           int server_iteration = pgStream.receiveInteger4();
+                          if (server_iteration > MAX_ITERATIONS) {
+                            throw new PSQLException(
+                                    GT.tr("Server requested {0} SCRAM PBKDF2 iterations, which exceeds the "
+                                                    + "client-side limit of {1}.", server_iteration, MAX_ITERATIONS),
+                                    PSQLState.CONNECTION_REJECTED);
+                          }
                           result =
                                   MD5Digest.RFC5802Algorithm(password, random64code, token, server_iteration);
                       }
