@@ -91,7 +91,7 @@ public class SocketFactoryFactory {
         String socketFactoryArg = PGProperty.SOCKET_FACTORY_ARG.get(properties);
         Object factory;
         try {
-            Class<?> cls = loader.loadClass(socketFactoryName);
+            Class<?> cls = loader.loadClass(socketFactoryName).asSubclass(SocketFactory.class);
             Constructor<?> constructor = cls.getDeclaredConstructor(String.class);
             factory = constructor.newInstance(socketFactoryArg);
         } catch (InvocationTargetException
