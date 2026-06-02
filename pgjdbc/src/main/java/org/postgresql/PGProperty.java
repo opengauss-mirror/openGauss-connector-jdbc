@@ -712,6 +712,16 @@ public enum PGProperty {
     ATF_SQL_COUNT("atfSqlCount", "0",
         "Specifies the maximum number of SQL statements that ATF can release per transaction."
         + " It is automatically set internally by the JDBC driver and should not be manually configured."),
+
+    /**
+     * whether to create ssl connection
+     */
+    USE_SSL("useSSL", "false", "whether to create ssl connection", false),
+
+    /**
+     * whether to verify server certificate
+     */
+    VERIFY_CERT("verifyCert", "false", "whether to verify server certificate", false)
   ;
 
   private String _name;

@@ -17,6 +17,7 @@ package org.postgresql.jdbc;
 
 import org.postgresql.core.ORBaseConnection;
 import org.postgresql.core.ORStream;
+import org.postgresql.ssl.ORStreamSSL;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.util.ORPackageHead;
@@ -40,6 +41,8 @@ import java.util.List;
 public class ORConnectionHandler {
     private static final int AGENT = 256;
     private static final int PACKAGE_HEAD_SIZE = 16;
+    private static final int SSL_SERVER = 512;
+    private static final int NO_SSL_SERVER = -513;
     private static final byte[] OR_MARK = new byte[]{(byte) 0xfe, (byte) 0xdc, (byte) 0xba, (byte) 0x98};
 
     private ORStream orStream;
@@ -106,15 +109,28 @@ public class ORConnectionHandler {
 
         int version = orStream.receiveChar();
         orStream.setVersion(version);
-        int requestFlag = orStream.receiveInteger2() | 1;
-        orStream.setRequestFlag(requestFlag);
+        int requestFlag = orStream.receiveInteger2();
+        int capacity = 0;
+        if ((requestFlag & SSL_SERVER) != 0) {
+            capacity = capacity | SSL_SERVER;
+        }
+        orStream.setCapacity(capacity);
+        if (orStream.isSsl() && (capacity & SSL_SERVER) == 0) {
+            requestFlag = requestFlag & NO_SSL_SERVER;
+            orStream.setSsl(false);
+        }
 
         this.clientKey = new byte[32];
         new SecureRandom().nextBytes(this.clientKey);
-        int capacity = 0;
-        orStream.setCapacity(capacity);
+        requestFlag = orStream.isSsl() ? (requestFlag | SSL_SERVER) : (requestFlag & NO_SSL_SERVER);
+        requestFlag = requestFlag | 1;
+        orStream.setRequestFlag(requestFlag);
         try {
             sendHandshakeQuery();
+            if (orStream.isSsl()) {
+                orStream.receive(4);
+                ORStreamSSL.createSSLSocket(orStream);
+            }
             processResults(false);
             sendAuthQuery();
             processResults(false);

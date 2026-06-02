@@ -22,11 +22,13 @@ import org.postgresql.util.HostSpec;
 import org.postgresql.util.ORPackageHead;
 import org.postgresql.util.PSQLException;
 
+import javax.net.ssl.SSLSocket;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
+import java.sql.SQLException;
 import java.util.Properties;
 import java.io.Closeable;
 import java.io.Flushable;
@@ -50,6 +52,7 @@ public class ORStream implements Closeable, Flushable {
     private static Log LOGGER = Logger.getLogger(ORStream.class.getName());
     private static final int BUFFER_SIZE = 8192;
     private static final int MAX_PARAMS_NUM = 65535;
+    private static final int SSL_BUFFER_SIZE = 65536;
 
     private final byte[] bf2;
     private final byte[] bf4;
@@ -59,8 +62,10 @@ public class ORStream implements Closeable, Flushable {
     private SocketChannel channel;
     private String localAddress;
     private Charset charset;
+    private HostAddress hostAddress;
     private int requestCount;
     private Socket socket;
+    private SSLSocket sslSocket;
     private int serverVersion;
     private int version;
     private int requestFlag;
@@ -75,6 +80,9 @@ public class ORStream implements Closeable, Flushable {
     private int sessionNumber;
     private ORPackageHead packageHead;
     private boolean isHandshake;
+    private boolean isVerifyCert;
+    private Properties properties;
+    private boolean isSsl;
 
     /**
      * input/output stream constructor
@@ -87,6 +95,7 @@ public class ORStream implements Closeable, Flushable {
         this.packageHead = new ORPackageHead();
         this.charset = Charset.forName("UTF-8");
         this.socketAddress = new InetSocketAddress(hostSpec.getHost(), hostSpec.getPort());
+        this.hostAddress = new HostAddress(hostSpec.getHost(), hostSpec.getPort());
         bf2 = new byte[2];
         bf4 = new byte[4];
     }
@@ -110,6 +119,33 @@ public class ORStream implements Closeable, Flushable {
     }
 
     /**
+     * get hostAddress
+     *
+     * @return hostAddress
+     */
+    public HostAddress getHostAddress() {
+        return hostAddress;
+    }
+
+    /**
+     * Whether to establish an SSL connection
+     *
+     * @return Is it an SSL connection
+     */
+    public boolean isSsl() {
+        return isSsl;
+    }
+
+    /**
+     * set SSL connection
+     *
+     * @param isSsl SSL connection
+     */
+    public void setSsl(boolean isSsl) {
+        this.isSsl = isSsl;
+    }
+
+    /**
      * get packageHead
      *
      * @return packageHead
@@ -125,6 +161,31 @@ public class ORStream implements Closeable, Flushable {
      */
     public String getLocalAddress() {
         return localAddress;
+    }
+
+    /**
+     * create SSL socket
+     *
+     * @param socket SSLSocket
+     * @throws SQLException if a database access error occurs
+     * @throws IOException if an I/O error occurs
+     */
+    public void setSslSocket(SSLSocket socket) throws SQLException {
+        try {
+            outputStream = new BufferedOutputStream(socket.getOutputStream(), SSL_BUFFER_SIZE);
+            outputStream.flush();
+            inputStream = socket.getInputStream();
+            visibleStream = new VisibleBufferedInputStream(socket.getInputStream(), BUFFER_SIZE);
+            sslSocket = socket;
+        } catch (IOException e) {
+            throw new SQLException(e.getMessage());
+        } finally {
+            try {
+                close();
+            } catch (IOException e) {
+                LOGGER.warn("IOException occur on close stream: ", e);
+            }
+        }
     }
 
     /**
@@ -182,6 +243,15 @@ public class ORStream implements Closeable, Flushable {
     }
 
     /**
+     * get properties
+     *
+     * @return properties
+     */
+    public Properties getProperties() {
+        return properties;
+    }
+
+    /**
      * get session id
      *
      * @return session id
@@ -197,6 +267,15 @@ public class ORStream implements Closeable, Flushable {
      */
     public void setSessionId(int sessionId) {
         this.sessionId = sessionId;
+    }
+
+    /**
+     * whether to verify the server certificate
+     *
+     * @return isVerifyCert
+     */
+    public boolean isVerifyCert() {
+        return isVerifyCert;
     }
 
     /**
@@ -279,6 +358,7 @@ public class ORStream implements Closeable, Flushable {
      * @throws PSQLException if a database access error occurs
      */
     public void socketConnect(Properties properties) throws IOException, PSQLException {
+        this.properties = properties;
         Socket socketConn;
         if (properties.containsKey("UDS") && properties.getProperty("UDS").equals("1")) {
             socketConn = SocketFactoryFactory.getUdsSocket(properties);
@@ -300,6 +380,8 @@ public class ORStream implements Closeable, Flushable {
             visibleStream = new VisibleBufferedInputStream(inputStream, BUFFER_SIZE);
             outputStream = new BufferedOutputStream(socketConn.getOutputStream(), BUFFER_SIZE);
             setEncoding(Encoding.getJVMEncoding("UTF-8"));
+            this.isVerifyCert = PGProperty.VERIFY_CERT.getBoolean(properties);
+            this.isSsl = PGProperty.USE_SSL.getBoolean(properties);
         }
     }
 
@@ -389,6 +471,9 @@ public class ORStream implements Closeable, Flushable {
     public void close() throws IOException {
         if (encodingWriter != null) {
             encodingWriter.close();
+        }
+        if (sslSocket != null) {
+            sslSocket.close();
         }
         if (outputStream != null) {
             outputStream.close();

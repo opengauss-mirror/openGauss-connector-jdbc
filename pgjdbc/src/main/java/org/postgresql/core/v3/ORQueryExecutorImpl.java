@@ -117,7 +117,7 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
             }
         } catch (IOException e) {
             try {
-                orStream.getSocket().close();
+                orStream.close();
             } catch (IOException e2) {
                 LOGGER.trace("Catch IOException on close:", e2);
             }
@@ -819,7 +819,7 @@ public class ORQueryExecutorImpl implements ORQueryExecutor {
             processCursorResults(cursorRs);
         } catch (IOException e) {
             try {
-                orStream.getSocket().close();
+                orStream.close();
             } catch (IOException e2) {
                 LOGGER.trace("Catch IOException on close:", e2);
             }
