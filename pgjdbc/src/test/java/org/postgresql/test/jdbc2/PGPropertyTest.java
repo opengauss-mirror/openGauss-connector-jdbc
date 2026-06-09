@@ -167,6 +167,8 @@ public class PGPropertyTest {
     excluded.add("atfReconnects");
     excluded.add("atfTimeout");
     excluded.add("atfSslcert");
+    excluded.add("useSSL");
+    excluded.add("verifyCert");
 
     // index PropertyDescriptors by name
     Map<String, PropertyDescriptor> propertyDescriptors =
@@ -296,7 +298,9 @@ public class PGPropertyTest {
     excluded.add("SSL_PRIVATEKEY_FACTORY"); // ssl[p]rivatekey[f]actory
     excluded.add("APPLICATION_TYPE"); // [A]pplication[T]ype
     excluded.add("TLS_CIPHERS_SUPPERTED"); // [TLS]CiphersSupperted
-    excluded.add("SSL_TLCP"); // [TLS]CiphersSupperted
+    excluded.add("SSL_TLCP"); // [TLS]
+    excluded.add("USE_SSL");
+    excluded.add("VERIFY_CERT");
 
     for (PGProperty property : PGProperty.values()) {
       if (!property.name().startsWith("PG")) { // Ignore all properties that start with PG
