@@ -690,6 +690,7 @@ public class PgConnection implements BaseConnection {
   }
 
   public void setQueryExecutor(QueryExecutor queryExecutor) {
+    queryExecutor.setUniqueID(this.queryExecutor.getUniqueID());
     this.queryExecutor = queryExecutor;
   }
 
