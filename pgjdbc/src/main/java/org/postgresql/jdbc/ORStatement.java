@@ -229,6 +229,30 @@ public class ORStatement implements Statement {
     }
 
     /**
+     * Just close the statement except for resultSet
+     *
+     * @throws SQLException if a database access error occurs
+     */
+    public void closeStmt() throws SQLException {
+        synchronized (this) {
+            if (isClosed) {
+                return;
+            }
+            try {
+                if (this.mark != -1) {
+                    connection.getQueryExecutor().freeStatement(this);
+                }
+            } catch (IOException e) {
+                throw new SQLException(e.getMessage());
+            }
+            if (generatedKeys != null) {
+                generatedKeys.close();
+            }
+            isClosed = true;
+        }
+    }
+
+    /**
      * get queryMode
      *
      * @return queryMode
