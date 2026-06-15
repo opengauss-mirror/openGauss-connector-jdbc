@@ -322,6 +322,16 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     }
   }
 
+  @Override
+  public long getUniqueID() {
+    return nextUniqueID;
+  }
+
+  @Override
+  public void setUniqueID(long uniqueID) {
+    nextUniqueID = uniqueID;
+  }
+
   private void recordSendTime() {
     sendTime = System.nanoTime();
   }
