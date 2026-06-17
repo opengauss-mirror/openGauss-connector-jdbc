@@ -75,6 +75,7 @@ public class ORConnection implements ORBaseConnection {
     private boolean isReadOnly = false;
     private int rsHoldability = ResultSet.CLOSE_CURSORS_AT_COMMIT;
     private String catalog;
+    private DatabaseMetaData metadata;
 
     /**
      * connection constructor
@@ -225,7 +226,11 @@ public class ORConnection implements ORBaseConnection {
 
     @Override
     public DatabaseMetaData getMetaData() throws SQLException {
-        return null;
+        checkClosed();
+        if (metadata == null) {
+            metadata = new ORDatabaseMetaData(this);
+        }
+        return metadata;
     }
 
     @Override
@@ -263,7 +268,12 @@ public class ORConnection implements ORBaseConnection {
         return createStatement(resultSetType, resultSetConcurrency, getHoldability());
     }
 
-    private void checkClosed() throws SQLException {
+    /**
+     * Check whether the database connection is closed
+     *
+     * @throws SQLException if a database access error occurs
+     */
+    protected void checkClosed() throws SQLException {
         if (isClosed()) {
             throw new PSQLException("This connection has been closed.",
                     PSQLState.CONNECTION_DOES_NOT_EXIST);
