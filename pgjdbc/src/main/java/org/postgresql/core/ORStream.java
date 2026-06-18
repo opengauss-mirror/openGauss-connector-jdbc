@@ -178,13 +178,12 @@ public class ORStream implements Closeable, Flushable {
             visibleStream = new VisibleBufferedInputStream(socket.getInputStream(), BUFFER_SIZE);
             sslSocket = socket;
         } catch (IOException e) {
-            throw new SQLException(e.getMessage());
-        } finally {
             try {
                 close();
-            } catch (IOException e) {
-                LOGGER.warn("IOException occur on close stream: ", e);
+            } catch (IOException e2) {
+                LOGGER.warn("IOException occur on close stream: ", e2);
             }
+            throw new SQLException(e.getMessage());
         }
     }
 
