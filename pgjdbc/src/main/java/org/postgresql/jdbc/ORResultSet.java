@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Locale;
 import java.util.UUID;
@@ -741,6 +742,19 @@ public class ORResultSet extends PgResultSet {
             hasNext = hasNext();
         }
         return hasNext;
+    }
+
+    /**
+     * get all data rows
+     *
+     * @throws SQLException if a database access error occurs
+     */
+    public void getDataRows() throws SQLException {
+        List<byte[][]> datas = new ArrayList<>();
+        while (next()) {
+            datas.add(dataRows.get(currentRow));
+        }
+        this.dataRows = datas;
     }
 
     /**

@@ -21,6 +21,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.PreparedStatement;
 import java.sql.RowIdLifetime;
 
 /**
@@ -143,17 +144,32 @@ public class ORDatabaseMetaData implements DatabaseMetaData {
 
     @Override
     public String getSQLKeywords() {
-        return null;
+        return "BLOB,BY,CHAR,CHECK,REAL,FALSE,FLOAT,FOR,BIGINT,RIGHT,CHECKPOINT,CLOB,HAVING,TABLESPACE,THEN,TIMESTAMP,"
+                + "SYSDATE,SYSTIMESTAMP,IN,NOT,NOW,NULL,NUMERIC,ON,DAY,VARCHAR,CURRENT_TIMESTAMP,FROM,DECIMAL,DELETE,"
+                + "AS,ASC,DUPLICATE,EXECUTE,EXISTS,VALUES,VARBINARY,SELECT,EXPLAIN,FETCH,INTO,IS,LAST_INSERT_ID,LEFT,"
+                + "LIKE,LIMIT,MONTH,ROLLBACK,ROWNUM,DROP,OR,BINARY,DESC,DISTINCT,DOUBLE,ORDER,INDEX,INSERT,INT,"
+                + "INTEGER,ALL,ALTER,BETWEEN,DATABASE,DATE,DATETIME,AND,COLUMN,COMMIT,CREATE,CURDATE,CURRENT_DATE,"
+                + "ADD,GROUP,PARTITION,SYSUTC,TRUE,TRUNCATE,UPDATE,UTC,ELSE,END,SET,SHUTDOWN,TABLE,UNION,VARCHAR2,"
+                + "WHEN,WHERE,YEAR";
     }
 
     @Override
     public String getNumericFunctions() {
-        return null;
+        return EscapedFunctions.ROUND + ',' + EscapedFunctions.SIN + ',' + EscapedFunctions.LOG10 + ','
+                + EscapedFunctions.ATAN + ',' + EscapedFunctions.CEILING + ',' + EscapedFunctions.PI + ','
+                + EscapedFunctions.TRUNCATE + ',' + EscapedFunctions.ASIN + ',' + EscapedFunctions.ATAN2 + ','
+                + EscapedFunctions.COS + ',' + EscapedFunctions.MOD + ',' + EscapedFunctions.EXP + ','
+                + EscapedFunctions.FLOOR + ',' + EscapedFunctions.POWER + ',' + EscapedFunctions.SQRT + ','
+                + EscapedFunctions.SIGN + ',' + EscapedFunctions.ABS + ',' + EscapedFunctions.TAN + ','
+                + EscapedFunctions.LOG + ',' + EscapedFunctions.ACOS;
     }
 
     @Override
     public String getStringFunctions() {
-        return null;
+        return EscapedFunctions.UCASE + ',' + EscapedFunctions.CHAR + ',' + EscapedFunctions.ASCII + ','
+                + EscapedFunctions.LCASE + ',' + EscapedFunctions.CONCAT + ',' + EscapedFunctions.LENGTH + ','
+                + EscapedFunctions.REPLACE + ',' + EscapedFunctions.LTRIM + ',' + EscapedFunctions.SUBSTRING + ','
+                + EscapedFunctions.RTRIM;
     }
 
     @Override
@@ -178,7 +194,10 @@ public class ORDatabaseMetaData implements DatabaseMetaData {
 
     @Override
     public String getTimeDateFunctions() {
-        return null;
+        return "GETUTCDATE,CURRENT_TIMESTAMP,NEXT_DAY,UTC_TIMESTAMP,SYS_EXTRACT_UTC,FROM_UNIXTIME,FROM_TZ,"
+                + "UTC_DATE,LOCALTIMESTAMP,SECOND,TO_TIMESTAMP,SYSDATE,YEAR,UNIX_TIMESTAMP,CURRENT_DATE,"
+                + "CURDATE,ADD_MONTHS,GSCN2DATE,EXTRACT,TIMESTAMPDIFF,HOUR,SYSTIMESTAMP,TO_DATE,LAST_DAY,"
+                + "NOW,TRUNC,MONTHS_BETWEEN,TIMESTAMPADD,SLEEP,MINUTE";
     }
 
     @Override
@@ -328,12 +347,7 @@ public class ORDatabaseMetaData implements DatabaseMetaData {
 
     @Override
     public String getCatalogTerm() {
-        return null;
-    }
-
-    @Override
-    public String getCatalogSeparator() {
-        return null;
+        return "";
     }
 
     @Override
@@ -419,6 +433,11 @@ public class ORDatabaseMetaData implements DatabaseMetaData {
     @Override
     public boolean supportsPositionedUpdate() {
         return false;
+    }
+
+    @Override
+    public String getCatalogSeparator() {
+        return "";
     }
 
     @Override
@@ -642,40 +661,349 @@ public class ORDatabaseMetaData implements DatabaseMetaData {
     @Override
     public ResultSet getProcedures(String catalog, String schemaPattern, String procedureNamePattern)
             throws SQLException {
-        return null;
+        String procedure = procedureNamePattern;
+        if (procedure == null) {
+            procedure = "%";
+        }
+        String schemaName = null;
+        if (schemaPattern == null) {
+            schemaName = "%";
+        } else if (schemaPattern.isEmpty()) {
+            schemaName = connection.getUser();
+        } else {
+            schemaName = schemaPattern;
+        }
+
+        if (catalog == null) {
+            return getCatalogNullProcedures(schemaName, procedure);
+        } else if (catalog.isEmpty()) {
+            return getCatalogEmptyProcedures(schemaName, procedure);
+        } else {
+            return getCatalogProcedures(catalog, schemaName, procedure);
+        }
+    }
+
+    private ResultSet getCatalogNullProcedures(String schemaName, String procedure) throws SQLException {
+        String sql = "SELECT NULL AS PROCEDURE_CAT, OWNER AS PROCEDURE_SCHEM, OBJECT_NAME AS PROCEDURE_NAME, "
+                + "NULL, NULL,NULL, 'STANDALONE PROCEDURE OR FUNCTION' AS REMARKS,  DECODE(OBJECT_TYPE, 'PROCEDURE', "
+                + " 1,'FUNCTION', 2, 0)  AS PROCEDURE_TYPE,  NULL AS SPECIFIC_NAME FROM DB_OBJECTS WHERE "
+                + "(OBJECT_TYPE = 'PROCEDURE' OR OBJECT_TYPE = 'FUNCTION')  AND OWNER LIKE ?  AND OBJECT_NAME LIKE ? "
+                + "UNION ALL SELECT K.PACKAGE_NAME AS PROCEDURE_CAT, K.OWNER AS PROCEDURE_SCHEM, K.OBJECT_NAME AS "
+                + "PROCEDURE_NAME, NULL, NULL, NULL, 'PACKAGED PROCEDURE' AS REMARKS, 1 AS PROCEDURE_TYPE, "
+                + "NULL AS SPECIFIC_NAME FROM DB_ARGUMENTS K WHERE ARGUMENT_NAME IS NULL  AND DATA_TYPE IS NULL AND "
+                + "K.PACKAGE_NAME IS NOT NULL AND K.OWNER LIKE ? AND K.OBJECT_NAME LIKE ? UNION ALL SELECT "
+                + "K.PACKAGE_NAME AS PROCEDURE_CAT, K.OWNER AS PROCEDURE_SCHEM, K.OBJECT_NAME AS PROCEDURE_NAME, "
+                + "NULL, NULL, NULL, 'PACKAGED PROCEDURE' AS REMARKS, 1 AS PROCEDURE_TYPE, NULL AS SPECIFIC_NAME "
+                + "FROM DB_ARGUMENTS K,DB_PL_MANAGER P WHERE K.ARGUMENT_NAME IS NOT NULL AND K.PACKAGE_NAME = "
+                + "P.PACKAGE_NAME AND K.OWNER = P.USER_NAME AND K.OBJECT_NAME = P.NAME AND P.TYPE = 'PROCEDURE' AND "
+                + "K.PACKAGE_NAME IS NOT NULL AND K.OWNER LIKE ? AND K.OBJECT_NAME LIKE ? UNION ALL SELECT  "
+                + "K.PACKAGE_NAME AS PROCEDURE_CAT, K.OWNER AS PROCEDURE_SCHEM, K.OBJECT_NAME AS PROCEDURE_NAME, "
+                + "NULL, NULL, NULL, 'PACKAGED FUNCTION' AS REMARKS, 2 AS PROCEDURE_TYPE,  NULL AS SPECIFIC_NAME "
+                + "FROM DB_ARGUMENTS K WHERE K.ARGUMENT_NAME IS NULL AND K.IN_OUT = 'OUT' AND   K.DATA_LEVEL = 0 AND "
+                + "K.PACKAGE_NAME IS NOT NULL AND K.OWNER LIKE ? AND K.OBJECT_NAME LIKE ? ORDER BY PROCEDURE_SCHEM, "
+                + "PROCEDURE_NAME ";
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            for (int i = 1; i <= 8; i++) {
+                if (i % 2 == 1) {
+                    ps.setString(i, schemaName);
+                } else {
+                    ps.setString(i, procedure);
+                }
+            }
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
+    }
+
+    private ResultSet getCatalogEmptyProcedures(String schemaName, String procedure) throws SQLException {
+        String sql = "SELECT NULL AS PROCEDURE_CAT, OWNER AS PROCEDURE_SCHEM, OBJECT_NAME AS PROCEDURE_NAME, NULL, "
+                + "NULL, NULL, 'STANDALONE PROCEDURE OR FUNCTION' AS REMARKS,  DECODE(OBJECT_TYPE, 'PROCEDURE', "
+                + "1, 'FUNCTION', 2, 0)  AS PROCEDURE_TYPE,  NULL AS SPECIFIC_NAME FROM DB_OBJECTS WHERE "
+                + "(OBJECT_TYPE = 'PROCEDURE' OR OBJECT_TYPE = 'FUNCTION')  AND OWNER LIKE ?  AND OBJECT_NAME LIKE ? ";
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            ps.setString(1, schemaName);
+            ps.setString(2, procedure);
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
+    }
+
+    private ResultSet getCatalogProcedures(String catalog, String schemaName, String procedure) throws SQLException {
+        String sql = "SELECT K.PACKAGE_NAME AS PROCEDURE_CAT, K.OWNER AS PROCEDURE_SCHEM, K.OBJECT_NAME AS "
+                + "PROCEDURE_NAME, NULL, NULL, NULL, 'PACKAGED PROCEDURE' AS REMARKS, 1 AS PROCEDURE_TYPE, "
+                + "NULL AS SPECIFIC_NAME FROM DB_ARGUMENTS K WHERE ARGUMENT_NAME IS NULL  AND DATA_TYPE IS NULL AND "
+                + "K.PACKAGE_NAME LIKE ?  AND K.OWNER LIKE ? AND K.OBJECT_NAME LIKE ? UNION ALL SELECT "
+                + "K.PACKAGE_NAME AS PROCEDURE_CAT, K.OWNER AS PROCEDURE_SCHEM, K.OBJECT_NAME AS PROCEDURE_NAME, "
+                + "NULL, NULL, NULL, 'PACKAGED PROCEDURE' AS REMARKS, 1 AS PROCEDURE_TYPE, NULL AS SPECIFIC_NAME "
+                + "FROM DB_ARGUMENTS K,DB_PL_MANAGER P WHERE K.ARGUMENT_NAME IS NOT NULL AND K.PACKAGE_NAME = "
+                + "P.PACKAGE_NAME AND K.OWNER = P.USER_NAME AND K.OBJECT_NAME = P.NAME AND P.TYPE = 'PROCEDURE' "
+                + "AND K.PACKAGE_NAME LIKE ?  AND K.OWNER LIKE ? AND K.OBJECT_NAME LIKE ? UNION ALL SELECT "
+                + "K.PACKAGE_NAME AS PROCEDURE_CAT, K.OWNER AS PROCEDURE_SCHEM, K.OBJECT_NAME AS PROCEDURE_NAME, "
+                + "NULL, NULL, NULL, 'PACKAGED FUNCTION' AS REMARKS, 2 AS PROCEDURE_TYPE,  NULL AS SPECIFIC_NAME "
+                + "FROM DB_ARGUMENTS K WHERE K.ARGUMENT_NAME IS NULL AND K.IN_OUT = 'OUT' AND   K.DATA_LEVEL = 0 "
+                + "AND K.PACKAGE_NAME LIKE ?  AND K.OWNER LIKE ? AND K.OBJECT_NAME LIKE ? ORDER BY PROCEDURE_SCHEM, "
+                + "PROCEDURE_NAME";
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            for (int i = 1; i <= 9; i++) {
+                if (i % 3 == 1) {
+                    ps.setString(i, catalog);
+                } else if (i % 3 == 2) {
+                    ps.setString(i, schemaName);
+                } else {
+                    ps.setString(i, procedure);
+                }
+            }
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
     public ResultSet getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern,
                                          String columnNamePattern) throws SQLException {
-        return null;
+        String initSql = "SELECT PACKAGE_NAME AS PROCEDURE_CAT,OWNER AS PROCEDURE_SCHEM, OBJECT_NAME AS "
+                + "PROCEDURE_NAME,ARGUMENT_NAME AS COLUMN_NAME, DECODE(IN_OUT, 'IN', 1, 'IN OUT', 2, 'OUT', 4, 0) "
+                + "AS COLUMN_TYPE,DECODE (DATA_TYPE, 'BINARY_INTEGER', 4,'BINARY_DOUBLE', 8, 'BINARY_UINT32',4, "
+                + "'BINARY_BIGINT',-5,'NUMBER', 2, 'IMAGE',2004, 'CHAR', 1,'CLOB',2005,'VARCHAR',12,'BINARY',-2, "
+                + " 'VARBINARY',-3,'BLOB',2004,'DATETIME',91,'DATE',91, 'TIMESTAMP',93,'TIMESTAMP_TZ',2014, "
+                + "'TIMESTAMP_LTZ',93,'BOOLEAN',16,'INTERVAL YEAR TO MONTH',1111,'INTERVAL DAY TO SECOND',1111, "
+                + "'BINARY_INTEGER[]',2003,'BINARY_DOUBLE[]', 2003, 'BINARY_UINT32[]',2003,'BINARY_BIGINT[]',"
+                + "2003,'NUMBER[]',2003, 'CHAR[]',2003,'VARCHAR[]',2003,'DATE[]',2003,'TIMESTAMP[]',2003,'BOOLEAN[]', "
+                + "2003,'TIMESTAMP_TZ[]',2003,'TIMESTAMP_LTZ[]',2003, 1111) AS DATA_TYPE, DATA_TYPE AS TYPE_NAME, "
+                + "DATA_PRECISION AS PRECISION,DATA_LENGTH AS LENGTH,DATA_SCALE AS SCALE, 10 AS RADIX,1 AS NULLABLE, "
+                + " NULL AS REMARKS, DEFAULT_VALUE AS COLUMN_DEF, NULL AS SQL_DATA_TYPE,  NULL AS SQL_DATETIME_SUB, "
+                + "DECODE(DATA_TYPE,'CHAR', 8000,'VARCHAR',8000,'RAW', 8000,'BINARY', 8000, 'VARBINARY', 8000,NULL) "
+                + "AS CHAR_OCTET_LENGTH, (SEQUENCE - 1) AS ORDINAL_POSITION,'YES' AS IS_NULLABLE, NULL AS "
+                + "SPECIFIC_NAME FROM DB_ARGUMENTS WHERE OWNER LIKE ? ESCAPE '/' AND OBJECT_NAME LIKE ? ESCAPE '/' "
+                + "AND DATA_LEVEL = 0 ";
+        StringBuilder sql = new StringBuilder();
+        sql.append(initSql);
+        if (catalog != null) {
+            if (catalog.isEmpty()) {
+                sql.append(" AND PACKAGE_NAME IS NULL ");
+            } else {
+                sql.append(" AND PACKAGE_NAME LIKE ? ESCAPE '/' ");
+            }
+        }
+
+        if (columnNamePattern != null && !columnNamePattern.equals("%")) {
+            sql.append(" AND ARGUMENT_NAME LIKE ? ESCAPE '/'");
+        } else {
+            sql.append(" AND (ARGUMENT_NAME LIKE ? ESCAPE '/' OR (ARGUMENT_NAME IS NULL AND DATA_TYPE IS NOT NULL))");
+        }
+        sql.append(" ORDER BY PROCEDURE_SCHEM, PROCEDURE_NAME");
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql.toString());
+            if (schemaPattern == null) {
+                ps.setString(1, "%");
+            } else if (schemaPattern.isEmpty()) {
+                ps.setString(1, this.getUserName());
+            } else {
+                ps.setString(1, schemaPattern);
+            }
+            if (procedureNamePattern == null) {
+                ps.setString(2, "%");
+            } else {
+                ps.setString(2, procedureNamePattern);
+            }
+
+            String column = columnNamePattern;
+            if (column == null) {
+                column = "%";
+            }
+            if (catalog != null && !catalog.isEmpty()) {
+                ps.setString(3, catalog);
+                ps.setString(4, column);
+            } else {
+                ps.setString(3, column);
+            }
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
     public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types)
             throws SQLException {
-        return null;
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT NULL AS TABLE_CAT,k.OWNER AS TABLE_SCHEM,k.OBJECT_NAME AS TABLE_NAME,k.OBJECT_TYPE AS "
+                + "TABLE_TYPE,'' AS REMARKS,NULL AS TYPE_CAT,NULL AS TYPE_SCHEM,NULL AS TYPE_NAME,NULL AS "
+                + "SELF_REFERENCING_COL_NAME,NULL AS REF_GENERATION FROM DB_OBJECTS k WHERE k.OWNER LIKE ? "
+                + "ESCAPE '/' AND k.OBJECT_NAME LIKE ? ESCAPE '/' AND k.OBJECT_TYPE IN (");
+        String[] tables = (types == null || types.length == 0) ? DEFAULT_TABLE : types;
+        for (int i = 0; i < tables.length; i++) {
+            if (i == 0) {
+                sql.append('?');
+            } else {
+                sql.append(",?");
+            }
+            if (i == tables.length - 1) {
+                sql.append(")");
+            }
+        }
+
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql.toString());
+            if (schemaPattern != null) {
+                ps.setString(1, schemaPattern);
+            } else {
+                ps.setString(1, "%");
+            }
+
+            if (tableNamePattern != null) {
+                ps.setString(2, tableNamePattern);
+            } else {
+                ps.setString(2, "%");
+            }
+            int parameterIndex = 3;
+            int index = 0;
+            for (String type : tables) {
+                ps.setString(parameterIndex + index, type);
+                index++;
+            }
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
     public ResultSet getSchemas() throws SQLException {
-        return null;
+        String sql = "SELECT USERNAME AS TABLE_SCHEM FROM DB_USERS ORDER BY TABLE_SCHEM";
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
     public ResultSet getCatalogs() throws SQLException {
-        return null;
+        String sql = "SELECT NULL AS TABLE_CAT FROM SYS_DUMMY WHERE FALSE";
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            return ps.executeQuery();
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
     public ResultSet getTableTypes() throws SQLException {
-        return null;
+        PreparedStatement ps = null;
+        String sql = "SELECT 'TABLE' AS TABLE_TYPE FROM SYS_DUMMY UNION SELECT 'VIEW' AS TABLE_TYPE FROM "
+                + "SYS_DUMMY UNION SELECT 'DYNAMIC VIEW' AS TABLE_TYPE from SYS_DUMMY UNION SELECT 'RECYCLED TABLE' "
+                + "AS TABLE_TYPE from SYS_DUMMY UNION SELECT 'RECYCLED INDEX' AS TABLE_TYPE from SYS_DUMMY ";
+        try {
+            ps = this.connection.prepareStatement(sql);
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
     public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)
             throws SQLException {
-        return null;
+        String sql = "SELECT NULL AS TABLE_CAT, k.OWNER AS TABLE_SCHEM,  k.TABLE_NAME AS TABLE_NAME,  k.COLUMN_NAME "
+                + "AS COLUMN_NAME, DATA_TYPE,  k.DATA_TYPE AS TYPE_NAME,  DECODE(k.DATA_SCALE, NULL, k.DATA_LENGTH, "
+                + "k.DATA_PRECISION) AS COLUMN_SIZE,  0 AS BUFFER_LENGTH,  k.DATA_SCALE AS DECIMAL_DIGITS,  10 AS "
+                + "NUM_PREC_RADIX ,  CASE k.NULLABLE WHEN 'Y' THEN 1 ELSE 0 END AS NULLABLE ,  C.COMMENTS AS REMARKS , "
+                + "'' AS COLUMN_DEF ,  0 AS SQL_DATA_TYPE ,  0 AS SQL_DATETIME_SUB,  0 AS CHAR_OCTET_LENGTH ,  "
+                + "k.COLUMN_ID + 1 AS ORDINAL_POSITION ,  '' AS IS_NULLABLE ,  '' AS SCOPE_CATLOG ,  '' AS "
+                + "SCOPE_SCHEMA , '' AS SCOPE_TABLE ,  NULL AS SOURCE_DATA_TYPE ,  '' AS IS_AUTOINCREMENT  FROM "
+                + "DB_TAB_COLUMNS k, DB_COL_COMMENTS C  WHERE k.OWNER LIKE ? ESCAPE '/' AND k.TABLE_NAME LIKE ? "
+                + "ESCAPE '/'  AND k.COLUMN_NAME LIKE ? ESCAPE '/' AND k.OWNER=C.OWNER (+) AND k.TABLE_NAME="
+                + "C.TABLE_NAME (+) AND k.COLUMN_NAME=C.COLUMN_NAME (+) ORDER BY TABLE_SCHEM, TABLE_NAME, "
+                + "ORDINAL_POSITION";
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            if (schemaPattern != null) {
+                ps.setString(1, schemaPattern);
+            } else {
+                ps.setString(1, "%");
+            }
+
+            if (tableNamePattern != null) {
+                ps.setString(2, tableNamePattern);
+            } else {
+                ps.setString(2, "%");
+            }
+            if (columnNamePattern != null) {
+                ps.setString(3, columnNamePattern);
+            } else {
+                ps.setString(3, "%");
+            }
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
@@ -704,17 +1032,137 @@ public class ORDatabaseMetaData implements DatabaseMetaData {
 
     @Override
     public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException {
-        return null;
+        PreparedStatement ps = null;
+        String sql = "SELECT NULL AS TABLE_CAT, C.OWNER AS TABLE_SCHEM, C.TABLE_NAME, C.COLUMN_NAME, C.POSITION "
+                + "AS KEY_SEQ, C.CONSTRAINT_NAME AS PK_NAME FROM DB_CONS_COLUMNS C, DB_CONSTRAINTS K WHERE "
+                + "K.CONSTRAINT_TYPE = 'P' AND K.TABLE_NAME = ? AND K.OWNER LIKE ? ESCAPE '/' AND K.CONSTRAINT_NAME = "
+                + "C.CONSTRAINT_NAME AND K.TABLE_NAME = C.TABLE_NAME AND K.OWNER = C.OWNER ORDER BY COLUMN_NAME";
+        try {
+            ps = this.connection.prepareStatement(sql);
+            ps.setString(1, table);
+            if (schema == null) {
+                ps.setString(2, "%");
+            } else {
+                ps.setString(2, schema);
+            }
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
     public ResultSet getImportedKeys(String catalog, String schema, String table) throws SQLException {
-        return null;
+        String s1 = "SELECT NULL AS PKTABLE_CAT, P.OWNER AS PKTABLE_SCHEM,P.TABLE_NAME AS "
+                + "PKTABLE_NAME, PC.COLUMN_NAME AS PKCOLUMN_NAME,NULL AS FKTABLE_CAT,F.OWNER AS "
+                + "FKTABLE_SCHEM, F.TABLE_NAME AS FKTABLE_NAME,FC.COLUMN_NAME AS FKCOLUMN_NAME, "
+                + "FC.POSITION AS KEY_SEQ,NULL AS UPDATE_RULE,DECODE(F.DELETE_RULE,'DELETE CASCADE',0,'SET NULL',2,1) "
+                + "AS DELETE_RULE, F.CONSTRAINT_NAME AS FK_NAME,P.CONSTRAINT_NAME AS PK_NAME, DECODE(F.DEFERRABLE, "
+                + "'DEFERRABLE',5,'NOT DEFERRABLE',7, 'DEFERRED', 6 ) DEFERRABILITY  FROM DB_CONS_COLUMNS PC, "
+                + "DB_CONSTRAINTS P, DB_CONS_COLUMNS FC, DB_CONSTRAINTS F WHERE 1=1 ";
+
+        String s2 = " AND F.CONSTRAINT_TYPE = 'R' AND P.OWNER = F.R_OWNER AND P.CONSTRAINT_NAME = "
+                + "F.R_CONSTRAINT_NAME AND P.CONSTRAINT_TYPE = 'P' AND PC.OWNER = P.OWNER AND PC.CONSTRAINT_NAME = "
+                + "P.CONSTRAINT_NAME AND PC.TABLE_NAME = P.TABLE_NAME AND FC.OWNER = F.OWNER AND "
+                + "FC.CONSTRAINT_NAME = F.CONSTRAINT_NAME AND FC.TABLE_NAME = F.TABLE_NAME AND FC.POSITION = "
+                + "PC.POSITION ORDER BY PKTABLE_SCHEM, PKTABLE_NAME, KEY_SEQ";
+        PreparedStatement ps = null;
+        try {
+            StringBuilder importedKeySql = new StringBuilder();
+            importedKeySql.append(s1);
+            int tableIndex = 0;
+            int p = 1;
+            if (table != null) {
+                tableIndex = p++;
+                importedKeySql.append(" AND F.TABLE_NAME = ? ");
+            }
+
+            int ownerIndex = 0;
+            if (schema != null && !schema.isEmpty()) {
+                ownerIndex = p++;
+                importedKeySql.append(" AND F.OWNER = ? ");
+            }
+
+            importedKeySql.append(s2);
+            ps = this.connection.prepareStatement(importedKeySql.toString());
+            if (table != null) {
+                ps.setString(tableIndex, table);
+            }
+
+            if (schema != null && !schema.isEmpty()) {
+                ps.setString(ownerIndex, schema);
+            }
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
     public ResultSet getExportedKeys(String catalog, String schema, String table) throws SQLException {
-        return null;
+        String s1 = "SELECT NULL AS PKTABLE_CAT, P.OWNER AS PKTABLE_SCHEM, P.TABLE_NAME AS "
+                + "PKTABLE_NAME, PC.COLUMN_NAME AS PKCOLUMN_NAME, NULL AS FKTABLE_CAT, F.OWNER AS "
+                + "FKTABLE_SCHEM, F.TABLE_NAME AS FKTABLE_NAME, FC.COLUMN_NAME AS FKCOLUMN_NAME,FC.POSITION "
+                + "AS KEY_SEQ,  NULL AS UPDATE_RULE,DECODE(F.DELETE_RULE, 'DELETE CASCADE', 0, 'SET NULL', 2, 1) "
+                + "AS DELETE_RULE, F.CONSTRAINT_NAME AS FK_NAME, P.CONSTRAINT_NAME AS PK_NAME, DECODE(F.DEFERRABLE, "
+                + "'DEFERRABLE',5,'NOT DEFERRABLE',7, 'DEFERRED', 6 ) DEFERRABILITY FROM DB_CONS_COLUMNS PC, "
+                + "DB_CONSTRAINTS P,DB_CONS_COLUMNS FC, DB_CONSTRAINTS F WHERE 1=1 ";
+
+        String s2 = " AND F.CONSTRAINT_TYPE = 'R' AND P.OWNER = F.R_OWNER AND "
+                + "P.CONSTRAINT_NAME = F.R_CONSTRAINT_NAME AND P.CONSTRAINT_TYPE = 'P' AND PC.OWNER = P.OWNER AND "
+                + "PC.CONSTRAINT_NAME = P.CONSTRAINT_NAME AND PC.TABLE_NAME = P.TABLE_NAME AND "
+                + "FC.OWNER = F.OWNER  AND FC.CONSTRAINT_NAME = F.CONSTRAINT_NAME AND FC.TABLE_NAME = F.TABLE_NAME AND "
+                + "FC.POSITION = PC.POSITION ORDER BY FKTABLE_SCHEM, FKTABLE_NAME, KEY_SEQ";
+        PreparedStatement ps = null;
+        try {
+            StringBuilder exportedKeysSql = new StringBuilder();
+            exportedKeysSql.append(s1);
+
+            int tableIndex = 0;
+            int p = 1;
+            if (table != null) {
+                tableIndex = p++;
+                exportedKeysSql.append(" AND P.TABLE_NAME = ? ");
+            }
+
+            int ownerIndex = 0;
+            if (schema != null && !schema.isEmpty()) {
+                ownerIndex = p++;
+                exportedKeysSql.append(" AND P.OWNER=? ");
+            }
+
+            exportedKeysSql.append(s2);
+            ps = this.connection.prepareStatement(exportedKeysSql.toString());
+            if (table != null) {
+                ps.setString(tableIndex, table);
+            }
+
+            if (schema != null && !schema.isEmpty()) {
+                ps.setString(ownerIndex, schema);
+            }
+
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
@@ -727,13 +1175,164 @@ public class ORDatabaseMetaData implements DatabaseMetaData {
 
     @Override
     public ResultSet getTypeInfo() throws SQLException {
-        return null;
+        String sql = "select 'INTEGER' as TYPE_NAME, 4 as DATA_TYPE, 10 as PRECISION, '' as LITERAL_PREFIX, '' as "
+                + "LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, false as CASE_SENSITIVE, 3 as SEARCHABLE, "
+                + "true UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, true as AUTO_INCREMENT, 'INTEGER' as "
+                + "LOCAL_TYPE_NAME, 0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB,"
+                + "10 as NUM_PREC_RADIX from SYS_DUMMY union select 'BIGINT' as TYPE_NAME, -5 as DATA_TYPE, 19 as "
+                + "PRECISION, '' as LITERAL_PREFIX, '' as LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, "
+                + "false as CASE_SENSITIVE, 3 as SEARCHABLE, true UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, true "
+                + "as AUTO_INCREMENT, 'BIGINT' as LOCAL_TYPE_NAME, 0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as "
+                + "SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY union select 'REAL' as "
+                + "TYPE_NAME, 8 as DATA_TYPE, 17 as PRECISION, '' as LITERAL_PREFIX, '' as LITERAL_SUFFIX, null as "
+                + "CREATE_PARAMS, 1 as NULLABLE, false as CASE_SENSITIVE, 3 as SEARCHABLE, true UNSIGNED_ATTRIBUTE, "
+                + "false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'REAL' as LOCAL_TYPE_NAME, -308 as "
+                + "MINIMUM_SCALE,308 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX "
+                + "from SYS_DUMMY union select 'NUMERIC' as TYPE_NAME, 2 as DATA_TYPE, 65 as PRECISION, '' as "
+                + "LITERAL_PREFIX, '' as LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, false as "
+                + "CASE_SENSITIVE, 3 as SEARCHABLE, true UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, false as "
+                + "AUTO_INCREMENT, 'NUMERIC' as LOCAL_TYPE_NAME, -308 as MINIMUM_SCALE, 308 as MAXIMUM_SCALE, 0 as "
+                + "SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY union select 'DATE' as "
+                + "TYPE_NAME, 93 as DATA_TYPE, 0 as PRECISION, '''' as LITERAL_PREFIX, '''' as LITERAL_SUFFIX, null "
+                + "as CREATE_PARAMS, 1 as NULLABLE, false as CASE_SENSITIVE, 3 as SEARCHABLE, false "
+                + "UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'DATE' as LOCAL_TYPE_NAME, "
+                + "0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as "
+                + "NUM_PREC_RADIX from SYS_DUMMY union select 'TIMESTAMP' as TYPE_NAME, 93 as DATA_TYPE, 0 as "
+                + "PRECISION, '''' as LITERAL_PREFIX, '''' as LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, "
+                + "false as CASE_SENSITIVE, 3 as SEARCHABLE, false UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, "
+                + "false as AUTO_INCREMENT, 'TIMESTAMP' as LOCAL_TYPE_NAME, 0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, "
+                + "0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY union select "
+                + "'VARCHAR' as TYPE_NAME, 12 as DATA_TYPE, 65535 as PRECISION, '''' as LITERAL_PREFIX, '''' as "
+                + "LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, false as CASE_SENSITIVE, 3 as SEARCHABLE, "
+                + "false UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'VARCHAR' as "
+                + "LOCAL_TYPE_NAME, 0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as "
+                + "SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY union select 'BINARY' as TYPE_NAME, -2 as "
+                + "DATA_TYPE, 255 as PRECISION, '''' as LITERAL_PREFIX, '''' as LITERAL_SUFFIX, null as "
+                + "CREATE_PARAMS, 1 as NULLABLE, true as CASE_SENSITIVE, 3 as SEARCHABLE, false UNSIGNED_ATTRIBUTE, "
+                + "false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'BINARY' as LOCAL_TYPE_NAME, 0 as "
+                + "MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX "
+                + "from SYS_DUMMY union select 'VARBINARY' as TYPE_NAME, -3 as DATA_TYPE, 65535 as PRECISION, "
+                + "'''' as LITERAL_PREFIX, '''' as LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, true as "
+                + "CASE_SENSITIVE, 3 as SEARCHABLE, false UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, false as "
+                + "AUTO_INCREMENT, 'VARBINARY' as LOCAL_TYPE_NAME, 0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as "
+                + "SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY union select 'BLOB' as "
+                + "TYPE_NAME, 2004 as DATA_TYPE, 2147483647 as PRECISION, '''' as LITERAL_PREFIX, '''' as "
+                + "LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, true as CASE_SENSITIVE, 3 as SEARCHABLE, "
+                + "false UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'BLOB' as "
+                + "LOCAL_TYPE_NAME,0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, "
+                + "10 as NUM_PREC_RADIX from SYS_DUMMY union select 'CLOB' as TYPE_NAME, 2005 as DATA_TYPE, "
+                + "2147483647 as PRECISION, '''' as LITERAL_PREFIX, '''' as LITERAL_SUFFIX, null as CREATE_PARAMS, "
+                + "1 as NULLABLE, true as CASE_SENSITIVE, 3 as SEARCHABLE, false UNSIGNED_ATTRIBUTE, false as "
+                + "FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'CLOB' as LOCAL_TYPE_NAME, 0 as MINIMUM_SCALE, 0 as "
+                + "MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY "
+                + "union select 'BOOL' as TYPE_NAME, 16 as DATA_TYPE, 4 as PRECISION, '' as LITERAL_PREFIX, '' as "
+                + "LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, true as CASE_SENSITIVE, 3 as SEARCHABLE, "
+                + "false UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'BOOL' as "
+                + "LOCAL_TYPE_NAME,0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, "
+                + "10 as NUM_PREC_RADIX from SYS_DUMMY union select 'FLOAT' as TYPE_NAME, 8 as DATA_TYPE, 17 as "
+                + "PRECISION, '' as LITERAL_PREFIX, '' as LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, "
+                + "false as CASE_SENSITIVE, 3 as SEARCHABLE, true UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, "
+                + "false as AUTO_INCREMENT, 'FLOAT' as LOCAL_TYPE_NAME, -308 as MINIMUM_SCALE, 308 as MAXIMUM_SCALE, "
+                + "0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY union select 'CHAR' "
+                + "as TYPE_NAME, 1 as DATA_TYPE, 8000 as PRECISION, '''' as LITERAL_PREFIX, '''' as LITERAL_SUFFIX, "
+                + "null as CREATE_PARAMS, 1 as NULLABLE, false as CASE_SENSITIVE, 3 as SEARCHABLE, false "
+                + "UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'CHAR' as LOCAL_TYPE_NAME, "
+                + "0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as "
+                + "NUM_PREC_RADIX from SYS_DUMMY union select 'NCHAR' as TYPE_NAME, -15 as DATA_TYPE, 8000 as "
+                + "PRECISION, '''' as LITERAL_PREFIX, '''' as LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, "
+                + "false as CASE_SENSITIVE, 3 as SEARCHABLE, false UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, "
+                + "false as AUTO_INCREMENT, 'NCHAR' as LOCAL_TYPE_NAME, 0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 "
+                + "as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY union select "
+                + "'NVARCHAR' as TYPE_NAME, -9 as DATA_TYPE, 8000 as PRECISION, '''' as LITERAL_PREFIX, '''' as "
+                + "LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, false as CASE_SENSITIVE, 3 as SEARCHABLE, "
+                + "false UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'NVARCHAR' as "
+                + "LOCAL_TYPE_NAME, 0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as "
+                + "SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY union select 'DECIMAL' as TYPE_NAME, 3 as "
+                + "DATA_TYPE, 65 as PRECISION, '' as LITERAL_PREFIX, '' as LITERAL_SUFFIX, null as CREATE_PARAMS, "
+                + "1 as NULLABLE, false as CASE_SENSITIVE, 3 as SEARCHABLE, true UNSIGNED_ATTRIBUTE, false as "
+                + "FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'DECIMAL' as LOCAL_TYPE_NAME, -308 as MINIMUM_SCALE, "
+                + "308 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from "
+                + "SYS_DUMMY union select 'DOUBLE' as TYPE_NAME, 8 as DATA_TYPE, 17 as PRECISION, '' as "
+                + "LITERAL_PREFIX, '' as LITERAL_SUFFIX, null as CREATE_PARAMS,1 as NULLABLE, false as CASE_SENSITIVE, "
+                + "3 as SEARCHABLE, true UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, "
+                + "'DOUBLE' as LOCAL_TYPE_NAME, -308 as MINIMUM_SCALE, 308 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, "
+                + "0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY union select 'TIME' as TYPE_NAME, "
+                + "92 as DATA_TYPE, 0 as PRECISION, '''' as LITERAL_PREFIX, '''' as LITERAL_SUFFIX, null as "
+                + "CREATE_PARAMS, 1 as NULLABLE, false as CASE_SENSITIVE, 3 as SEARCHABLE, false UNSIGNED_ATTRIBUTE, "
+                + "false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'TIME' as LOCAL_TYPE_NAME, 0 as MINIMUM_SCALE, "
+                + "0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY "
+                + "union select 'TIMESTAMP' as TYPE_NAME, 93 as DATA_TYPE, 0 as PRECISION, '''' as LITERAL_PREFIX, "
+                + "'''' as LITERAL_SUFFIX, null as CREATE_PARAMS, 1 as NULLABLE, false as CASE_SENSITIVE, 3 as "
+                + "SEARCHABLE, false UNSIGNED_ATTRIBUTE, false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, "
+                + "'TIMESTAMP' as LOCAL_TYPE_NAME, 0 as MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as "
+                + "SQL_DATETIME_SUB, 10 as NUM_PREC_RADIX from SYS_DUMMY union select 'TIMESTAMP_LTZ' as TYPE_NAME, "
+                + "93 as DATA_TYPE, 0 as PRECISION, '''' as LITERAL_PREFIX, '''' as LITERAL_SUFFIX, null as "
+                + "CREATE_PARAMS, 1 as NULLABLE, false as CASE_SENSITIVE, 3 as SEARCHABLE, false UNSIGNED_ATTRIBUTE, "
+                + "false as FIXED_PREC_SCALE, false as AUTO_INCREMENT, 'TIMESTAMP_LTZ' as LOCAL_TYPE_NAME, 0 as "
+                + "MINIMUM_SCALE, 0 as MAXIMUM_SCALE, 0 as SQL_DATA_TYPE, 0 as SQL_DATETIME_SUB, 10 as "
+                + "NUM_PREC_RADIX from SYS_DUMMY";
+
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
     }
 
     @Override
     public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)
             throws SQLException {
-        return null;
+        String sql = getIndexInfoSql(schema, unique);
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            ps.setString(1, table);
+
+            if (schema != null && !schema.isEmpty()) {
+                ps.setString(2, schema);
+            }
+            ResultSet result = ps.executeQuery();
+            if (result instanceof ORResultSet) {
+                ((ORResultSet) result).getDataRows();
+            }
+            return result;
+        } finally {
+            if (ps instanceof ORStatement) {
+                ((ORStatement) ps).closeStmt();
+            }
+        }
+    }
+
+    private String getIndexInfoSql(String schema, boolean unique) {
+        String s1 = "SELECT NULL AS TABLE_CAT,i.OWNER AS TABLE_SCHEM,i.TABLE_NAME,CASE i.IS_PRIMARY "
+                + " || i.IS_UNIQUE WHEN 'NN' THEN 1 ELSE 0 END AS NON_UNIQUE,NULL AS INDEX_QUALIFIER, "
+                + " i.INDEX_NAME AS INDEX_NAME, 1 AS TYPE, c.COLUMN_POSITION AS ORDINAL_POSITION, "
+                + " c.COLUMN_NAME,NULL AS ASC_OR_DESC,0 AS CARDINALITY,i.PAGES AS PAGES,NULL AS "
+                + " FILTER_CONDITION FROM DB_INDEXES i,DB_IND_COLUMNS c WHERE i.TABLE_NAME = ? ";
+
+        String s2 = " AND i.INDEX_NAME = c.INDEX_NAME AND i.OWNER = c.TABLE_OWNER AND i.TABLE_NAME = c.TABLE_NAME AND "
+                + "i.OWNER = c.INDEX_OWNER ORDER BY NON_UNIQUE, TYPE, INDEX_NAME, ORDINAL_POSITION ";
+        StringBuilder infoSql = new StringBuilder();
+        infoSql.append(s1);
+
+        if (unique) {
+            String s3 = " AND (i.IS_UNIQUE = 'Y' or i.IS_PRIMARY = 'Y') ";
+            infoSql.append(s3);
+        }
+
+        if (schema != null && !schema.isEmpty()) {
+            infoSql.append(" AND i.OWNER = ? ");
+        }
+        infoSql.append(s2);
+        return infoSql.toString();
     }
 
     @Override
