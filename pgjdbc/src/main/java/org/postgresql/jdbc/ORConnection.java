@@ -30,6 +30,7 @@ import org.postgresql.util.HostSpec;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.postgresql.util.PGobject;
+import org.postgresql.util.GT;
 
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -68,6 +69,7 @@ public class ORConnection implements ORBaseConnection {
     private int fetchSize = -1;
     private boolean isSsl;
     private String enabledCipherSuites;
+    private int savepointId = 0;
     private boolean isOnlySSL;
     private HostSpec hostSpec;
     private String url;
@@ -325,8 +327,22 @@ public class ORConnection implements ORBaseConnection {
     }
 
     @Override
-    public Savepoint setSavepoint(String name) {
-        return null;
+    public Savepoint setSavepoint(String name) throws SQLException {
+        checkClosed();
+        if (getAutoCommit()) {
+            throw new SQLException("Cannot establish a savepoint in auto-commit mode.");
+        }
+
+        if (name == null || name.trim().isEmpty()) {
+            throw new PSQLException(GT.tr("SavePoint name is invalid."),
+                    PSQLState.INVALID_SAVEPOINT_SPECIFICATION);
+        }
+        ORSavepoint savepoint = new ORSavepoint(name);
+        String sql = "SAVEPOINT " + savepoint.getSavepointName();
+        try (Statement stmt = this.createStatement()) {
+            stmt.execute(sql);
+        }
+        return savepoint;
     }
 
     @Override
@@ -368,7 +384,24 @@ public class ORConnection implements ORBaseConnection {
     }
 
     @Override
-    public void rollback(Savepoint savepoint) {
+    public void rollback(Savepoint savepoint) throws SQLException {
+        checkClosed();
+        String sql = null;
+        if (savepoint.getSavepointName() == null) {
+            sql = "ROLLBACK TO SAVEPOINT Gauss_" + savepoint.getSavepointId();
+        } else {
+            sql = "ROLLBACK TO SAVEPOINT " + savepoint.getSavepointName();
+        }
+
+        Statement stmt = null;
+        try {
+            stmt = this.createStatement();
+            stmt.execute(sql);
+        } finally {
+            if (stmt != null) {
+                stmt.close();
+            }
+        }
     }
 
     @Override
@@ -396,7 +429,28 @@ public class ORConnection implements ORBaseConnection {
     }
 
     @Override
-    public void releaseSavepoint(Savepoint savepoint) {
+    public void releaseSavepoint(Savepoint savepoint) throws SQLException {
+        checkClosed();
+        if (savepoint instanceof ORSavepoint) {
+            ORSavepoint orSavepoint = (ORSavepoint) savepoint;
+            String sql = null;
+            if (orSavepoint.getSavepointName() == null) {
+                sql = "RELEASE SAVEPOINT Gauss_" + orSavepoint.getSavepointId();
+            } else {
+                sql = "RELEASE SAVEPOINT " + orSavepoint.getSavepointName();
+            }
+
+            Statement stmt = null;
+            try {
+                stmt = this.createStatement();
+                stmt.execute(sql);
+            } finally {
+                if (stmt != null) {
+                    stmt.close();
+                }
+            }
+            orSavepoint.release();
+        }
     }
 
     @Override
@@ -442,8 +496,18 @@ public class ORConnection implements ORBaseConnection {
     }
 
     @Override
-    public Savepoint setSavepoint() {
-        return null;
+    public Savepoint setSavepoint() throws SQLException {
+        checkClosed();
+        if (getAutoCommit()) {
+            throw new SQLException("Cannot establish a savepoint in auto-commit mode.");
+        }
+
+        ORSavepoint savepoint = new ORSavepoint(savepointId++);
+        String sql = "SAVEPOINT Gauss_" + savepoint.getSavepointId();
+        try (Statement stmt = createStatement()) {
+            stmt.execute(sql);
+        }
+        return savepoint;
     }
 
     @Override
