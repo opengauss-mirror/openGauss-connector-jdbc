@@ -21,6 +21,7 @@ import java.sql.Types;
 import java.sql.SQLException;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * data type info
@@ -172,13 +173,28 @@ public class ORDataType {
     private static List<Object[]> types = new ArrayList<>();
     private static HashMap<Integer, Object[]> dbToType = new HashMap<>();
     private static HashMap<Integer, Integer> dbToJavaType = new HashMap<>();
+    private static HashMap<String, Integer> typeNameToJavaType = new HashMap<>();
 
     static {
         setTypes();
         for (Object[] type : types) {
             dbToType.put(Integer.valueOf(type[1].toString()), type);
             dbToJavaType.put(Integer.valueOf(type[1].toString()), Integer.valueOf(type[2].toString()));
+            typeNameToJavaType.put(type[0].toString(), Integer.valueOf(type[2].toString()));
         }
+        setTypesMap();
+    }
+
+    private static void setTypesMap() {
+        typeNameToJavaType.put("SMALLINT", Types.INTEGER);
+        typeNameToJavaType.put("SHORT", Types.INTEGER);
+        typeNameToJavaType.put("FLOAT", Types.DOUBLE);
+        typeNameToJavaType.put("DOUBLE", Types.DOUBLE);
+        typeNameToJavaType.put("TINYINT", Types.INTEGER);
+        typeNameToJavaType.put("NUMBER", Types.NUMERIC);
+        typeNameToJavaType.put("INTEGER", Types.INTEGER);
+        typeNameToJavaType.put("DATETIME", Types.DATE);
+        typeNameToJavaType.put("BOOLEAN", Types.BOOLEAN);
     }
 
     private static void setTypes() {
@@ -238,5 +254,23 @@ public class ORDataType {
             return dbToType.get(dbType);
         }
         return dbToType.get(UNSPECIFIED);
+    }
+
+    /**
+     * convert type name to java type
+     *
+     * @param typeName typeName
+     * @return sql type
+     * @throws SQLException if a database access error occurs
+     */
+    public static Integer getJavaType(String typeName) throws SQLException {
+        if (typeName == null) {
+            throw new SQLException("typeName is null.");
+        }
+        Integer type = typeNameToJavaType.get(typeName.toUpperCase(Locale.ENGLISH));
+        if (type == null) {
+            throw new SQLException("the typeName " + typeName + " is invalid.");
+        }
+        return type;
     }
 }
