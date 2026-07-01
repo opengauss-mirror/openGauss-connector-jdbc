@@ -25,9 +25,10 @@ public class LogFactory {
         try {
             Class<?> loggerClass = null;
             try {
-                loggerClass = Class.forName(className);
+                loggerClass = Class.forName(className).asSubclass(Log.class);
             } catch (ClassNotFoundException en) {
-                loggerClass = Class.forName(getPackageName(Log.class) + "." + className);
+                loggerClass = Class.forName(getPackageName(Log.class)
+                        + "." + className).asSubclass(Log.class);
             }
             Constructor<?> constructor = loggerClass.getConstructor(new Class[]{String.class});
             return (Log) (constructor.newInstance(new Object[]{instanceName}));
