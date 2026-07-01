@@ -772,6 +772,12 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                         String random64code = pgStream.receiveString(64);
                         String token = pgStream.receiveString(8);
                         int serverIteration = pgStream.receiveInteger4();
+                        if (serverIteration < 1 || serverIteration > MAX_ITERATIONS) {
+                          throw new PSQLException(
+                                  GT.tr("Server requested {0} SCRAM PBKDF2 iterations, which is outside the "
+                                          + "client-side allowed range of 1 to {1}.", serverIteration, MAX_ITERATIONS),
+                                  PSQLState.CONNECTION_REJECTED);
+                        }
                         byte[] result = null;
                         result = MD5Digest.RFC5802Algorithm(password, random64code, token, null, serverIteration, false);
                         if (result == null)
@@ -973,8 +979,11 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
 
   private String queryDataBaseDatcompatibility(QueryExecutor queryExecutor, String database) throws SQLException,
           IOException {
-    byte[][] result = SetupQueryRunner.run(queryExecutor, "select datcompatibility from pg_database where " +
-            "datname='" + database + "';", true);
+    StringBuilder sql = new StringBuilder();
+    sql.append("select datcompatibility from pg_database where datname='");
+    Utils.escapeLiteral(sql, database, queryExecutor.getStandardConformingStrings());
+    sql.append("';");
+    byte[][] result = SetupQueryRunner.run(queryExecutor, sql.toString(), true);
     String datcompatibility = queryExecutor.getEncoding().decode(result[0]);
     return datcompatibility == null ? "PG" : datcompatibility;
   }
