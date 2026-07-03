@@ -139,6 +139,11 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   private boolean waitNexttime = false;
 
   /**
+   * error occurred in the current QueryExecutor
+   */
+  private boolean isErr = false;
+
+  /**
    * {@code CommandComplete(B)} messages are quite common, so we reuse instance to parse those
    */
   private final CommandCompleteParser commandCompleteParser = new CommandCompleteParser();
@@ -438,6 +443,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     boolean autosave = false;
     try {
       try {
+        checkExecutorValid();
         recordAndSendTrace(flags);
         handler = sendQueryPreamble(handler, flags);
         autosave = sendAutomaticSavepoint(query, flags);
@@ -479,6 +485,11 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       handler.handleError(
               new PSQLException(GT.tr("[" + secSocketAddress + "] " + socketStatus + "An I/O error occured while sending to the backend." + "detail:" + e.getMessage() + "; "),
                       PSQLState.CONNECTION_FAILURE, e));
+    } catch (Error error) {
+        isErr = true;
+        LOGGER.warn("[" + socketAddress + "] Error occurred, we will close socket", error);
+        abort();
+        throw error;
     }
 
     try {
@@ -612,6 +623,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     boolean autosave = false;
     ResultHandler handler = batchHandler;
     try {
+      checkExecutorValid();
       recordAndSendTrace(flags);
       handler = sendQueryPreamble(batchHandler, flags);
       autosave = sendAutomaticSavepoint(queries[0], flags);
@@ -647,6 +659,11 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       handler.handleError(
               new PSQLException(GT.tr("[" + secSocketAddress + "] " + socketStatus + "An I/O error occured while sending to the backend." + "detail:" + e.getMessage() + "; "),
                       PSQLState.CONNECTION_FAILURE, e));
+    } catch (Error error) {
+        isErr = true;
+        LOGGER.warn("[" + socketAddress + "] Error occurred, we will close socket", error);
+        abort();
+        throw error;
     }
 
     try {
@@ -691,6 +708,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     try {
       // P->DS->S U->E->S
       recordAndSendTrace(flags);
+      checkExecutorValid();
       handler = sendQueryPreamble(batchHandler, flags);
       autosave = sendAutomaticSavepoint(queries[0], flags);
       estimatedReceiveBufferBytes = 0;
@@ -716,6 +734,11 @@ public class QueryExecutorImpl extends QueryExecutorBase {
                       GT.tr("[" + secSocketAddress + "] " + socketStatus + "An I/O error occured while sending to the backend." + "detail:" + e.getMessage() + "; "),
                       PSQLState.CONNECTION_FAILURE,
                       e));
+    } catch (Error error) {
+        isErr = true;
+        LOGGER.warn("[" + socketAddress + "] Error occurred, we will close socket", error);
+        abort();
+        throw error;
     }
 
     try {
@@ -824,6 +847,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
       try {
         recordAndSendTrace(QueryExecutor.QUERY_NO_METADATA);
+        checkExecutorValid();
         sendOneQuery(beginTransactionQuery, SimpleQuery.NO_PARAMETERS, 0, 0,
                 QueryExecutor.QUERY_NO_METADATA);
         sendSync();
@@ -832,9 +856,13 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       } catch (IOException ioe) {
         throw new PSQLException(GT.tr("An I/O error occured while sending to the backend."),
                 PSQLState.CONNECTION_FAILURE, ioe);
+      } catch (Error error) {
+          isErr = true;
+          LOGGER.warn("[" + socketAddress + "] Error occurred, we will close socket", error);
+          abort();
+          throw error;
       }
     }
-
   }
 
   public ParameterList createFastpathParameters(int count) {
@@ -2985,6 +3013,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     // Now actually run it.
 
     try {
+      checkExecutorValid();
       processDeadParsedQueries();
       processDeadPortals();
 
@@ -2999,6 +3028,11 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       handler.handleError(
               new PSQLException(GT.tr("An I/O error occured while sending to the backend."),
                       PSQLState.CONNECTION_FAILURE, e));
+    } catch (Error error) {
+        isErr = true;
+        LOGGER.warn("[" + socketAddress + "] Error occurred, we will close socket", error);
+        abort();
+        throw error;
     }
 
     handler.handleCompletion();
@@ -3329,6 +3363,15 @@ public class QueryExecutorImpl extends QueryExecutorBase {
   public void setTimeZone(TimeZone timeZone) {
     this.timeZone = timeZone;
   }
+
+    private void checkExecutorValid() throws IOException {
+        if (isErr) {
+            if (LOGGER.isErrorEnabled()) {
+                LOGGER.error("[" + socketAddress + "] executor has occurred error");
+            }
+            throw new IOException("[" + socketAddress + "] executor has occurred error");
+        }
+    }
 
   public TimeZone getTimeZone() {
     return timeZone;
