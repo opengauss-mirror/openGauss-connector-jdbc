@@ -15,21 +15,20 @@
 
 package org.postgresql.jdbc;
 
-import org.postgresql.PGNotification;
-import org.postgresql.copy.CopyManager;
+import org.postgresql.Driver;
 import org.postgresql.core.ORBaseConnection;
 import org.postgresql.core.ORQueryExecutor;
 import org.postgresql.core.ConnectionFactory;
 import org.postgresql.core.ORStream;
-import org.postgresql.fastpath.Fastpath;
-import org.postgresql.largeobject.LargeObjectManager;
+import org.postgresql.core.types.PGBlob;
+import org.postgresql.core.types.PGClob;
+import org.postgresql.core.ORCachedQuery;
+import org.postgresql.core.ORDataType;
 import org.postgresql.log.Log;
 import org.postgresql.log.Logger;
-import org.postgresql.replication.PGReplicationConnection;
 import org.postgresql.util.HostSpec;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
-import org.postgresql.util.PGobject;
 import org.postgresql.util.GT;
 
 import java.sql.SQLException;
@@ -46,8 +45,10 @@ import java.sql.NClob;
 import java.sql.SQLXML;
 import java.sql.Array;
 import java.sql.Struct;
+import java.sql.Connection;
 import java.io.IOException;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
@@ -75,9 +76,10 @@ public class ORConnection implements ORBaseConnection {
     private String url;
     private String user;
     private boolean isReadOnly = false;
-    private int rsHoldability = ResultSet.CLOSE_CURSORS_AT_COMMIT;
+    private int orHoldability = ResultSet.CLOSE_CURSORS_AT_COMMIT;
     private String catalog;
     private DatabaseMetaData metadata;
+    private int isolationLevel;
 
     /**
      * connection constructor
@@ -164,8 +166,8 @@ public class ORConnection implements ORBaseConnection {
     }
 
     @Override
-    public String nativeSQL(String sql) {
-        return null;
+    public String nativeSQL(String sql) throws SQLException {
+        throw Driver.notImplemented(this.getClass(), "nativeSQL(String)");
     }
 
     @Override
@@ -199,7 +201,7 @@ public class ORConnection implements ORBaseConnection {
     }
 
     @Override
-    public void close() throws SQLException {
+    public void close() {
         try {
             if (queryExecutor != null) {
                 queryExecutor.close();
@@ -256,12 +258,28 @@ public class ORConnection implements ORBaseConnection {
     }
 
     @Override
-    public void setTransactionIsolation(int level) {
+    public void setTransactionIsolation(int level) throws SQLException {
+        checkClosed();
+        if (level != Connection.TRANSACTION_SERIALIZABLE && level != Connection.TRANSACTION_READ_COMMITTED) {
+            throw new SQLException("Transaction isolation level " + level + " not supported.");
+        }
+
+        String isolation = null;
+        if (level == Connection.TRANSACTION_SERIALIZABLE) {
+            isolation = "serializable";
+        } else {
+            isolation = "read committed";
+        }
+        String sql = "set transaction isolation level " + isolation;
+        try (Statement stmt = this.createStatement()) {
+            stmt.execute(sql);
+        }
+        this.isolationLevel = level;
     }
 
     @Override
     public SQLWarning getWarnings() throws SQLException {
-        return null;
+        throw Driver.notImplemented(this.getClass(), "getWarnings()");
     }
 
     @Override
@@ -285,6 +303,7 @@ public class ORConnection implements ORBaseConnection {
     @Override
     public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
                                               int resultSetHoldability) throws SQLException {
+        checkClosed();
         return new ORPreparedStatement(this, sql, resultSetType, resultSetConcurrency, resultSetHoldability);
     }
 
@@ -319,11 +338,20 @@ public class ORConnection implements ORBaseConnection {
 
     @Override
     public Map<String, Class<?>> getTypeMap() {
-        return null;
+        return Collections.emptyMap();
     }
 
     @Override
-    public void setHoldability(int holdability) {
+    public void setHoldability(int holdability) throws SQLException {
+        checkClosed();
+        switch (holdability) {
+            case ResultSet.CLOSE_CURSORS_AT_COMMIT:
+            case ResultSet.HOLD_CURSORS_OVER_COMMIT:
+                orHoldability = holdability;
+                break;
+            default:
+                throw new SQLException("Holdability " + holdability + " is invalid");
+        }
     }
 
     @Override
@@ -354,33 +382,41 @@ public class ORConnection implements ORBaseConnection {
 
     @Override
     public int getTransactionIsolation() {
-        return 0;
+        return isolationLevel;
     }
 
     @Override
     public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency,
                                          int resultSetHoldability) throws SQLException {
+        checkClosed();
         return new ORCallableStatement(this, sql, resultSetType, resultSetConcurrency,
                 resultSetHoldability);
     }
 
     @Override
     public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
-        return null;
+        checkClosed();
+        ORPreparedStatement preparedStatement = new ORPreparedStatement(this, sql,
+                ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, getHoldability());
+        ORCachedQuery cachedQuery = preparedStatement.getPreparedQuery();
+        cachedQuery.setAutoGeneratedKeys(true);
+        return preparedStatement;
     }
 
     @Override
     public void setClientInfo(Properties properties) {
+        this.properties = properties;
     }
 
     @Override
-    public Blob createBlob() {
-        return null;
+    public Blob createBlob() throws SQLException {
+        checkClosed();
+        return new PGBlob();
     }
 
     @Override
-    public SQLXML createSQLXML() {
-        return null;
+    public SQLXML createSQLXML() throws SQLException {
+        throw Driver.notImplemented(this.getClass(), "createSQLXML()");
     }
 
     @Override
@@ -406,6 +442,7 @@ public class ORConnection implements ORBaseConnection {
 
     @Override
     public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
+        checkClosed();
         ORPreparedStatement ps = new ORPreparedStatement(this, sql, ResultSet.TYPE_FORWARD_ONLY,
                 ResultSet.CONCUR_READ_ONLY, getHoldability());
         if (autoGeneratedKeys == Statement.RETURN_GENERATED_KEYS) {
@@ -416,11 +453,12 @@ public class ORConnection implements ORBaseConnection {
 
     @Override
     public void setClientInfo(String name, String value) {
+        this.properties.setProperty(name, value);
     }
 
     @Override
-    public NClob createNClob() {
-        return null;
+    public NClob createNClob() throws SQLException {
+        throw Driver.notImplemented(this.getClass(), "createNClob()");
     }
 
     @Override
@@ -454,40 +492,68 @@ public class ORConnection implements ORBaseConnection {
     }
 
     @Override
-    public void setTypeMap(Map<String, Class<?>> map) {
+    public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
+        throw Driver.notImplemented(this.getClass(), "setTypeMap(Map<String, Class<?>>)");
     }
 
     @Override
     public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
-        return null;
+        checkClosed();
+        ORArray arr = new ORArray();
+        Integer type = ORDataType.getJavaType(typeName);
+        arr.setType(type);
+        arr.setValue(elements);
+        return arr;
     }
 
     @Override
     public int getHoldability() {
-        return rsHoldability;
+        return orHoldability;
     }
 
     @Override
     public void clearWarnings() throws SQLException {
+        throw Driver.notImplemented(this.getClass(), "clearWarnings()");
     }
 
     @Override
-    public Struct createStruct(String typeName, Object[] attributes) {
-        return null;
+    public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
+        throw Driver.notImplemented(this.getClass(), "createStruct(String, Object[])");
     }
 
     @Override
-    public Clob createClob() {
-        return null;
+    public Clob createClob() throws SQLException {
+        checkClosed();
+        return new PGClob();
     }
 
     @Override
-    public void setSchema(String schema) {
+    public void setSchema(String schema) throws SQLException {
+        checkClosed();
+        if (schema == null || schema.contains(";")) {
+            throw new PSQLException(GT.tr("Invalid schema name."),
+                    PSQLState.INVALID_PARAMETER_VALUE);
+        }
+
+        String sql = "ALTER SESSION SET CURRENT_SCHEMA = " + schema;
+        try (Statement stmt = createStatement()) {
+            stmt.execute(sql);
+        }
     }
 
     @Override
-    public int getNetworkTimeout() {
-        return 0;
+    public int getNetworkTimeout() throws SQLException {
+        checkClosed();
+        int timeout = 0;
+        try {
+            if (orStream != null) {
+                timeout = orStream.getSocket().getSoTimeout();
+            }
+        } catch (IOException e) {
+            throw new PSQLException(GT.tr("Unable to get network timeout."),
+                    PSQLState.COMMUNICATION_ERROR, e);
+        }
+        return timeout;
     }
 
     @Override
@@ -511,36 +577,105 @@ public class ORConnection implements ORBaseConnection {
     }
 
     @Override
-    public String getSchema() {
-        return null;
+    public String getSchema() throws SQLException {
+        checkClosed();
+        String schema = null;
+        String sql = "SELECT SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')";
+        try (Statement stmt = this.createStatement()) {
+            try (ResultSet rs = stmt.executeQuery(sql)) {
+                if (rs.next()) {
+                    schema = rs.getString(1);
+                }
+            }
+        }
+        return schema;
     }
 
     @Override
-    public void setNetworkTimeout(Executor executor, int milliseconds) {
+    public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException {
+        checkClosed();
+        if (milliseconds < 0) {
+            throw new PSQLException(GT.tr("Network timeout must be a value greater than or equal to 0."),
+                    PSQLState.INVALID_PARAMETER_VALUE);
+        }
+
+        if (orStream == null) {
+            return;
+        }
+        try {
+            orStream.getSocket().setSoTimeout(milliseconds);
+        } catch (IOException e) {
+            throw new PSQLException(GT.tr("Failed to set network timeout."),
+                    PSQLState.COMMUNICATION_ERROR, e);
+        }
     }
 
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException {
-        return null;
+        throw Driver.notImplemented(this.getClass(), "unwrap(Class<T>)");
     }
 
     @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        return false;
+        throw Driver.notImplemented(this.getClass(), "isWrapperFor(Class<?>)");
     }
 
     @Override
     public void abort(Executor executor) throws SQLException {
+        if (isClosed()) {
+            return;
+        }
+
+        AbortConnection abortConnection = new AbortConnection();
+        if (executor == null) {
+            abortConnection.run();
+        } else {
+            executor.execute(abortConnection);
+        }
+    }
+
+    private class AbortConnection implements Runnable {
+        @Override
+        public void run() {
+            close();
+        }
     }
 
     @Override
     public boolean isValid(int timeout) throws SQLException {
-        return false;
-    }
+        if (timeout < 0) {
+            throw new PSQLException(GT.tr("timeout is invalid."), PSQLState.INVALID_PARAMETER_VALUE);
+        }
+        if (isClosed()) {
+            return false;
+        }
 
-    @Override
-    public Array createArrayOf(String typeName, Object elements) throws SQLException {
-        return null;
+        Statement stmt = null;
+        int originalTime = 0;
+        try {
+            originalTime = orStream.getSocket().getSoTimeout();
+            if (timeout > 0) {
+                orStream.getSocket().setSoTimeout(timeout * 1000);
+            }
+            stmt = createStatement();
+            stmt.execute("select 0");
+            return true;
+        } catch (IOException | SQLException e) {
+            throw new SQLException("Failed to detect connection status", e);
+        } finally {
+            try {
+                orStream.getSocket().setSoTimeout(originalTime);
+            } catch (IOException e) {
+                LOGGER.warn("Failed to set timeout, error: " + e.getMessage());
+            }
+            try {
+                if (stmt != null) {
+                    stmt.close();
+                }
+            } catch (SQLException e) {
+                LOGGER.warn("Failed to close statement, error: " + e.getMessage());
+            }
+        }
     }
 
     @Override
@@ -551,87 +686,7 @@ public class ORConnection implements ORBaseConnection {
     }
 
     @Override
-    public PGNotification[] getNotifications() {
-        return new PGNotification[0];
-    }
-
-    @Override
-    public PGNotification[] getNotifications(int timeoutMillis) {
-        return new PGNotification[0];
-    }
-
-    @Override
-    public CopyManager getCopyAPI() {
-        return null;
-    }
-
-    @Override
-    public LargeObjectManager getLargeObjectAPI() {
-        return null;
-    }
-
-    @Override
-    public Fastpath getFastpathAPI() {
-        return null;
-    }
-
-    @Override
     public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
         return prepareStatement(sql);
-    }
-
-    @Override
-    public void addDataType(String type, String className) {
-    }
-
-    @Override
-    public void addDataType(String type, Class<? extends PGobject> klass) {
-    }
-
-    @Override
-    public void setPrepareThreshold(int threshold) {
-    }
-
-    @Override
-    public int getPrepareThreshold() {
-        return 0;
-    }
-
-    @Override
-    public void setDefaultFetchSize(int fetchSize) {
-    }
-
-    @Override
-    public int getDefaultFetchSize() {
-        return 0;
-    }
-
-    @Override
-    public String escapeIdentifier(String identifier) {
-        return null;
-    }
-
-    @Override
-    public String escapeLiteral(String literal) {
-        return null;
-    }
-
-    @Override
-    public PreferQueryMode getPreferQueryMode() {
-        return null;
-    }
-
-    @Override
-    public AutoSave getAutosave() {
-        return null;
-    }
-
-    @Override
-    public void setAutosave(AutoSave autoSave) {
-    }
-
-    @Override
-    public PGReplicationConnection getReplicationAPI() {
-        return null;
     }
 }

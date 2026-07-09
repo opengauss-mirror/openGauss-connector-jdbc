@@ -15,7 +15,6 @@
 
 package org.postgresql.core;
 
-import org.postgresql.PGConnection;
 import org.postgresql.jdbc.TimestampUtils;
 import org.postgresql.util.HostSpec;
 
@@ -27,7 +26,7 @@ import java.sql.Connection;
  * @author zhangting
  * @since  2025-06-29
  */
-public interface ORBaseConnection extends PGConnection, Connection {
+public interface ORBaseConnection extends Connection {
     /**
      * get query executor
      *
