@@ -1364,29 +1364,46 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
   }
 
   protected void writeBaseObject(ObjectOutputStream out) throws IOException {
-    out.writeObject(serverName);
-    out.writeObject(databaseName);
-    out.writeObject(user);
-    out.writeObject(password);
-    out.writeInt(portNumber);
-    out.writeBoolean(allowEncodingChanges);
-    out.writeObject(characterEncoding);
-	out.writeBoolean(connectionExtraInfo);
-
-    out.writeObject(properties);
+      writeNullableUTF(out, serverName);
+      writeNullableUTF(out, databaseName);
+      writeNullableUTF(out, user);
+      writeNullableUTF(out, password);
+      out.writeInt(portNumber);
+      out.writeBoolean(allowEncodingChanges);
+      writeNullableUTF(out, characterEncoding);
+      out.writeBoolean(connectionExtraInfo);
+      out.writeInt(properties.size());
+      for (String key : properties.stringPropertyNames()) {
+          writeNullableUTF(out, key);
+          writeNullableUTF(out, properties.getProperty(key));
+      }
   }
 
   protected void readBaseObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
-    serverName = (String) in.readObject();
-    databaseName = (String) in.readObject();
-    user = (String) in.readObject();
-    password = (String) in.readObject();
-    portNumber = in.readInt();
-    allowEncodingChanges = in.readBoolean();
-    characterEncoding = (String)in.readObject();
-	connectionExtraInfo = in.readBoolean();
-    properties = (Properties) in.readObject();
+      serverName = readNullableUTF(in);
+      databaseName = readNullableUTF(in);
+      user = readNullableUTF(in);
+      password = readNullableUTF(in);
+      portNumber = in.readInt();
+      allowEncodingChanges = in.readBoolean();
+      characterEncoding = readNullableUTF(in);
+      connectionExtraInfo = in.readBoolean();
+      int size = in.readInt();
+      properties = new Properties();
+      for (int i = 0; i < size; i++) {
+          properties.setProperty(readNullableUTF(in), readNullableUTF(in));
+      }
   }
+
+    private static void writeNullableUTF(ObjectOutputStream out, String s) throws IOException {
+        out.writeBoolean(s != null);
+        if (s != null) {
+            out.writeUTF(s);
+        }
+    }
+    private static String readNullableUTF(ObjectInputStream in) throws IOException {
+        return in.readBoolean() ? in.readUTF() : null;
+    }
 
   public void initializeFrom(BaseDataSource source) throws IOException, ClassNotFoundException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
