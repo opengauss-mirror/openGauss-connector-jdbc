@@ -65,7 +65,7 @@ public enum SslMode {
     // If sslmode is not set, fallback to ssl parameter
     if (sslmode == null) {
       if (PGProperty.SSL.getBoolean(info)) {
-        return REQUIRE;
+        return VERIFY_FULL;
       }
       return DISABLE;
     }
