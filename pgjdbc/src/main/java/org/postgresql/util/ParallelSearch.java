@@ -16,9 +16,9 @@
 package org.postgresql.util;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.ResultSetMetaData;
 import java.sql.DriverManager;
 
@@ -51,8 +51,7 @@ public class ParallelSearch {
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern COMMENT_PATTERN = Pattern.compile(
-        "--.*$",
-        Pattern.MULTILINE
+        "/\\*(?s:.*?)\\*/|--[^\\r\\n]*"
     );
     private static final Pattern VECTOR_OP_PATTERN = Pattern.compile(
         "<->|<=>|<#>|<\\+>|<~>|<%>"
@@ -167,7 +166,7 @@ public class ParallelSearch {
             );
         }
 
-        Matcher vectorOpMatcher = VECTOR_OP_PATTERN.matcher(trimmedSql);
+        Matcher vectorOpMatcher = VECTOR_OP_PATTERN.matcher(processedSql);
         if (!vectorOpMatcher.find()) {
             throw new IllegalArgumentException(
                 "Invalid SQL template: must contain vector operator <->, <=>, <+>, <~>, <%> or <#>"
@@ -187,6 +186,8 @@ public class ParallelSearch {
 }
 
 class QueryTask implements Callable<List<Map<String, Object>>> {
+    private static final String SET_CONFIG_SQL = "SELECT set_config(?, ?, false)";
+
     private final String jdbcUrl;
     private final String username;
     private final String auth;
@@ -207,24 +208,14 @@ class QueryTask implements Callable<List<Map<String, Object>>> {
     @Override
     public List<Map<String, Object>> call() throws SQLException {
         Logger logger = Logger.getLogger(QueryTask.class.getName());
-        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, auth);
-            Statement st = connection.createStatement()) {
-            StringBuilder sqlBuilder = new StringBuilder();
-            for (Map.Entry<String, Object> entry : scanParams.entrySet()) {
-                sqlBuilder.append("SET ")
-                    .append(entry.getKey())
-                    .append(" = ")
-                    .append(entry.getValue())
-                    .append("; ");
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, auth)) {
+            setScanParams(connection);
+            try (PreparedStatement st = connection.prepareStatement(sqlTemplate)) {
+                bindParameters(st);
+                try (ResultSet rs = st.executeQuery()) {
+                    return resultSetToMapList(rs);
+                }
             }
-            String configSql = sqlBuilder.toString().trim();
-            if (!configSql.isEmpty()) {
-                st.execute(configSql);
-            }
-
-            String sql = generateSql(sqlTemplate, parameters);
-            ResultSet rs = st.executeQuery(sql);
-            return resultSetToMapList(rs);
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "SQLException occurred while executing query: " + e.getMessage(), e);
             throw e;
@@ -234,12 +225,35 @@ class QueryTask implements Callable<List<Map<String, Object>>> {
         }
     }
 
-    private static String generateSql(String sqlTemplate, List<Object> parameters) {
-        String sql = sqlTemplate;
-        for (Object param : parameters) {
-            sql = sql.replaceFirst("\\?", param.toString());
+    private void setScanParams(Connection connection) throws SQLException {
+        if (scanParams == null || scanParams.isEmpty()) {
+            return;
         }
-        return sql;
+
+        try (PreparedStatement st = connection.prepareStatement(SET_CONFIG_SQL)) {
+            for (Map.Entry<String, Object> entry : scanParams.entrySet()) {
+                if (entry.getKey() == null || entry.getKey().trim().isEmpty()) {
+                    throw new SQLException("Invalid scan parameter name");
+                }
+                st.setString(1, entry.getKey());
+                st.setString(2, String.valueOf(entry.getValue()));
+                try (ResultSet rs = st.executeQuery()) {
+                    if (rs.next()) {
+                        rs.getString(1);
+                    }
+                }
+            }
+        }
+    }
+
+    private void bindParameters(PreparedStatement st) throws SQLException {
+        if (parameters == null) {
+            throw new SQLException("Parameters item must not be null");
+        }
+
+        for (int i = 0; i < parameters.size(); i++) {
+            st.setObject(i + 1, parameters.get(i));
+        }
     }
 
     private List<Map<String, Object>> resultSetToMapList(ResultSet rs) throws SQLException {
