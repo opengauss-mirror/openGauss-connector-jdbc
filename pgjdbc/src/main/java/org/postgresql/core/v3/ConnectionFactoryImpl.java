@@ -51,7 +51,7 @@ import javax.net.SocketFactory;
  * @author Oliver Jowett (oliver@opencloud.com), based on the previous implementation
  */
 public class ConnectionFactoryImpl extends ConnectionFactory {
-
+    static final String KERBEROS_SERVER_HOSTNAME = "kerberosServerHostname";
   private static Log LOGGER = Logger.getLogger(ConnectionFactoryImpl.class.getName());
   private static final int AUTH_REQ_OK = 0;
   private static final int AUTH_REQ_KRB4 = 1;
@@ -90,6 +90,23 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       setStaticUseBoolean(useBoolean);
   }
 
+    static String getKerberosServerHostname(Properties info, boolean shouldUseConnectionProperty) {
+        String kerberosServerHostname = shouldUseConnectionProperty
+                ? info.getProperty(KERBEROS_SERVER_HOSTNAME) : null;
+        if (kerberosServerHostname != null && kerberosServerHostname.length() != 0) {
+            /*
+             * Prefer the per-connection value and pass it directly into GSS. This avoids
+             * writing connection metadata into the process-wide System properties.
+             */
+            return kerberosServerHostname;
+        }
+        /*
+         * Keep compatibility for applications that deliberately configured the legacy
+         * JVM property themselves. The driver no longer writes this property, so a
+         * connection-local value cannot leak into later connections through this path.
+         */
+        return System.getProperty(KERBEROS_SERVER_HOSTNAME);
+    }
 
   private void setSocketTimeout(PGStream stream, Properties info, PGProperty propKey) throws SQLException, IOException {
     // Set the socket timeout if the "socketTimeout" property has been set.
@@ -890,16 +907,16 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
 
               case AUTH_REQ_GSS:
               case AUTH_REQ_SSPI:
-                  if(areq==AUTH_REQ_GSS){
-                      String kerberosServerHostname= info.getProperty("kerberosServerHostname");
-                      if(kerberosServerHostname!=null && kerberosServerHostname.length()!=0){
-                          System.setProperty("kerberosServerHostname",kerberosServerHostname);
-                      }
-                  }
-                  org.postgresql.gss.MakeGSS.authenticate(pgStream, host, user, password,
-                          PGProperty.JAAS_APPLICATION_NAME.get(info),
-                          PGProperty.KERBEROS_SERVER_NAME.get(info), PGProperty.USE_SPNEGO.getBoolean(info),
-                          PGProperty.JAAS_LOGIN.getBoolean(info));
+                org.postgresql.gss.MakeGSS.AuthenticationRequest gssRequest =
+                        new org.postgresql.gss.MakeGSS.AuthenticationRequest(pgStream, host,
+                                user, password)
+                                .jaasApplicationName(PGProperty.JAAS_APPLICATION_NAME.get(info))
+                                .kerberosServerName(PGProperty.KERBEROS_SERVER_NAME.get(info))
+                                .shouldUseSpnego(PGProperty.USE_SPNEGO.getBoolean(info))
+                                .shouldPerformJaasLogin(PGProperty.JAAS_LOGIN.getBoolean(info))
+                                .kerberosServerHostname(
+                                        getKerberosServerHostname(info, areq == AUTH_REQ_GSS));
+                org.postgresql.gss.MakeGSS.authenticate(gssRequest);
                   if (LOGGER.isDebugEnabled()) {
                     if (areq == AUTH_REQ_GSS) {
                         LOGGER.debug("[" + connectInfo + "]" + " AUTH_REQ_GSS");
