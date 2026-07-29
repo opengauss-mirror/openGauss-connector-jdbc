@@ -127,6 +127,44 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
 
    成功编译后会出现两个jar包，分别是opengauss-jdbc-${version}.jar与postgresql.jar。编译后的jar包路径为：**/sda/openGauss-connector-jdbc/output**。
 
+#### 安装并配置opengauss数据库环境
+
+1. 安装数据库
+   
+   安装opengauss数据库步骤请参考server仓的README说明：https://gitcode.com/opengauss/openGauss-server
+
+2. 修改配置
+
+   数据库安装成功之后修改配置文件pg_hba.conf，在pg_hba.conf中新增一行：
+
+   ```
+   host    all             all             0.0.0.0/0               sha256
+   ```
+
+   然后重启opengauss数据库。
+
+3. 登录数据库
+
+   ```
+   gsql -d postgres -p 5432 -r
+   ```
+   
+4. 创建用户
+
+   ```
+   create user test identified by 'test123@'
+   ```
+   
+5. 创建数据库
+
+   ```
+   create database jdbc_utf8_a ENCODING='utf8' DBCOMPATIBILITY='A';
+
+   create database jdbc_utf8_pg ENCODING='utf8' DBCOMPATIBILITY='PG';
+
+   create database jdbc_utf8_b ENCODING='utf8' DBCOMPATIBILITY='B';
+   ```
+
 #### 使用mvn命令生成jar包（Windows 或 Linux）
 
 1. 准备 Java 与 Maven环境。
@@ -161,6 +199,12 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
 
    构建成功后会出现两个jar包，分别是opengauss-jdbc-\\${version}.jar与postgresql.jar。jar包路径为/sda/openGauss-connector-jdbc/pgjdbc/target/。
    **注意:3.1.0之后，我们在maven中央仓库提供了org.postgresql和org.opengauss两种jar包版本.其中默认的的版本号对应org.postgresql的jar包，x.0.0-og对应org.opengauss的jar包。**
+
+4. 执行测试用例
+
+   ```
+   mvn test
+   ```
 
 ## JDBC的使用
 
