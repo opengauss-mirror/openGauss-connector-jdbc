@@ -353,6 +353,13 @@ public enum PGProperty {
    */
   RECEIVE_BUFFER_SIZE("receiveBufferSize", "-1", "Socket read buffer size"),
 
+    /**
+     * Maximum payload size, in bytes, accepted for one backend CopyData message. This value is a
+     * defensive client allocation limit, not a PostgreSQL protocol maximum.
+     */
+    MAX_COPY_DATA_RECEIVE_BYTES("maxCopyDataReceiveBytes", "67108864",
+        "Maximum payload size in bytes accepted for one backend CopyData message"),
+
   /**
    * Socket write buffer size (SO_SNDBUF). A value of {@code -1}, which is the default, means system
    * default.

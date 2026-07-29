@@ -181,6 +181,8 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   private static final int TIME_NS_ONE_US = 1000;
 
+    private final int maxCopyDataReceiveBytes;
+
   public QueryExecutorImpl(PGStream pgStream, String user, String database,
                            int cancelSignalTimeout, Properties info) throws SQLException, IOException {
     super(pgStream, user, database, cancelSignalTimeout, info);
@@ -191,6 +193,7 @@ public class QueryExecutorImpl extends QueryExecutorBase {
     this.socketAddress = pgStream.getConnectInfo();
     this.secSocketAddress = pgStream.getSecConnectInfo();
     this.preparedStatementCacheQueries = PGProperty.PREPARED_STATEMENT_CACHE_QUERIES.getInt(info);
+    this.maxCopyDataReceiveBytes = getMaxCopyDataReceiveBytes(info);
     readStartupMessages();
   }
 
@@ -1415,22 +1418,24 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
         case 'd': // CopyData
 
-          LOGGER.trace(" <=BE CopyData");
+            LOGGER.trace(" <=BE CopyData");
 
-          len = pgStream.receiveInteger4() - 4;
-          byte[] buf = pgStream.receive(len);
-          if (op == null) {
-            error = new PSQLException(GT.tr("Got CopyData without an active copy operation"),
-                    PSQLState.OBJECT_NOT_IN_STATE);
-          } else if (!(op instanceof CopyOut)) {
-            error = new PSQLException(
-                    GT.tr("Unexpected copydata from server for {0}", op.getClass().getName()),
-                    PSQLState.COMMUNICATION_ERROR);
-          } else {
-            op.handleCopydata(buf);
-          }
-          endReceiving = true;
-          break;
+            len = validateCopyDataLength(pgStream.receiveInteger4(), maxCopyDataReceiveBytes);
+            if (op == null) {
+                pgStream.skip(len);
+                error = new PSQLException(GT.tr("Got CopyData without an active copy operation"),
+                        PSQLState.OBJECT_NOT_IN_STATE);
+            } else if (!(op instanceof CopyOut)) {
+                pgStream.skip(len);
+                error = new PSQLException(
+                        GT.tr("Unexpected copydata from server for {0}", op.getClass().getName()),
+                        PSQLState.COMMUNICATION_ERROR);
+            } else {
+                byte[] buf = pgStream.receive(len, maxCopyDataReceiveBytes);
+                op.handleCopydata(buf);
+            }
+            endReceiving = true;
+            break;
 
         case 'c': // CopyDone (expected after all copydata received)
 
@@ -1503,6 +1508,41 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
     return op;
   }
+
+    /**
+     * Validates the protocol length of a CopyData message before any payload allocation is attempted.
+     *
+     * @param messageLength backend message length, including the 4-byte length field itself
+     * @param maxCopyDataReceiveBytes maximum allowed CopyData payload size for this connection
+     * @return CopyData payload length, excluding the 4-byte length field
+     * @throws PSQLException if the backend sent a malformed or oversized CopyData frame
+     */
+    static int validateCopyDataLength(int messageLength, int maxCopyDataReceiveBytes)
+            throws PSQLException {
+        if (messageLength < 4) {
+            throw new PSQLException(GT.tr("Invalid CopyData message length: {0}",
+                    Integer.toString(messageLength)), PSQLState.PROTOCOL_VIOLATION);
+        }
+
+        int copyDataLength = messageLength - 4;
+        if (copyDataLength > maxCopyDataReceiveBytes) {
+            throw new PSQLException(GT.tr("CopyData message length {0} exceeds maximum allowed size {1}",
+                    Integer.toString(copyDataLength), Integer.toString(maxCopyDataReceiveBytes)),
+                    PSQLState.PROTOCOL_VIOLATION);
+        }
+
+        return copyDataLength;
+    }
+
+    private static int getMaxCopyDataReceiveBytes(Properties info) throws PSQLException {
+        int maxCopyDataReceiveBytes = PGProperty.MAX_COPY_DATA_RECEIVE_BYTES.getInt(info);
+        if (maxCopyDataReceiveBytes <= 0) {
+            throw new PSQLException(GT.tr("{0} parameter value must be greater than 0 but was: {1}",
+                    PGProperty.MAX_COPY_DATA_RECEIVE_BYTES.getName(),
+                    Integer.toString(maxCopyDataReceiveBytes)), PSQLState.INVALID_PARAMETER_VALUE);
+        }
+        return maxCopyDataReceiveBytes;
+    }
 
   /*
    * To prevent client/server protocol deadlocks, we try to manage the estimated recv buffer size

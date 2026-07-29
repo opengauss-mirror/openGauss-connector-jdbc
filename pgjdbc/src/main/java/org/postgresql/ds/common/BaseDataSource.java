@@ -353,6 +353,26 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
     PGProperty.RECEIVE_BUFFER_SIZE.set(properties, nbytes);
   }
 
+    /**
+     * Gets the maximum CopyData payload size accepted for one backend message.
+     *
+     * @return maximum CopyData payload size accepted for one backend message
+     * @see PGProperty#MAX_COPY_DATA_RECEIVE_BYTES
+     */
+    public int getMaxCopyDataReceiveBytes() {
+        return PGProperty.MAX_COPY_DATA_RECEIVE_BYTES.getIntNoCheck(properties);
+    }
+
+    /**
+     * Sets the maximum CopyData payload size accepted for one backend message.
+     *
+     * @param nbytes maximum CopyData payload size accepted for one backend message
+     * @see PGProperty#MAX_COPY_DATA_RECEIVE_BYTES
+     */
+    public void setMaxCopyDataReceiveBytes(int nbytes) {
+        PGProperty.MAX_COPY_DATA_RECEIVE_BYTES.set(properties, nbytes);
+    }
+
   /**
    * @return send buffer size
    * @see PGProperty#SEND_BUFFER_SIZE
