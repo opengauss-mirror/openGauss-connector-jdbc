@@ -6,6 +6,7 @@
 package org.postgresql.core;
 
 import org.postgresql.PGProperty;
+import org.postgresql.jdbc.SslMode;
 import org.postgresql.ssl.LibPQFactory;
 import org.postgresql.util.GT;
 import org.postgresql.util.ObjectFactory;
@@ -25,6 +26,12 @@ import javax.net.ssl.SSLSocketFactory;
  * Instantiates {@link SocketFactory} based on the {@link PGProperty#SOCKET_FACTORY}.
  */
 public class SocketFactoryFactory {
+    /**
+     * This built-in factory accepts every server certificate, so it must be handled before loading
+     * the configured SSLSocketFactory.
+     */
+    private static final String NON_VALIDATING_SSL_FACTORY =
+            "org.postgresql.ssl.NonValidatingFactory";
 
   /**
    * Instantiates {@link SocketFactory} based on the {@link PGProperty#SOCKET_FACTORY}.
@@ -63,6 +70,15 @@ public class SocketFactoryFactory {
         || "org.postgresql.ssl.jdbc4.LibPQFactory".equals(classname)
         || "org.postgresql.ssl.LibPQFactory".equals(classname)) {
       return new LibPQFactory(info);
+    }
+    // Keep legacy non-verifying modes compatible, but do not let sslfactory bypass the contract of
+    // verify-ca or verify-full where the caller explicitly requests server certificate checks.
+    if (NON_VALIDATING_SSL_FACTORY.equals(classname)
+            && SslMode.of(info).verifyCertificate()) {
+        throw new PSQLException(
+                GT.tr("The SSLSocketFactory class provided {0} disables certificate validation and "
+                        + "cannot be used with sslmode verify-ca or verify-full.", classname),
+                PSQLState.CONNECTION_FAILURE);
     }
     try {
       return ObjectFactory.instantiate(SSLSocketFactory.class, classname, info, true,
