@@ -481,6 +481,26 @@ public abstract class BaseDataSource implements CommonDataSource, Referenceable 
     return PGProperty.UNKNOWN_LENGTH.getIntNoCheck(properties);
   }
 
+    /**
+     * Sets the maximum number of characters buffered for stream parameters.
+     *
+     * @param maxBufferedStreamParameterChars maximum number of characters buffered for stream parameters
+     * @see PGProperty#MAX_BUFFERED_STREAM_PARAMETER_CHARS
+     */
+    public void setMaxBufferedStreamParameterChars(int maxBufferedStreamParameterChars) {
+        PGProperty.MAX_BUFFERED_STREAM_PARAMETER_CHARS.set(properties, maxBufferedStreamParameterChars);
+    }
+
+    /**
+     * Gets the maximum number of characters buffered for stream parameters.
+     *
+     * @return maximum number of characters buffered for stream parameters
+     * @see PGProperty#MAX_BUFFERED_STREAM_PARAMETER_CHARS
+     */
+    public int getMaxBufferedStreamParameterChars() {
+        return PGProperty.MAX_BUFFERED_STREAM_PARAMETER_CHARS.getIntNoCheck(properties);
+    }
+
   /**
    * @param seconds socket timeout
    * @see PGProperty#SOCKET_TIMEOUT

@@ -188,6 +188,8 @@ public class PgConnection implements BaseConnection {
   //Default statement fetchsize
   private int fetchSize = -1;
 
+    private int maxBufferedStreamParameterChars;
+
   // Bind String to UNSPECIFIED or VARCHAR?
   private final boolean bindStringAsVarchar;
 
@@ -531,6 +533,14 @@ public class PgConnection implements BaseConnection {
     this.setDolphinCmpt(PGProperty.B_CMPT_MODE.getBoolean(info));
 
     int unknownLength = PGProperty.UNKNOWN_LENGTH.getInt(info);
+    maxBufferedStreamParameterChars = PGProperty.MAX_BUFFERED_STREAM_PARAMETER_CHARS.getInt(info);
+    if (maxBufferedStreamParameterChars < 0) {
+        throw new PSQLException(
+                GT.tr("{0} parameter value must be greater than or equal to 0 but was: {1}",
+                        PGProperty.MAX_BUFFERED_STREAM_PARAMETER_CHARS.getName(),
+                        Integer.valueOf(maxBufferedStreamParameterChars)),
+                PSQLState.INVALID_PARAMETER_VALUE);
+    }
 
     // Initialize object handling
     _typeCache = createTypeInfo(this, unknownLength);
@@ -2508,6 +2518,10 @@ public class PgConnection implements BaseConnection {
 
     public boolean isBlobMode() {
         return blobmode;
+    }
+
+    public int getMaxBufferedStreamParameterChars() {
+        return maxBufferedStreamParameterChars;
     }
 
     public int getFetchSize() {
