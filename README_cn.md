@@ -158,11 +158,11 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
 5. 创建数据库
 
    ```
-   create database jdbc_utf8_a ENCODING='utf8' DBCOMPATIBILITY='A';
+   create database jdbc_utf8_a DBCOMPATIBILITY='A';
 
-   create database jdbc_utf8_pg ENCODING='utf8' DBCOMPATIBILITY='PG';
+   create database jdbc_utf8_pg DBCOMPATIBILITY='PG';
 
-   create database jdbc_utf8_b ENCODING='utf8' DBCOMPATIBILITY='B';
+   create database jdbc_utf8_b DBCOMPATIBILITY='B';
    ```
 
 #### 使用mvn命令生成jar包（Windows 或 Linux）
