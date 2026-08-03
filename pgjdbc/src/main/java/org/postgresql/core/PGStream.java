@@ -541,10 +541,55 @@ public class PGStream implements Closeable, Flushable {
    * @throws IOException if a data I/O error occurs
    */
   public byte[] receive(int siz) throws IOException {
+    checkReceiveSize(siz);
     byte[] answer = new byte[siz];
     receive(answer, 0, siz);
     return answer;
   }
+
+    /**
+     * Reads in a bounded number of bytes from the backend.
+     *
+     * @param siz number of bytes to read
+     * @param maxSize maximum number of bytes allowed by the protocol handler for this read
+     * @return array of bytes received
+     * @throws IOException if the requested size is invalid, exceeds the limit, or cannot be read
+     */
+    public byte[] receive(int siz, int maxSize) throws IOException {
+        checkReceiveSize(siz, maxSize);
+        byte[] answer = new byte[siz];
+        receive(answer, 0, siz);
+        return answer;
+    }
+
+    /**
+     * Checks an array-backed receive size before allocation. This guard is parameterized so callers
+     * can apply protocol-specific limits without changing the behavior of unrelated receive paths.
+     *
+     * @param siz number of bytes requested by the caller
+     * @param maxSize maximum number of bytes allowed by the caller
+     * @throws IOException if the requested size is invalid or exceeds the caller-supplied limit
+     */
+    static void checkReceiveSize(int siz, int maxSize) throws IOException {
+        checkReceiveSize(siz);
+        if (siz > maxSize) {
+            throw new IOException(GT.tr("Message size {0} exceeds maximum allowed size {1}",
+                Integer.toString(siz), Integer.toString(maxSize)));
+        }
+    }
+
+    /**
+     * Checks structural validity before an array-backed receive. This preserves existing positive-size
+     * behavior and only converts invalid negative sizes into an I/O failure.
+     *
+     * @param siz number of bytes requested by the caller
+     * @throws IOException if the requested size is invalid
+     */
+    static void checkReceiveSize(int siz) throws IOException {
+        if (siz < 0) {
+            throw new IOException(GT.tr("Invalid message size: {0}", Integer.toString(siz)));
+        }
+    }
 
   /**
    * Reads in a given number of bytes from the backend.
