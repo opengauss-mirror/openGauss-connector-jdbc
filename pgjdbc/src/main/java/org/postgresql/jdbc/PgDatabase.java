@@ -53,17 +53,20 @@ public class PgDatabase {
         if (dolphinNum > 0 && CompatibilityEnum.ON.equals(compatibilityEnum)) {
             isDolphin = true;
             String bitOutput = PGProperty.BIT_OUTPUT.get(info);
-            try {
-                if (bitOutput == null) {
-                    bitOutput = getDolphin("show dolphin.bit_output;");
-                } else {
-                    updateBitOutput(bitOutput);
+            if (bitOutput == null) {
+                try {
+                    isDec = BitOutputEnum.DEC.equals(parseBitOutput(getDolphin("show dolphin.bit_output;")));
+                } catch (SQLException e) {
+                    isDec = false;
                 }
-                if (BitOutputEnum.DEC.equals(BitOutputEnum.valueOf(bitOutput.toUpperCase(Locale.ROOT)))) {
-                    isDec = true;
+            } else {
+                BitOutputEnum bitOutputEnum = parseBitOutput(bitOutput);
+                try {
+                    updateBitOutput(bitOutputEnum);
+                    isDec = BitOutputEnum.DEC.equals(bitOutputEnum);
+                } catch (SQLException e) {
+                    isDec = false;
                 }
-            } catch (SQLException e) {
-                isDec = false;
             }
         } else {
             isDolphin = false;
@@ -91,13 +94,26 @@ public class PgDatabase {
         }
     }
 
-    private void updateBitOutput(String bitOutput) throws SQLException {
+    private BitOutputEnum parseBitOutput(String bitOutput) throws PSQLException {
+        if (bitOutput == null) {
+            throw new PSQLException(
+                GT.tr("Unsupported value for bitOutput parameter: " + bitOutput),
+                PSQLState.INVALID_PARAMETER_VALUE);
+        }
+        try {
+            return BitOutputEnum.valueOf(bitOutput.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new PSQLException(
+                GT.tr("Unsupported value for bitOutput parameter: " + bitOutput),
+                PSQLState.INVALID_PARAMETER_VALUE, e);
+        }
+    }
+
+    private void updateBitOutput(BitOutputEnum bitOutput) throws SQLException {
         /* set parameter cannot use prepareStatement to set the value */
         try (Statement stmt = connection.createStatement()) {
-            String sql = "set dolphin.bit_output to " + bitOutput;
+            String sql = "set dolphin.bit_output to " + bitOutput.name().toLowerCase(Locale.ROOT);
             stmt.execute(sql);
-        } catch (SQLException e) {
-            throw e;
         }
     }
 }
