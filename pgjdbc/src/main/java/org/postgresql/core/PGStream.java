@@ -435,14 +435,21 @@ public class PGStream implements Closeable, Flushable {
    * @throws IOException if a data I/O error occurs
    */
   public byte[][] receiveTupleV3() throws IOException, OutOfMemoryError {
-    // TODO: use l_msgSize
     int l_msgSize = receiveInteger4();
     int l_nf = receiveInteger2();
+    if (l_msgSize < 6 || (long) l_nf * 4L > l_msgSize - 6L) {
+      throw new IOException("unexpected length of DataRow message");
+    }
+    long remaining = l_msgSize - 6L;
     byte[][] answer = new byte[l_nf][];
 
     OutOfMemoryError oom = null;
     for (int i = 0; i < l_nf; ++i) {
       int l_size = receiveInteger4();
+      remaining -= 4;
+      if (l_size < -1 || (long) l_size > remaining) {
+        throw new IOException("unexpected length of DataRow field");
+      }
       if (l_size != -1) {
         try {
           answer[i] = new byte[l_size];
@@ -451,7 +458,12 @@ public class PGStream implements Closeable, Flushable {
           oom = oome;
           skip(l_size);
         }
+        remaining -= l_size;
       }
+    }
+
+    if (remaining != 0) {
+      throw new IOException("unexpected length of DataRow message");
     }
 
     if (oom != null) {
