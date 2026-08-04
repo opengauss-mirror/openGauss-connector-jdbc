@@ -211,14 +211,23 @@ class SimpleParameterList implements V3ParameterList {
 		}
   }
 
+    @Override
+    public void setBlob(int index, InputStream stream) throws SQLException {
+        bind(index, new StreamWrapper(stream), Oid.BLOB, BINARY);
+    }
+
   @Override
   public void setText(int index, InputStream stream) throws SQLException {
     bind(index, new StreamWrapper(stream), Oid.TEXT, TEXT);
   }
 
+    @Override
+    public void setText(int index, InputStream stream, int oid) throws SQLException {
+        bind(index, new StreamWrapper(stream), oid, TEXT);
+    }
+
   @Override
   public void setNull(int index, int oid) throws SQLException {
-
     byte binaryTransfer = TEXT;
     if (oid == Oid.BLOB || oid == Oid.BYTEA) {
       binaryTransfer = BINARY;

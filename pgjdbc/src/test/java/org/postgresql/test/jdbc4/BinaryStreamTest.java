@@ -10,14 +10,21 @@ import org.junit.Test;
 import org.postgresql.test.TestUtil;
 import org.postgresql.test.jdbc2.BaseTest4;
 
+import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Properties;
 import java.util.Random;
 
+/**
+ * Tests binary stream parameter binding.
+ *
+ * @since 2026-07-29
+ */
 public class BinaryStreamTest extends BaseTest4 {
-
   private ByteBuffer _testData;
 
   @Override
@@ -59,6 +66,24 @@ public class BinaryStreamTest extends BaseTest4 {
     }
   }
 
+    private void insertBinaryStreamUnknownLengthBlobModeOff(byte[] data) throws Exception {
+        Properties props = new Properties();
+        props.setProperty("blobMode", "OFF");
+        Connection streamCon = TestUtil.openDB(props);
+        try {
+            PreparedStatement updatePS =
+                streamCon.prepareStatement(TestUtil.insertSQL("images", "img", "?"));
+            try {
+                updatePS.setBinaryStream(1, new ByteArrayInputStream(data));
+                updatePS.executeUpdate();
+            } finally {
+                updatePS.close();
+            }
+        } finally {
+            TestUtil.closeDB(streamCon);
+        }
+    }
+
   private void validateContent(byte[] data) throws Exception {
     PreparedStatement selectPS = con.prepareStatement(TestUtil.selectSQL("images", "img"));
     try {
@@ -88,6 +113,14 @@ public class BinaryStreamTest extends BaseTest4 {
     _testData.get(data);
     return data;
   }
+
+    private byte[] getLargeTestData(int size) {
+        byte[] data = new byte[size];
+        for (int i = 0; i < data.length; i++) {
+            data[i] = (byte) i;
+        }
+        return data;
+    }
 
   @Test
   public void testKnownLengthEmpty() throws Exception {
@@ -158,4 +191,11 @@ public class BinaryStreamTest extends BaseTest4 {
     insertStreamUnkownLength(data);
     validateContent(data);
   }
+
+    @Test
+    public void testUnknownLength16Mb() throws Exception {
+        byte[] data = getLargeTestData(16 * 1024 * 1024);
+        insertBinaryStreamUnknownLengthBlobModeOff(data);
+        validateContent(data);
+    }
 }

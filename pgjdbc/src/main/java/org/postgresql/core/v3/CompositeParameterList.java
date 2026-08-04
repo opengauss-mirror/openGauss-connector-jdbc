@@ -132,6 +132,19 @@ class CompositeParameterList implements V3ParameterList {
     subparams[sub].setText(index - offsets[sub], stream);
   }
 
+    /**
+     * Binds a text stream to the corresponding sub-parameter.
+     *
+     * @param index the 1-based parameter index to bind.
+     * @param stream a stream containing the parameter data.
+     * @param oid the type OID of the parameter.
+     * @throws SQLException on binding failure.
+     */
+    public void setText(int index, InputStream stream, int oid) throws SQLException {
+        int sub = findSubParam(index);
+        subparams[sub].setText(index - offsets[sub], stream, oid);
+    }
+
   public void setNull(int index, int oid) throws SQLException {
     int sub = findSubParam(index);
     subparams[sub].setNull(index - offsets[sub], oid);
@@ -213,6 +226,18 @@ class CompositeParameterList implements V3ParameterList {
       int sub = findSubParam(index);
       subparams[sub].setBlob(index - offsets[sub], stream, length);
   }
+
+    /**
+     * Binds a BLOB stream to the corresponding sub-parameter.
+     *
+     * @param index the 1-based parameter index to bind.
+     * @param stream a stream containing the parameter data.
+     * @throws SQLException on binding failure.
+     */
+    public void setBlob(int index, InputStream stream) throws SQLException {
+        int sub = findSubParam(index);
+        subparams[sub].setBlob(index - offsets[sub], stream);
+    }
 
   public int getTypeOID(int index) {
      int[] oids = this.getTypeOIDs();

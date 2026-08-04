@@ -5,6 +5,7 @@
 
 package org.postgresql.test.jdbc2;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -18,6 +19,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.sql.Blob;
 import java.sql.Clob;
@@ -109,6 +111,37 @@ public class BlobTest {
     pstmt.setClob(2, clob);
     assertEquals(1, pstmt.executeUpdate());
   }
+
+    @Test
+    public void testSetBinaryStreamUnknownLength() throws Exception {
+        byte[] data = new byte[2 * 1024 * 1024];
+        for (int i = 0; i < data.length; i++) {
+            data[i] = (byte) i;
+        }
+
+        PreparedStatement pstmt = con.prepareStatement("INSERT INTO testblob(id, lo) VALUES (?, ?)");
+        try {
+            pstmt.setString(1, "setBinaryStreamUnknownLength");
+            pstmt.setBinaryStream(2, new ByteArrayInputStream(data));
+            assertEquals(1, pstmt.executeUpdate());
+        } finally {
+            pstmt.close();
+        }
+
+        PreparedStatement select = con.prepareStatement("SELECT lo FROM testblob WHERE id = ?");
+        try {
+            select.setString(1, "setBinaryStreamUnknownLength");
+            ResultSet rs = select.executeQuery();
+            try {
+                assertTrue(rs.next());
+                assertArrayEquals(data, rs.getBlob(1).getBytes(1, data.length));
+            } finally {
+                rs.close();
+            }
+        } finally {
+            select.close();
+        }
+    }
 
   /*
    * Tests one method of uploading a blob to the database

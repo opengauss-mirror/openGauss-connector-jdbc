@@ -173,6 +173,16 @@ public interface ParameterList {
    */
   void setBlob(int index, InputStream stream, int length) throws SQLException;
 
+    /**
+     * Binds a binary BLOB value stored as an InputStream.
+     * The stream should remain valid until query execution has completed.
+     *
+     * @param index the 1-based parameter index to bind.
+     * @param stream a stream containing the parameter data.
+     * @throws SQLException on error or if <code>index</code> is out of range
+     */
+    void setBlob(int index, InputStream stream) throws SQLException;
+
   /**
    * Binds a text value stored as an InputStream that is a valid UTF-8 byte stream.
    * Any byte-order marks (BOM) in the stream are passed to the backend.
@@ -184,6 +194,18 @@ public interface ParameterList {
    * @throws SQLException on error or if <code>index</code> is out of range
    */
   void setText(int index, InputStream stream) throws SQLException;
+
+    /**
+     * Binds a text value stored as an InputStream that is a valid UTF-8 byte stream.
+     * Any byte-order marks (BOM) in the stream are passed to the backend.
+     * The stream should remain valid until query execution has completed.
+     *
+     * @param index the 1-based parameter index to bind.
+     * @param stream a stream containing the parameter data.
+     * @param oid the type OID of the parameter.
+     * @throws SQLException on error or if <code>index</code> is out of range
+     */
+    void setText(int index, InputStream stream, int oid) throws SQLException;
 
   /**
    * Binds given byte[] value to a parameter. The bytes must already be in correct format matching

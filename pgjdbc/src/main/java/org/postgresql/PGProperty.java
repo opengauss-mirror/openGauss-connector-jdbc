@@ -183,6 +183,13 @@ public enum PGProperty {
   UNKNOWN_LENGTH("unknownLength", Integer.toString(Integer.MAX_VALUE),
       "Specifies the length to return for types of unknown length"),
 
+    /**
+     * Maximum number of characters buffered for stream parameters in simple query mode.
+     */
+    MAX_BUFFERED_STREAM_PARAMETER_CHARS("maxBufferedStreamParameterChars",
+        Integer.toString(16 * 1024 * 1024),
+        "Maximum number of characters buffered for stream parameters in simple query mode"),
+
   /**
    * When connections that are not explicitly closed are garbage collected, log the stacktrace from
    * the opening of the connection to trace the leak source.
