@@ -943,8 +943,10 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     final int dbVersion = queryExecutor.getServerVersionNum();
 
     if (dbVersion >= ServerVersion.v9_0.getVersionNum()) {
-      String setSql = "SET extra_float_digits = 3;set client_encoding = '"+CLIENT_ENCODING+"';";
-      SetupQueryRunner.run(queryExecutor, setSql, false);
+        StringBuilder sql = new StringBuilder("SET extra_float_digits = 3;set client_encoding = '");
+        Utils.escapeLiteral(sql, CLIENT_ENCODING, queryExecutor.getStandardConformingStrings());
+        sql.append("';");
+        SetupQueryRunner.run(queryExecutor, sql.toString(), false);
     }
 
     String appName = PGProperty.APPLICATION_NAME.get(info);
