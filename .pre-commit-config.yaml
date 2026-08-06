@@ -1,0 +1,35 @@
+# pre-commit 配置（hooks 仓库使用 GitCode 镜像，避免访问 GitHub）
+# 安装：pip install pre-commit && pre-commit install
+# 手动跑：pre-commit run --all-files
+
+exclude: |
+  (?x)^(
+    pgjdbc/target/|
+    .*/target/|
+    docs/_site/
+  )
+
+repos:
+  - repo: https://gitcode.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-xml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=1024']
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ['--fix=no']
+
+  # 复用仓库已有的 Maven Checkstyle
+  - repo: local
+    hooks:
+      - id: maven-checkstyle
+        name: Maven Checkstyle
+        entry: mvn -pl pgjdbc checkstyle:check -q
+        language: system
+        pass_filenames: false
+        files: \.java$
