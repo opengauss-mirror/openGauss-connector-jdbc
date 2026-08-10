@@ -1255,20 +1255,20 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
     private String readerToString(Reader value, int maxLength, boolean shouldLimitBufferedParameter)
         throws SQLException {
         try {
-            int bufferSize = Math.min(maxLength, 1024);
-            StringBuilder v = new StringBuilder(bufferSize);
+            int bufferSize = Math.min(Math.max(maxLength, 1), 1024);
+            StringBuilder v = new StringBuilder(Math.min(maxLength, 1024));
             char[] buf = new char[bufferSize];
             int nRead = 0;
             while (nRead > -1 && v.length() < maxLength) {
                 nRead = value.read(buf, 0, Math.min(bufferSize, maxLength - v.length()));
                 if (nRead > 0) {
-                    if (shouldLimitBufferedParameter
-                        && v.length() + nRead > getMaxBufferedStreamParameterChars()) {
-                        throw new PSQLException(GT.tr("Object is too large to send over the protocol."),
-                            PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE);
-                    }
                     v.append(buf, 0, nRead);
                 }
+            }
+            if (shouldLimitBufferedParameter && v.length() >= maxLength
+                && value.read(buf, 0, 1) != -1) {
+                throw new PSQLException(GT.tr("Object is too large to send over the protocol."),
+                    PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE);
             }
             return v.toString();
         } catch (IOException ioe) {
@@ -1511,7 +1511,8 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
  public void setCharacterStream(int parameterIndex, Reader value) throws SQLException {
    checkClosed();
    if (connection.getPreferQueryMode() == PreferQueryMode.SIMPLE) {
-        String s = (value != null) ? readerToString(value, Integer.MAX_VALUE, true) : null;
+        String s = (value != null)
+            ? readerToString(value, getMaxBufferedStreamParameterChars(), true) : null;
      setString(parameterIndex, s);
      return;
    }
@@ -1618,22 +1619,9 @@ class PgPreparedStatement extends PgStatement implements PreparedStatement {
             preparedParameters.setText(parameterIndex, new ReaderInputStream(reader), getStringType());
             return;
         }
-        StringBuffer strbuf = new StringBuffer();
-        char[] buf = new char[1024];
-        int num = 0;
-        try {
-            while ((num = reader.read(buf)) != -1) {
-                if (strbuf.length() + num > getMaxBufferedStreamParameterChars()) {
-                    throw new PSQLException(GT.tr("Object is too large to send over the protocol."),
-                        PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE);
-                }
-                strbuf.append(buf, 0, num);
-            }
-        } catch (IOException e) {
-            throw new SQLException(e.getMessage());
-        }
+        String str = readerToString(reader, getMaxBufferedStreamParameterChars(), true);
         setString(
-                parameterIndex, strbuf.toString(), (connection.getStringVarcharFlag() ? Oid.VARCHAR : Oid.UNSPECIFIED));
+                parameterIndex, str, (connection.getStringVarcharFlag() ? Oid.VARCHAR : Oid.UNSPECIFIED));
     }
 
     private static class FixedLengthReader extends Reader {

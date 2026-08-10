@@ -187,7 +187,7 @@ public enum PGProperty {
      * Maximum number of characters buffered for stream parameters in simple query mode.
      */
     MAX_BUFFERED_STREAM_PARAMETER_CHARS("maxBufferedStreamParameterChars",
-        Integer.toString(16 * 1024 * 1024),
+        Integer.toString(4 * 1024 * 1024),
         "Maximum number of characters buffered for stream parameters in simple query mode"),
 
   /**
