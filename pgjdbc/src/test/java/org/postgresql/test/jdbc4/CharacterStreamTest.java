@@ -8,6 +8,7 @@ package org.postgresql.test.jdbc4;
 import org.postgresql.PGProperty;
 import org.postgresql.test.TestUtil;
 import org.postgresql.test.jdbc2.BaseTest4;
+import org.postgresql.util.PSQLState;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -172,10 +173,36 @@ public class CharacterStreamTest extends BaseTest4 {
         };
     }
 
+    private static Reader infiniteReader() {
+        return new Reader() {
+            @Override
+            public int read(char[] cbuf, int off, int len) throws IOException {
+                for (int i = 0; i < len; i++) {
+                    cbuf[off + i] = 'x';
+                }
+                return len;
+            }
+
+            @Override
+            public void close() throws IOException {
+            }
+        };
+    }
+
     private void assertSimpleModeReaderRejected(ReaderAction action) throws Exception {
+        assertSimpleModeReaderRejected(action, Integer.valueOf(1024));
+    }
+
+    private void assertSimpleModeDefaultReaderRejected(ReaderAction action) throws Exception {
+        assertSimpleModeReaderRejected(action, null);
+    }
+
+    private void assertSimpleModeReaderRejected(ReaderAction action, Integer maxChars) throws Exception {
         Properties props = new Properties();
         PGProperty.PREFER_QUERY_MODE.set(props, "simple");
-        PGProperty.MAX_BUFFERED_STREAM_PARAMETER_CHARS.set(props, 1024);
+        if (maxChars != null) {
+            PGProperty.MAX_BUFFERED_STREAM_PARAMETER_CHARS.set(props, maxChars.intValue());
+        }
         Connection simpleCon = TestUtil.openDB(props);
         try {
             PreparedStatement ps = simpleCon.prepareStatement("SELECT ?");
@@ -183,7 +210,31 @@ public class CharacterStreamTest extends BaseTest4 {
                 action.set(ps);
                 Assert.fail("large stream parameter should be rejected");
             } catch (SQLException e) {
-                // expected
+                Assert.assertEquals(PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE.getState(), e.getSQLState());
+            } finally {
+                TestUtil.closeQuietly(ps);
+            }
+        } finally {
+            TestUtil.closeDB(simpleCon);
+        }
+    }
+
+    private void assertSimpleModeReaderAccepted(ReaderAction action, String expected) throws Exception {
+        Properties props = new Properties();
+        PGProperty.PREFER_QUERY_MODE.set(props, "simple");
+        PGProperty.MAX_BUFFERED_STREAM_PARAMETER_CHARS.set(props, expected.length());
+        Connection simpleCon = TestUtil.openDB(props);
+        try {
+            PreparedStatement ps = simpleCon.prepareStatement("SELECT ?");
+            try {
+                action.set(ps);
+                ResultSet rs = ps.executeQuery();
+                try {
+                    Assert.assertTrue(rs.next());
+                    Assert.assertEquals(expected, rs.getString(1));
+                } finally {
+                    TestUtil.closeQuietly(rs);
+                }
             } finally {
                 TestUtil.closeQuietly(ps);
             }
@@ -377,7 +428,38 @@ public class CharacterStreamTest extends BaseTest4 {
         assertSimpleModeReaderRejected(new ReaderAction() {
             @Override
             public void set(PreparedStatement ps) throws SQLException {
-                ps.setCharacterStream(1, repeatingReader(2 * 1024));
+                ps.setCharacterStream(1, repeatingReader(1025));
+            }
+        });
+    }
+
+    @Test
+    public void testSimpleModeUnknownLengthCharacterStreamAtLimitAccepted() throws Exception {
+        final String expected = getTestData(1024);
+        assertSimpleModeReaderAccepted(new ReaderAction() {
+            @Override
+            public void set(PreparedStatement ps) throws SQLException {
+                ps.setCharacterStream(1, new StringReader(expected));
+            }
+        }, expected);
+    }
+
+    @Test
+    public void testSimpleModeUnknownLengthCharacterStreamInfiniteRejected() throws Exception {
+        assertSimpleModeReaderRejected(new ReaderAction() {
+            @Override
+            public void set(PreparedStatement ps) throws SQLException {
+                ps.setCharacterStream(1, infiniteReader());
+            }
+        });
+    }
+
+    @Test
+    public void testSimpleModeDefaultInfiniteCharacterStreamRejected() throws Exception {
+        assertSimpleModeDefaultReaderRejected(new ReaderAction() {
+            @Override
+            public void set(PreparedStatement ps) throws SQLException {
+                ps.setCharacterStream(1, infiniteReader());
             }
         });
     }
@@ -387,7 +469,28 @@ public class CharacterStreamTest extends BaseTest4 {
         assertSimpleModeReaderRejected(new ReaderAction() {
             @Override
             public void set(PreparedStatement ps) throws SQLException {
-                ps.setClob(1, repeatingReader(2 * 1024));
+                ps.setClob(1, repeatingReader(1025));
+            }
+        });
+    }
+
+    @Test
+    public void testSimpleModeUnknownLengthClobAtLimitAccepted() throws Exception {
+        final String expected = getTestData(1024);
+        assertSimpleModeReaderAccepted(new ReaderAction() {
+            @Override
+            public void set(PreparedStatement ps) throws SQLException {
+                ps.setClob(1, new StringReader(expected));
+            }
+        }, expected);
+    }
+
+    @Test
+    public void testSimpleModeUnknownLengthClobInfiniteRejected() throws Exception {
+        assertSimpleModeReaderRejected(new ReaderAction() {
+            @Override
+            public void set(PreparedStatement ps) throws SQLException {
+                ps.setClob(1, infiniteReader());
             }
         });
     }

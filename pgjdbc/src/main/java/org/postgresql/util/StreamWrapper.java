@@ -20,10 +20,14 @@ import java.io.OutputStream;
  * @author Oliver Jowett (oliver@opencloud.com)
  */
 public class StreamWrapper {
-
   private static final int MAX_MEMORY_BUFFER_BYTES = 51200;
 
   private static final String TEMP_FILE_PREFIX = "postgres-pgjdbc-stream";
+
+    private final InputStream stream;
+    private final byte[] rawData;
+    private final int offset;
+    private final int length;
 
   public StreamWrapper(byte[] data, int offset, int length) {
     this.stream = null;
@@ -40,6 +44,7 @@ public class StreamWrapper {
   }
 
   public StreamWrapper(InputStream stream) throws PSQLException {
+    File temporaryFile = null;
     try {
       ByteArrayOutputStream memoryOutputStream = new ByteArrayOutputStream();
       final int memoryLength = copyStream(stream, memoryOutputStream, MAX_MEMORY_BUFFER_BYTES);
@@ -47,18 +52,18 @@ public class StreamWrapper {
 
       if (memoryLength == -1) {
         final int diskLength;
-        final File tempFile = File.createTempFile(TEMP_FILE_PREFIX, null);
+        final File tempFile = temporaryFile = File.createTempFile(TEMP_FILE_PREFIX, null);
         FileOutputStream diskOutputStream = new FileOutputStream(tempFile);
-        diskOutputStream.write(rawDataArray);
         try {
-          diskLength = copyStream(stream, diskOutputStream, Integer.MAX_VALUE - rawDataArray.length);
-          if (diskLength == -1) {
-            throw new PSQLException(GT.tr("Object is too large to send over the protocol."),
-                PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE);
-          }
-          diskOutputStream.flush();
+            diskOutputStream.write(rawDataArray);
+            diskLength = copyStream(stream, diskOutputStream, Integer.MAX_VALUE - rawDataArray.length);
+            if (diskLength == -1) {
+                throw new PSQLException(GT.tr("Object is too large to send over the protocol."),
+                    PSQLState.NUMERIC_CONSTANT_OUT_OF_RANGE);
+            }
+            diskOutputStream.flush();
         } finally {
-          diskOutputStream.close();
+            diskOutputStream.close();
         }
         this.offset = 0;
         this.length = rawDataArray.length + diskLength;
@@ -107,9 +112,12 @@ public class StreamWrapper {
 
           public void close() throws IOException {
             if (!_closed) {
-              super.close();
-              tempFile.delete();
-              _closed = true;
+                try {
+                    super.close();
+                } finally {
+                    deleteTemporaryFile(tempFile);
+                    _closed = true;
+                }
             }
           }
 
@@ -126,7 +134,11 @@ public class StreamWrapper {
         this.offset = 0;
         this.length = rawData.length;
       }
+    } catch (PSQLException e) {
+        deleteTemporaryFile(temporaryFile);
+        throw e;
     } catch (IOException e) {
+        deleteTemporaryFile(temporaryFile);
       throw new PSQLException(GT.tr("An I/O error occured while sending to the backend."),
           PSQLState.IO_ERROR, e);
     }
@@ -172,8 +184,9 @@ public class StreamWrapper {
     return totalLength;
   }
 
-  private final InputStream stream;
-  private final byte[] rawData;
-  private final int offset;
-  private final int length;
+    private static void deleteTemporaryFile(File temporaryFile) {
+        if (temporaryFile != null && temporaryFile.exists() && !temporaryFile.delete()) {
+            temporaryFile.deleteOnExit();
+        }
+    }
 }
