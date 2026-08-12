@@ -24,10 +24,15 @@ import java.sql.SQLWarning;
 import java.util.ArrayList;
 import java.util.Properties;
 
-
+/**
+ * Base implementation shared by query executors.
+ *
+ * @since 2026-08-12
+ */
 public abstract class QueryExecutorBase implements QueryExecutor {
+    static final int MAX_NOTIFICATION_QUEUE_SIZE = 1024;
+    private static Log LOGGER = Logger.getLogger(QueryExecutorBase.class.getName());
 
-  private static Log LOGGER = Logger.getLogger(QueryExecutorBase.class.getName());
   protected final PGStream pgStream;
   private final String user;
   private final String database;
@@ -226,8 +231,16 @@ public abstract class QueryExecutorBase implements QueryExecutor {
   }
 
   public synchronized void addNotification(PGNotification notification) {
-    notifications.add(notification);
+    enqueueNotification(notifications, notification);
   }
+
+    static void enqueueNotification(ArrayList<PGNotification> notifications,
+        PGNotification notification) {
+        if (notifications.size() >= MAX_NOTIFICATION_QUEUE_SIZE) {
+            notifications.remove(0);
+        }
+        notifications.add(notification);
+    }
 
   @Override
   public synchronized PGNotification[] getNotifications() throws SQLException {

@@ -582,7 +582,7 @@ public enum PGProperty {
   /**
    * Factory class to instantiate factories for XML processing.
    * The default factory disables external entity processing.
-   * Legacy behavior with external entity processing can be enabled by specifying a value of LEGACY_INSECURE.
+   * The value LEGACY_INSECURE is kept as a compatibility alias and still resolves to the secure default behavior.
    * Or specify a custom class that implements {@code org.postgresql.xml.PGXmlFactoryFactory}.
    */
   XML_FACTORY_FACTORY(

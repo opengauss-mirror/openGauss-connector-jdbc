@@ -5,8 +5,12 @@
 
 package org.postgresql.core;
 
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.PSQLState;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -181,6 +185,25 @@ public class ParserTest {
     boolean returningKeywordPresent = qry.get(0).command.isReturningKeywordPresent();
     Assert.assertFalse("There's no top-level <<returning>> clause " + query, returningKeywordPresent);
   }
+
+    @Test
+    public void rejectMaliciousReturningColumnWhenIdentifiersAreNotQuoted() throws SQLException {
+        try {
+            Parser.parseJdbcSql("INSERT INTO t(v) VALUES (1)", true, true, true, true, false,
+                "(SELECT current_user)");
+            fail("Expected generated-keys column validation to reject SQL fragments");
+        } catch (PSQLException e) {
+            assertEquals(PSQLState.INVALID_PARAMETER_VALUE.getState(), e.getSQLState());
+        }
+    }
+
+    @Test
+    public void allowQuotedReturningIdentifierWhenIdentifiersAreNotQuoted() throws SQLException {
+        List<NativeQuery> qry =
+            Parser.parseJdbcSql("INSERT INTO t(v) VALUES (1)", true, true, true, true, false,
+                "\"safe_identifier\"");
+        Assert.assertTrue(qry.get(0).nativeSql.contains("RETURNING \"safe_identifier\""));
+    }
 
   @Test
   public void insertBatchedReWriteOnConflict() throws SQLException {

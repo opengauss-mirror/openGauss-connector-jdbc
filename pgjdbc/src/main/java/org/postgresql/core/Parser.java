@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Basic query parser infrastructure.
@@ -30,6 +31,10 @@ import java.util.Set;
 public class Parser {
   private static final int[] NO_BINDS = new int[0];
   private static final char[] chars = new char[]{' ','\n','\r','\t'};
+    private static final Pattern UNQUOTED_RETURNING_IDENTIFIER =
+        Pattern.compile("[A-Za-z_][A-Za-z0-9_$]*");
+    private static final Pattern QUOTED_RETURNING_IDENTIFIER =
+        Pattern.compile("\"(?:[^\"]|\"\")*\"");
   private static final Set<String> FUNCTION_MATCH_FIRST = new HashSet<String>() {
     {
       add("BEGIN");
@@ -555,11 +560,22 @@ public class Parser {
       if (isQuotedReturningIdentifiers) {
         Utils.escapeIdentifier(nativeSql, columnName);
       } else {
+        validateReturningColumnName(columnName);
         nativeSql.append(columnName);
       }
     }
     return true;
   }
+
+    private static void validateReturningColumnName(String columnName) throws PSQLException {
+        if (UNQUOTED_RETURNING_IDENTIFIER.matcher(columnName).matches()
+            || QUOTED_RETURNING_IDENTIFIER.matcher(columnName).matches()) {
+            return;
+        }
+        throw new PSQLException(
+            GT.tr("Invalid generated-keys column name: {0}.", columnName),
+            PSQLState.INVALID_PARAMETER_VALUE);
+    }
 
   /**
    * Converts {@code List<Integer>} to {@code int[]}. Empty and {@code null} lists are converted to
