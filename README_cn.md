@@ -140,7 +140,13 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
    ```
    host    all             all             0.0.0.0/0               sha256
    ```
+   
+   设置GUC参数instr_unique_sql_count，并将该参数的修改持久化到postgresql.conf配置文件中：
 
+   ```
+   ALTER SYSTEM SET instr_unique_sql_count = 10000
+   ```
+   
    然后重启opengauss数据库。
 
 3. 登录数据库
@@ -203,7 +209,7 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
 4. 执行测试用例
 
    ```
-   mvn test
+   mvn clean test -Dgpg.skip -Dproject.build.sourceEncoding=UTF-8 -Dproject.reporting.outputEncoding=UTF-8
    ```
 
 ## JDBC的使用
