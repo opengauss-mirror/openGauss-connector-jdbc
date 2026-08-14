@@ -386,8 +386,15 @@ public class Driver implements java.sql.Driver {
         } catch (Exception ex2) {
             LOGGER.debug("Unexpected connection error: ", ex2);
             throw new PSQLException(GT.tr("Something unusual has occured to cause the driver to fail: {0}.",
-                    ex2.getMessage()), PSQLState.UNEXPECTED_ERROR, ex2);
+                    formatUnexpectedConnectionError(ex2)), PSQLState.UNEXPECTED_ERROR, ex2);
         }
+    }
+
+    private static String formatUnexpectedConnectionError(Exception ex) {
+        if (ex.getMessage() != null && !ex.getMessage().isEmpty()) {
+            return ex.getMessage();
+        }
+        return ex.toString();
     }
 
     /**

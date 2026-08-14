@@ -192,21 +192,22 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       HostChooser hostChooser =
               HostChooserFactory.createHostChooser(currentSpecs, HostRequirement.any, info);
       Iterator<CandidateHost> hostIter = hostChooser.iterator();
+      StringBuilder failureDetail = new StringBuilder();
       while (hostIter.hasNext()) {
         CandidateHost candidateHost = hostIter.next();
-        boolean isSuccessed = createConnection(candidateHost, info);
+        boolean isSuccessed = createConnection(candidateHost, info, failureDetail);
         if (isSuccessed) {
           this.connection.setHostSpec(candidateHost.hostSpec);
           return;
         }
         if (!hostIter.hasNext()) {
-          throw new SQLException("Connection refused, all hosts failed to connect.");
+          throw new SQLException("Connection refused, all hosts failed to connect." + failureDetail.toString());
         }
       }
     }
   }
 
-  private boolean createConnection(CandidateHost candidateHost, Properties info) {
+  private boolean createConnection(CandidateHost candidateHost, Properties info, StringBuilder failureDetail) {
     HostSpec hostSpec = candidateHost.hostSpec;
     ORStream orStream = null;
     try {
@@ -219,10 +220,12 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
       } catch (SQLException e2) {
         LOGGER.error("SQLException occur, connect to host " + hostSpec + " failed.", e2);
         closeStream(orStream);
+        appendConnectFailureDetail(failureDetail, hostSpec, e2);
         return false;
       } catch (IOException e3) {
         LOGGER.error("IOException occur, connect to host " + hostSpec + " failed.", e3);
         closeStream(orStream);
+        appendConnectFailureDetail(failureDetail, hostSpec, e3);
         return false;
       }
     }
@@ -230,6 +233,16 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     connection.setQueryExecutor(queryExecutor);
     LOGGER.debug("connect to host " + hostSpec + " success.");
     return true;
+  }
+
+  private void appendConnectFailureDetail(StringBuilder sb, HostSpec hostSpec, Exception e) {
+    sb.append(" [host=").append(hostSpec).append(", ").append(e.toString());
+    Throwable cause = e.getCause();
+    while (cause != null) {
+      sb.append(", caused by: ").append(cause.toString());
+      cause = cause.getCause();
+    }
+    sb.append(']');
   }
 
   private void closeStream(ORStream orStream) {
