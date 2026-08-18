@@ -179,6 +179,10 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   private static final int PROTOCOL3_MSGLEN_OFFSET = 4;
 
+    private static final int MIN_PARAMETER_STATUS_PAYLOAD_BYTES = 2;
+
+    private static final int MAX_PARAMETER_STATUS_PAYLOAD_BYTES = 65536;
+
   private static final int TIME_NS_ONE_US = 1000;
 
     private final int maxCopyDataReceiveBytes;
@@ -3396,9 +3400,12 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   public void receiveParameterStatus() throws IOException, SQLException {
     // ParameterStatus
-    int l_len = pgStream.receiveInteger4();
-    String name = pgStream.receiveString();
-    String value = pgStream.receiveString();
+    int messageLength = pgStream.receiveInteger4();
+    int payloadLength = validateParameterStatusMessageLength(messageLength);
+    byte[] payload = pgStream.receive(payloadLength, MAX_PARAMETER_STATUS_PAYLOAD_BYTES);
+    String[] parameterStatus = parseParameterStatusPayload(pgStream.getEncoding(), payload);
+    String name = parameterStatus[0];
+    String value = parameterStatus[1];
 
     if (name.equals(GUC_SERVER_SUPPORT_TRACE)) {
       // receive GUC_SERVER_SUPPORT_TRACE from server means server support trace
@@ -3471,6 +3478,42 @@ public class QueryExecutorImpl extends QueryExecutorBase {
       }
     }
   }
+
+    static int validateParameterStatusMessageLength(int messageLength) throws PSQLException {
+        int payloadLength = messageLength - PROTOCOL3_MSGLEN_OFFSET;
+        if (payloadLength < MIN_PARAMETER_STATUS_PAYLOAD_BYTES
+            || payloadLength > MAX_PARAMETER_STATUS_PAYLOAD_BYTES) {
+            throw new PSQLException(GT.tr("Malformed ParameterStatus message."),
+                PSQLState.PROTOCOL_VIOLATION);
+        }
+        return payloadLength;
+    }
+
+    static String[] parseParameterStatusPayload(Encoding encoding, byte[] payload)
+        throws IOException, SQLException {
+        int nameTerminator = -1;
+        int valueTerminator = -1;
+        for (int i = 0; i < payload.length; i++) {
+            if (payload[i] == 0) {
+                if (nameTerminator < 0) {
+                    nameTerminator = i;
+                } else {
+                    valueTerminator = i;
+                    break;
+                }
+            }
+        }
+
+        if (nameTerminator < 0 || valueTerminator < 0 || valueTerminator != payload.length - 1) {
+            throw new PSQLException(GT.tr("Malformed ParameterStatus message."),
+                PSQLState.PROTOCOL_VIOLATION);
+        }
+
+        String name = encoding.decode(payload, 0, nameTerminator);
+        String value = encoding.decode(payload, nameTerminator + 1,
+            valueTerminator - nameTerminator - 1);
+        return new String[]{name, value};
+    }
 
   private List<String> strSplit(String value) {
     if (value == null) {

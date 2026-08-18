@@ -49,6 +49,9 @@ import javax.security.auth.x500.X500Principal;
  * A Key manager that only loads the keys, if necessary.
  */
 public class LazyKeyManager implements X509KeyManager {
+    private static final long MAX_SSL_KEY_FILE_SIZE = 10L * 1024L * 1024L;
+    private static Log LOGGER = Logger.getLogger(LazyKeyManager.class.getName());
+
   private X509Certificate[] cert = null;
   private PrivateKey key = null;
   private String certfile;
@@ -59,7 +62,7 @@ public class LazyKeyManager implements X509KeyManager {
   private String privateKeyFactory;
   private Class<?> privateKeyFactoryCls;
   private boolean pkFactoryClsNotFound = false;
-  private static Log LOGGER = Logger.getLogger(LazyKeyManager.class.getName());
+
   /**
    * Constructor. certfile and keyfile can be null, in that case no certificate is presented to the
    * server.
@@ -185,7 +188,14 @@ public class LazyKeyManager implements X509KeyManager {
           throwNotDefaultFileException(ex);
           return null;
         }
-        byte[] keydata = new byte[(int) raf.length()];
+        long keyFileLength = raf.length();
+        if (keyFileLength > MAX_SSL_KEY_FILE_SIZE) {
+            error = new PSQLException(
+                GT.tr("Could not read SSL key file {0}: file is too large.", keyfile),
+                PSQLState.CONNECTION_FAILURE);
+          return null;
+        }
+        byte[] keydata = new byte[(int) keyFileLength];
         raf.readFully(keydata);
         raf.close();
         raf = null;
