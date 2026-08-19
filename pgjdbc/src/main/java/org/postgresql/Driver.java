@@ -360,11 +360,13 @@ public class Driver implements java.sql.Driver {
             // the connection; at that point we clean up the connection if
             // we managed to establish one after all. See ConnectThread for
             // more details.
+
+            if (isOGRAC) {
+                return makeCTConnection(url, props);
+            }
+
             long timeout = timeout(props);
             if (timeout <= 0) {
-                if (isOGRAC) {
-                    return makeCTConnection(url, props);
-                }
                 Connection con = makeConnection(url, props);
                 return con;
             }
