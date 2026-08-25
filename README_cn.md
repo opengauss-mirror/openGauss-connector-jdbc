@@ -108,7 +108,7 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
    [user@linux sda]$ cd /sda/openGauss-connector-jdbc/
    ```
 
-2. 执行如下命令使用build.sh进行打包：
+2. 执行如下命令使用build.sh进行打包，打包过程中将Maven的下载源改成国内源：
 
    ```
    [user@linux openGauss-connector-jdbc]$ sh build.sh
@@ -209,7 +209,7 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
 4. 执行测试用例
 
    ```
-   mvn clean test -Dgpg.skip -Dproject.build.sourceEncoding=UTF-8 -Dproject.reporting.outputEncoding=UTF-8
+   mvn clean test -Dgpg.skip -Dtest=org.postgresql.**.* -Dproject.build.sourceEncoding=UTF-8 -Dproject.reporting.outputEncoding=UTF-8
    ```
 
 ## JDBC的使用
