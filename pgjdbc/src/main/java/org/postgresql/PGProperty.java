@@ -241,11 +241,11 @@ public enum PGProperty {
       "Argument forwarded to constructor of SSLSocketFactory class."),
 
   /**
-   * Classname of the SSL HostnameVerifier to use (instance of {@code
-   * javax.net.ssl.HostnameVerifier}).
+   * HostnameVerifier to use. Only {@code org.postgresql.ssl.PGjdbcHostnameVerifier} is supported;
+   * arbitrary class names are rejected to prevent loading externally controlled code.
    */
   SSL_HOSTNAME_VERIFIER("sslhostnameverifier", null,
-      "A class, implementing javax.net.ssl.HostnameVerifier that can verify the server"),
+          "Only org.postgresql.ssl.PGjdbcHostnameVerifier is supported."),
 
   /**
    * File containing the SSL Certificate. Default will be the file {@code postgresql.crt} in {@code
