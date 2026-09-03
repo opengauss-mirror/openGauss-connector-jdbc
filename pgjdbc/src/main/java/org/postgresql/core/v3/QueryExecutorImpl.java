@@ -185,6 +185,14 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   private static final int TIME_NS_ONE_US = 1000;
 
+  /**
+   * Maximum allowed length (bytes) of a backend AsyncNotify ('A') message. Legitimate NOTIFY
+   * payloads are tiny (openGauss/PostgreSQL caps the payload well under 8 KB), so this only
+   * exists to reject a malicious backend that declares an enormous msglen to drive an unbounded
+   * allocation or scan.
+   */
+  private static final int MAX_ASYNC_NOTIFY_LENGTH = 1024 * 1024; // 1 MB
+
     private final int maxCopyDataReceiveBytes;
 
   public QueryExecutorImpl(PGStream pgStream, String user, String database,
@@ -952,9 +960,6 @@ public class QueryExecutorImpl extends QueryExecutorBase {
           setSocketTimeout(timeoutMillis);
         }
         int c = pgStream.receiveChar();
-        if (useTimeout && timeoutMillis >= 0) {
-          setSocketTimeout(0); // Don't timeout after first char
-        }
         switch (c) {
           case 'A': // Asynchronous Notify
             receiveAsyncNotify();
@@ -3205,14 +3210,42 @@ public class QueryExecutorImpl extends QueryExecutorBase {
 
   private void receiveAsyncNotify() throws IOException {
     int msglen = pgStream.receiveInteger4();
+    if (msglen < 10 || msglen > MAX_ASYNC_NOTIFY_LENGTH) {
+      throw new IOException(GT.tr("Protocol error: invalid AsyncNotify message length {0}",
+          Integer.toString(msglen)));
+    }
     int pid = pgStream.receiveInteger4();
-    String msg = pgStream.receiveString();
-    String param = pgStream.receiveString();
+    receiveAsyncNotifyPayload(msglen - 8, pid);
+  }
+
+  private void receiveAsyncNotifyPayload(int payloadLength, int pid) throws IOException {
+    // Read exactly the declared payload, then parse the two NUL-terminated strings within it so
+    // the scan cannot run past the frame boundary.
+    byte[] payload = pgStream.receive(payloadLength);
+    int msgEnd = indexOfNull(payload, 0);
+    if (msgEnd < 0) {
+      throw new IOException(GT.tr("Protocol error: AsyncNotify channel name not terminated"));
+    }
+    int paramEnd = indexOfNull(payload, msgEnd + 1);
+    if (paramEnd < 0 || paramEnd != payload.length - 1) {
+      throw new IOException(GT.tr("Protocol error: malformed AsyncNotify payload"));
+    }
+    String msg = pgStream.getEncoding().decode(payload, 0, msgEnd);
+    String param = pgStream.getEncoding().decode(payload, msgEnd + 1, paramEnd - msgEnd - 1);
     addNotification(new org.postgresql.core.Notification(msg, pid, param));
 
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace(" <=BE AsyncNotify(" + pid + "," + msg + "," + param + ")");
     }
+  }
+
+  private static int indexOfNull(byte[] data, int start) {
+    for (int i = start; i < data.length; i++) {
+      if (data[i] == 0) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   private SQLException receiveErrorResponse() throws IOException {
