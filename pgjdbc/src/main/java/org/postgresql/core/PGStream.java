@@ -436,14 +436,21 @@ public class PGStream implements Closeable, Flushable {
    * @throws IOException if a data I/O error occurs
    */
   public byte[][] receiveTupleV3() throws IOException, OutOfMemoryError {
-    // TODO: use l_msgSize
     int l_msgSize = receiveInteger4();
     int l_nf = receiveInteger2();
+    if (l_msgSize < 6 || (long) l_nf * 4L > l_msgSize - 6L) {
+      throw new IOException("unexpected length of DataRow message");
+    }
+    long remaining = l_msgSize - 6L;
     byte[][] answer = new byte[l_nf][];
 
     OutOfMemoryError oom = null;
     for (int i = 0; i < l_nf; ++i) {
       int l_size = receiveInteger4();
+      remaining -= 4;
+      if (l_size < -1 || (long) l_size > remaining) {
+        throw new IOException("unexpected length of DataRow field");
+      }
       if (l_size != -1) {
         try {
           answer[i] = new byte[l_size];
@@ -452,7 +459,12 @@ public class PGStream implements Closeable, Flushable {
           oom = oome;
           skip(l_size);
         }
+        remaining -= l_size;
       }
+    }
+
+    if (remaining != 0) {
+      throw new IOException("unexpected length of DataRow message");
     }
 
     if (oom != null) {
@@ -501,20 +513,28 @@ public class PGStream implements Closeable, Flushable {
     public byte[][] receiveTuple(QueryExecutionResult queryExecutionResult) throws IOException, OutOfMemoryError {
         int msgSize = receiveInteger4();
         int nf = receiveInteger2();
+        if (msgSize < 6 || (long) nf * 4L > msgSize - 6L) {
+            throw new IOException("unexpected length of DataRow message");
+        }
         byte[][] answer = new byte[nf][];
         byte[] buf = pg_input.getBuffer();
         int index = pg_input.getIndex();
         byte[] resultHash = null;
-        if (msgSize > 6 && index + msgSize - 6 <= buf.length) {
+        if (msgSize > 6 && (long) index + msgSize - 6L <= buf.length) {
             int len = msgSize - 6;
             // ATF: To verify the integrity of replayed SQL results,
             // calculate the hash of the tuple and update the hash value in queryExecutionResult
             resultHash = hashBytes(buf, index, len);
             queryExecutionResult.updateHash(resultHash);
         }
+        long remaining = msgSize - 6L;
         OutOfMemoryError oom = null;
         for (int i = 0; i < nf; ++i) {
             int lSize = receiveInteger4();
+            remaining -= 4;
+            if (lSize < -1 || (long) lSize > remaining) {
+                throw new IOException("unexpected length of DataRow field");
+            }
             if (lSize != -1) {
                 try {
                     answer[i] = new byte[lSize];
@@ -523,7 +543,12 @@ public class PGStream implements Closeable, Flushable {
                     oom = oome;
                     skip(lSize);
                 }
+                remaining -= lSize;
             }
+        }
+
+        if (remaining != 0) {
+            throw new IOException("unexpected length of DataRow message");
         }
 
         if (oom != null) {
