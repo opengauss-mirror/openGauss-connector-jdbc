@@ -9,6 +9,7 @@ import org.postgresql.copy.CopyDual;
 import org.postgresql.core.PGStream;
 import org.postgresql.core.QueryExecutor;
 import org.postgresql.core.ReplicationProtocol;
+import org.postgresql.core.Utils;
 import org.postgresql.replication.PGReplicationStream;
 import org.postgresql.replication.ReplicationType;
 import org.postgresql.replication.fluent.CommonOptions;
@@ -68,11 +69,13 @@ public class V3ReplicationProtocol implements ReplicationProtocol {
   /**
    * START_REPLICATION [SLOT slot_name] [PHYSICAL] XXX/XXX.
    */
-  private String createStartPhysicalQuery(PhysicalReplicationOptions options) {
+  private String createStartPhysicalQuery(PhysicalReplicationOptions options)
+      throws SQLException {
     StringBuilder builder = new StringBuilder();
     builder.append("START_REPLICATION");
 
     if (options.getSlotName() != null) {
+      validateSlotName(options.getSlotName());
       builder.append(" SLOT ").append(options.getSlotName());
     }
 
@@ -84,10 +87,13 @@ public class V3ReplicationProtocol implements ReplicationProtocol {
   /**
    * START_REPLICATION SLOT slot_name LOGICAL XXX/XXX [ ( option_name [option_value] [, ... ] ) ]
    */
-  private String createStartLogicalQuery(LogicalReplicationOptions options) {
+  private String createStartLogicalQuery(LogicalReplicationOptions options)
+      throws SQLException {
     StringBuilder builder = new StringBuilder();
+    String slotName = options.getSlotName();
+    validateSlotName(slotName);
     builder.append("START_REPLICATION SLOT ")
-        .append(options.getSlotName())
+        .append(slotName)
         .append(" LOGICAL ")
         .append(options.getStartLSNPosition().asString());
 
@@ -96,7 +102,7 @@ public class V3ReplicationProtocol implements ReplicationProtocol {
       return builder.toString();
     }
 
-    //todo replace on java 8
+    boolean isStandardConformingStrings = queryExecutor.getStandardConformingStrings();
     builder.append(" (");
     boolean isFirst = true;
     for (String name : slotOptions.stringPropertyNames()) {
@@ -105,12 +111,39 @@ public class V3ReplicationProtocol implements ReplicationProtocol {
       } else {
         builder.append(", ");
       }
-      builder.append('\"').append(name).append('\"').append(" ")
-          .append('\'').append(slotOptions.getProperty(name)).append('\'');
+      Utils.escapeIdentifier(builder, name);
+      builder.append(" '");
+      Utils.escapeLiteral(builder, slotOptions.getProperty(name), isStandardConformingStrings);
+      builder.append("'");
     }
     builder.append(")");
 
     return builder.toString();
+  }
+
+  /**
+   * Validate a replication slot name. PostgreSQL/openGauss restricts slot names to lowercase
+   * letters, digits and underscore, length 1..63. Rejecting anything else prevents an
+   * attacker-controlled slot name from breaking out of the {@code START_REPLICATION} command.
+   */
+  private static void validateSlotName(String slotName) throws SQLException {
+    if (slotName == null || slotName.isEmpty()) {
+      throw new PSQLException(GT.tr("Replication slot name must not be null or empty."),
+          PSQLState.INVALID_PARAMETER_VALUE);
+    }
+    if (slotName.length() > 63) {
+      throw new PSQLException(
+          GT.tr("Replication slot name too long: {0}", slotName),
+          PSQLState.INVALID_PARAMETER_VALUE);
+    }
+    for (int i = 0; i < slotName.length(); i++) {
+      char c = slotName.charAt(i);
+      if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')) {
+        throw new PSQLException(
+            GT.tr("Replication slot name contains invalid character: {0}", slotName),
+            PSQLState.INVALID_PARAMETER_VALUE);
+      }
+    }
   }
 
   private void configureSocketTimeout(CommonOptions options) throws PSQLException {
