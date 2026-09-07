@@ -130,8 +130,12 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
 #### 安装并配置opengauss数据库环境
 
 1. 安装数据库
+
+   先安装opengauss数据库，下载openGauss 7.0.0-RC3极简版的数据库：https://opengauss.org/zh/download/?version=rc
+
+   根据当前操作系统架构选择相应的opengauss安装包安装，参考官网极简版数据库安装步骤进行安装：https://docs.opengauss.org/zh/docs/latest/installation_guide/installation_on_a_single_node.html 
    
-   安装opengauss数据库步骤请参考server仓的README说明：https://gitcode.com/opengauss/openGauss-server
+   安装时指定安装端口为5432，如果该端口被占用，改用空闲端口，并在跑 UT 时加 -Dport=<实际端口>，如果该机器上已经安装了opengauss数据库，也重新安装。
 
 2. 修改配置
 
@@ -209,7 +213,7 @@ openGauss-connector-jdbc中的build.sh是编译过程中的重要脚本工具。
 4. 执行测试用例
 
    ```
-   mvn clean test -Dgpg.skip -Dtest=org.postgresql.**.* -Dproject.build.sourceEncoding=UTF-8 -Dproject.reporting.outputEncoding=UTF-8
+   mvn clean test -Dgpg.skip -Dtest=org.postgresql.test.jdbc4.* -Dproject.build.sourceEncoding=UTF-8 -Dproject.reporting.outputEncoding=UTF-8
    ```
 
 ## JDBC的使用
