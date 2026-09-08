@@ -755,6 +755,9 @@ public class ORResultSet extends PgResultSet {
             datas.add(dataRows.get(currentRow));
         }
         this.dataRows = datas;
+        // Materializing advances currentRow to the end; reset so callers can next() again.
+        this.currentRow = -1;
+        this.totalRows = datas.size();
     }
 
     /**
@@ -763,16 +766,18 @@ public class ORResultSet extends PgResultSet {
      * @return has next
      */
     protected boolean hasNext() {
-        boolean hasNext = false;
         if (currentRow + 1 < totalRows) {
-            hasNext = true;
             currentRow++;
+            // Forward-only memory reclaim: drop the previous row payload.
+            if (currentRow > 0) {
+                dataRows.set(currentRow - 1, null);
+            }
+            return true;
         }
-
-        if (currentRow > 0) {
-            dataRows.set(currentRow - 1, null);
+        if (totalRows > 0) {
+            currentRow = totalRows;
         }
-        return hasNext;
+        return false;
     }
 
     @Override
@@ -1346,7 +1351,9 @@ public class ORResultSet extends PgResultSet {
                     PSQLState.INVALID_CURSOR_STATE);
         }
         checkColumnIndex(column);
-        wasNullFlag = (dataRows.get(currentRow)[column - 1] == null);
+        // Protocol encodes SQL NULL as valueLen=-1 with an empty byte[0] cell (not a Java null).
+        wasNullFlag = dataRows.get(currentRow)[column - 1] == null
+                || (valueLens != null && valueLens.get(currentRow)[column - 1] < 0);
     }
 
     @Override
