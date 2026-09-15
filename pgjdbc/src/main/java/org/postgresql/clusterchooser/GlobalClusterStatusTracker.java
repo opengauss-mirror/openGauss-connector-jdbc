@@ -118,7 +118,9 @@ public class GlobalClusterStatusTracker {
             try {
                 Thread.sleep(intervalWaitHasRefreshedCNList);
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 LOGGER.info("[PRIORITYSERVERS] InterruptedException. This caused by: \"Thread.sleep\", waiting for refreshing master cluster from connection.");
+                break;
             }
         }
         if (block) {
