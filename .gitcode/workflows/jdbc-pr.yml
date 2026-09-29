@@ -1,0 +1,108 @@
+name: openGauss_jdbc_PR
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request_target:
+    branches:
+      - '**'
+  pull_request_comment:
+    types:
+      - created
+    branches:
+      - '**'
+    comments:
+      - '/retest'
+  workflow_dispatch:
+
+permissions:
+  repository: read
+  pr: write
+  note: write
+
+env:
+  JDBC_REPO_URL: https://gitcode.com/opengauss/openGauss-connector-jdbc.git
+  WORKSPACE_ROOT: /var/jenkins_home/workspace
+
+jobs:
+  prepare:
+    name: Mark running
+    runs-on: [self-hosted, jdbc_arm]
+    steps:
+      - name: Mark PR as running
+        if: ${{ atomgit.event.pull_request.number != '' }}
+        uses: cann/.gitcode/actions/pre-pipeline@master
+        with:
+          owner: opengauss
+          repo: openGauss-connector-jdbc
+          pr_number: ${{ atomgit.event.pull_request.number }}
+          token: ${{ secrets.PR_LABEL_TOKEN }}
+          apply_label: 'true'
+          run_url: https://gitcode.com/opengauss/openGauss-connector-jdbc/actions/runs/${{ atomgit.workflow_run_id }}
+
+  jdbc_test:
+    name: openGauss_jdbc_testCase
+    needs: prepare
+    runs-on: [self-hosted, jdbc_arm]
+    timeout-minutes: 120
+    steps:
+      - name: Manual checkout workflow source
+        run: |
+          set -e
+          workspace="$PWD"
+          repo="${ATOMGIT_REPOSITORY:-}"
+          if [ -z "${repo}" ]; then
+            repo="${GITCODE_REPOSITORY:-}"
+          fi
+          if [ -z "${repo}" ] || ! echo "${repo}" | grep -q '/'; then
+            repo="opengauss/openGauss-connector-jdbc"
+          fi
+          server="${ATOMGIT_SERVER_URL:-}"
+          if [ -z "${server}" ]; then
+            server="${GITCODE_SERVER_URL:-}"
+          fi
+          if [ -z "${server}" ]; then
+            server="https://gitcode.com"
+          fi
+          repo_url="${server%/}/${repo}.git"
+          bootstrap_ref="refs/heads/master"
+          echo "Bootstrap GitCode Action scripts from ${repo_url} ${bootstrap_ref}"
+
+          mkdir -p "${workspace}"
+          cd "${workspace}"
+          if [ ! -d .git ]; then
+            git init
+          fi
+          if git remote | grep -qx origin; then
+            git remote set-url origin "${repo_url}"
+          else
+            git remote add origin "${repo_url}"
+          fi
+          git fetch --depth=1 origin "${bootstrap_ref}"
+          git checkout -f FETCH_HEAD
+
+      - name: Run JDBC PR gate
+        run: |
+          source .gitcode/scripts/resolve_gitcode_env.sh
+          bash .gitcode/scripts/jdbc_pr_test.sh
+        env:
+          GITCODE_PR_IID: ${{ atomgit.event.pull_request.number }}
+
+  report_result:
+    name: Query pipeline and label PR
+    if: ${{ always() }}
+    needs:
+      - jdbc_test
+    runs-on: [self-hosted, jdbc_arm]
+    steps:
+      - name: Query pipeline and update PR label
+        if: ${{ atomgit.event.pull_request.number != '' }}
+        uses: cann/.gitcode/actions/query-pipeline@master
+        with:
+          owner: opengauss
+          repo: openGauss-connector-jdbc
+          run_id: ${{ atomgit.workflow_run_id }}
+          token: ${{ secrets.PR_LABEL_TOKEN }}
+          pr_number: ${{ atomgit.event.pull_request.number }}
+          apply_label: 'true'
