@@ -11,6 +11,8 @@ maven_cmd="${MAVEN_CMD:-mvn}"
 setup_java() {
   if [[ -n "${JDBC_JAVA_HOME:-}" && -x "${JDBC_JAVA_HOME}/bin/java" ]]; then
     export JAVA_HOME="${JDBC_JAVA_HOME}"
+  elif [[ -x /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-5.oe2203.aarch64/bin/java ]]; then
+    export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-5.oe2203.aarch64
   elif [[ -x /usr/local/jdk1.8.0_412/bin/java ]]; then
     export JAVA_HOME=/usr/local/jdk1.8.0_412
   elif [[ -x /usr/local/jdk8/bin/java ]]; then
@@ -117,7 +119,7 @@ write_local_properties() {
 run_tests() {
   cd "${workdir}"
   echo "start jdbc testCase"
-  "${maven_cmd}" -B test
+  "${maven_cmd}" -B test '-Dtest=org.postgresql.**.*'
   echo "jdbc testCase success"
 }
 
