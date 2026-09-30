@@ -9,22 +9,12 @@ gauss_env="${GAUSS_ENV_PATH:-/home/jdbc_jenkins/gauss_env}"
 maven_cmd="${MAVEN_CMD:-mvn}"
 
 setup_java() {
-  if [[ -n "${JDBC_JAVA_HOME:-}" && -x "${JDBC_JAVA_HOME}/bin/java" ]]; then
-    export JAVA_HOME="${JDBC_JAVA_HOME}"
-  elif [[ -x /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-5.oe2203.aarch64/bin/java ]]; then
-    export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-5.oe2203.aarch64
-  elif [[ -x /usr/local/jdk1.8.0_412/bin/java ]]; then
-    export JAVA_HOME=/usr/local/jdk1.8.0_412
-  elif [[ -x /usr/local/jdk8/bin/java ]]; then
-    export JAVA_HOME=/usr/local/jdk8
-  elif [[ -x /usr/local/java8/bin/java ]]; then
-    export JAVA_HOME=/usr/local/java8
+  export JAVA_HOME="${JDBC_JAVA_HOME:-/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-5.oe2203.aarch64}"
+  if [[ ! -x "${JAVA_HOME}/bin/java" ]]; then
+    echo "JDK 8 is not available at ${JAVA_HOME}" >&2
+    return 1
   fi
-
-  if [[ -n "${JAVA_HOME:-}" ]]; then
-    export PATH="${JAVA_HOME}/bin:${PATH}"
-  fi
-
+  export PATH="${JAVA_HOME}/bin:${PATH}"
   java -version
 }
 
@@ -48,13 +38,19 @@ restart_cluster() {
     su - "${db_user}" <<EOF
 set -e
 source "${gauss_env}"
-gs_om -t stop
-gs_om -t start
+gs_om -t restart
 EOF
   else
     source "${gauss_env}"
-    gs_om -t stop
-    gs_om -t start
+    gs_om -t restart
+  fi
+}
+
+validate_target_branch() {
+  local branch="${GITCODE_TARGET_BRANCH:-master}"
+  if [[ "${branch}" != "master" && "${branch}" != "6.0.0" ]]; then
+    echo "branch is not master/6.0.0, skip"
+    exit 0
   fi
 }
 
@@ -81,13 +77,11 @@ merge_pull_request() {
   cd "${workdir}"
   git rev-parse --is-inside-work-tree
   git config remote.origin.url "${repo_url}"
-  git config user.email "${GIT_AUTHOR_EMAIL:-gitcode-actions@users.noreply.gitcode.com}"
-  git config user.name "${GIT_AUTHOR_NAME:-gitcode-actions}"
 
   if [[ -n "${GITCODE_PR_IID:-}" ]]; then
-    local pr_head="refs/merge-requests/${GITCODE_PR_IID}/head"
-    git fetch --force --progress origin "${pr_head}:${pr_head}"
-    git merge --no-verify "${pr_head}" --no-edit
+    local merge_ref="${GITCODE_MERGE_REF:-refs/merge-requests/${GITCODE_PR_IID}/merge}"
+    git fetch --tags --force --progress origin "${merge_ref}:${merge_ref}"
+    git checkout -b "${merge_ref}" "${merge_ref}"
   elif [[ -n "${GITCODE_AFTER_COMMIT_SHA:-}" ]]; then
     git fetch --tags --force --progress origin "${GITCODE_AFTER_COMMIT_SHA}"
     git checkout -f "${GITCODE_AFTER_COMMIT_SHA}"
@@ -96,30 +90,33 @@ merge_pull_request() {
   fi
 }
 
-write_local_properties() {
-  local props="${workdir}/build.local.properties"
-  {
-    echo "server=${JDBC_DB_HOST:-localhost}"
-    echo "port=${JDBC_DB_PORT:-5432}"
-    echo "secondaryServer=${JDBC_SECONDARY_DB_HOST:-localhost}"
-    echo "secondaryPort=${JDBC_SECONDARY_DB_PORT:-5433}"
-    echo "secondaryServer2=${JDBC_THIRD_DB_HOST:-localhost}"
-    echo "secondaryServerPort2=${JDBC_THIRD_DB_PORT:-5434}"
-    echo "database=${JDBC_DB_NAME:-jdbc_utf8_a}"
-    echo "database_pg=${JDBC_DB_NAME_PG:-jdbc_utf8_pg}"
-    echo "database_b=${JDBC_DB_NAME_B:-jdbc_utf8_b}"
-    echo "username=${JDBC_DB_USER:-test}"
-    echo "password=${JDBC_DB_PASSWORD:-test123@}"
-    echo "privilegedUser=${JDBC_DB_PRIVILEGED_USER:-postgres}"
-    echo "privilegedPassword=${JDBC_DB_PRIVILEGED_PASSWORD:-}"
-    echo "loggerFile=${JDBC_LOGGER_FILE:-target/pgjdbc-tests.log}"
-  } > "${props}"
+write_build_properties() {
+  if [[ -z "${JDBC_DB_PASSWORD:-}" ]]; then
+    echo "JDBC_DB_PASSWORD is required" >&2
+    return 1
+  fi
+
+  cat > "${workdir}/build.properties" <<EOF
+server=${JDBC_DB_HOST:-localhost}
+port=${JDBC_DB_PORT:-15432}
+secondaryServer=${JDBC_SECONDARY_DB_HOST:-localhost}
+secondaryPort=${JDBC_SECONDARY_DB_PORT:-15432}
+secondaryServer2=${JDBC_THIRD_DB_HOST:-localhost}
+secondaryServerPort2=${JDBC_THIRD_DB_PORT:-15432}
+database=${JDBC_DB_NAME:-target_db_a}
+database_b=${JDBC_DB_NAME_B:-target_db_b}
+database_pg=${JDBC_DB_NAME_PG:-target_db_pg}
+username=${JDBC_DB_USER:-test_case_user}
+password=${JDBC_DB_PASSWORD}
+loggerLevel=OFF
+sslpassword=sslpwd
+EOF
 }
 
 run_tests() {
   cd "${workdir}"
   echo "start jdbc testCase"
-  "${maven_cmd}" -B test '-Dtest=org.postgresql.**.*'
+  "${maven_cmd}" test '-Dtest=org.postgresql.**.*'
   echo "jdbc testCase success"
 }
 
@@ -131,8 +128,9 @@ echo "gitcodeRef: ${GITCODE_MERGE_REF:-}"
 git config --global core.compression 0
 setup_java
 drop_caches
+validate_target_branch
 restart_cluster
 clone_with_retry
 merge_pull_request
-write_local_properties
+write_build_properties
 run_tests
