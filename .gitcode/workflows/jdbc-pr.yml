@@ -88,6 +88,7 @@ jobs:
           bash .gitcode/scripts/jdbc_pr_test.sh
         env:
           GITCODE_PR_IID: ${{ atomgit.event.pull_request.number }}
+          JDBC_DB_PASSWORD: ${{ secrets.JDBC_DB_PASSWORD }}
 
   report_result:
     name: Query pipeline and label PR
