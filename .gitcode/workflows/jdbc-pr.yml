@@ -94,7 +94,7 @@ post:
   jobs:
     report_result:
       name: Report pipeline result
-      runs-on: [self-hosted, plugin_1]
+      runs-on: [self-hosted, opengauss-jdbc]
       steps:
         - name: Set result label
           uses: openlibing/pr-label-action@v1.0.0
