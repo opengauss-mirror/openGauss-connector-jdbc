@@ -90,20 +90,15 @@ jobs:
           GITCODE_PR_IID: ${{ atomgit.event.pull_request.number }}
           JDBC_DB_PASSWORD: ${{ secrets.JDBC_DB_PASSWORD }}
 
-  report_result:
-    name: Query pipeline and label PR
-    if: ${{ always() }}
-    needs:
-      - jdbc_test
-    runs-on: [self-hosted, jdbc_arm]
-    steps:
-      - name: Query pipeline and update PR label
-        if: ${{ atomgit.event.pull_request.number != '' }}
-        uses: cann/.gitcode/actions/query-pipeline@master
-        with:
-          owner: opengauss
-          repo: openGauss-connector-jdbc
-          run_id: ${{ atomgit.workflow_run_id }}
-          token: ${{ secrets.PR_LABEL_TOKEN }}
-          pr_number: ${{ atomgit.event.pull_request.number }}
-          apply_label: 'true'
+post:
+  jobs:
+    report_result:
+      name: Report pipeline result
+      runs-on: [self-hosted, plugin_1]
+      steps:
+        - name: Set result label
+          uses: openlibing/pr-label-action@v1.0.0
+          with:
+            add_labels: ${{ pipeline.upstream_status == 'COMPLETED' && 'ci-pipeline-success' || 'ci-pipeline-failed' }}
+            remove_labels: ci-pipeline-running
+            token: ${{secrets.PR_LABEL_TOKEN}}
