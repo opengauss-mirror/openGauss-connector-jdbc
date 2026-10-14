@@ -94,7 +94,7 @@ post:
   jobs:
     report_result:
       name: Report pipeline result
-      runs-on: [self-hosted, opengauss-jdbc]
+      runs-on: [self-hosted, jdbc_arm]
       steps:
         - name: Set result label
           uses: openlibing/pr-label-action@v1.0.0
