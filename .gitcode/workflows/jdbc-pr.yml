@@ -13,7 +13,11 @@ on:
     branches:
       - '**'
     comments:
-      - '/retest'
+      - '^\s*/retest\s*$'
+  pr_comment:
+    types:
+      - created
+    keyword: '^\s*/retest\s*$'
   workflow_dispatch:
 
 permissions:
