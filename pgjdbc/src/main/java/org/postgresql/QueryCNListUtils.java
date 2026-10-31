@@ -52,7 +52,9 @@ public class QueryCNListUtils {
             try {
                 Thread.sleep(intervalWaitHasRefreshedCNList);
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 LOGGER.info("InterruptedException. This caused by: \"Thread.sleep\", waiting for refreshing CN List from connection.");
+                break;
             }
         }
         if(block){
