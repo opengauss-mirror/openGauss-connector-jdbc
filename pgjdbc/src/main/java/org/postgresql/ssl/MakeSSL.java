@@ -86,19 +86,18 @@ public class MakeSSL extends ObjectFactory {
 
   private static void verifyPeerName(PGStream stream, Properties info, SSLSocket newConnection)
       throws PSQLException {
-    HostnameVerifier hvn;
     String sslhostnameverifier = PGProperty.SSL_HOSTNAME_VERIFIER.get(info);
+    HostnameVerifier hvn = PGjdbcHostnameVerifier.INSTANCE;
     if (sslhostnameverifier == null) {
-      hvn = PGjdbcHostnameVerifier.INSTANCE;
       sslhostnameverifier = "PgjdbcHostnameVerifier";
     } else {
-      try {
-        hvn = instantiate(HostnameVerifier.class, sslhostnameverifier, info, false, null);
-      } catch (Exception e) {
+      // Only the built-in verifier is accepted. Loading an externally named class here would
+      // execute its static initializer and constructor inside the application JVM.
+      if (!PGjdbcHostnameVerifier.class.getName().equals(sslhostnameverifier)) {
         throw new PSQLException(
             GT.tr("The HostnameVerifier class provided {0} could not be instantiated.",
                 sslhostnameverifier),
-            PSQLState.CONNECTION_FAILURE, e);
+            PSQLState.CONNECTION_FAILURE);
       }
     }
 
