@@ -189,8 +189,13 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     this.protocolVerion = (protocolProp != null && !protocolProp.isEmpty()) ? Integer.parseInt(protocolProp) : PROTOCOL_VERSION_351;
     sendStartupPacket(newStream, paramList);
 
-    // Do authentication (until AuthenticationOk).
-    doAuthentication(newStream, hostSpec.getHost(), user, info);
+    try {
+        // Do authentication (until AuthenticationOk).
+        doAuthentication(newStream, hostSpec.getHost(), user, info);
+    } catch (SQLException | IOException e) {
+        closeStream(newStream);
+        throw e;
+    }
     setSocketTimeout(newStream, info, PGProperty.SOCKET_TIMEOUT);
 
     return newStream;
